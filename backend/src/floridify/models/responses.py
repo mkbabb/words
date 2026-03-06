@@ -92,6 +92,10 @@ class LookupResponse(BaseResponse):
     """
 
     word: str = Field(..., description="The word that was looked up")
+    languages: list[Language] = Field(
+        ...,
+        description="Language precedence list (primary first)",
+    )
     id: str | None = Field(None, description="Entry ID")
     last_updated: datetime | None = Field(None, description="Last update time")
     model_info: dict[str, Any] | None = Field(

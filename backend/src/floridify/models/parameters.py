@@ -14,16 +14,12 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 from .base import Language
 from .dictionary import DictionaryProvider
-
-if TYPE_CHECKING:
-    pass
-
 
 class LookupParams(BaseModel):
     """Shared parameters for word lookup operations.
@@ -131,6 +127,10 @@ class SearchParams(BaseModel):
     corpus_name: str | None = Field(
         default=None,
         description="Specific corpus name to search (optional)",
+    )
+    semantic: bool = Field(
+        default=True,
+        description="Enable semantic search",
     )
 
     @field_validator("languages", mode="before")

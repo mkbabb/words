@@ -55,7 +55,8 @@ class Word(Document, BaseMetadata):
     text: str = Field(min_length=1, max_length=200)
     normalized: str = ""  # Will be auto-populated
     lemma: str = ""  # Will be auto-populated
-    language: Language = Language.ENGLISH
+    languages: list[Language] = Field(default_factory=lambda: [Language.ENGLISH], min_length=1)
+    corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
 
     # Word forms and variations
     homograph_number: int | None = None  # For identical spellings
@@ -74,7 +75,8 @@ class Word(Document, BaseMetadata):
     class Settings:
         name = "words"
         indexes = [
-            [("text", 1), ("language", 1)],
+            [("text", 1), ("languages", 1)],
+            "corpus_ids",
             "normalized",
             "lemma",
             [("text", 1), ("homograph_number", 1)],
@@ -86,6 +88,7 @@ class Pronunciation(Document, BaseMetadata):
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
+    # TODO[MEDIUM]: Remove empty-string compatibility default and require explicit IPA/null semantics.
     ipa: str = ""  # American IPA - default to empty string for backwards compatibility
     audio_file_ids: list[
         PydanticObjectId
@@ -219,7 +222,7 @@ class DictionaryEntry(Document, BaseMetadata):
 
     # Provider information
     provider: DictionaryProvider
-    language: Language = Language.ENGLISH
+    languages: list[Language] = Field(default_factory=lambda: [Language.ENGLISH], min_length=1)
 
     # Etymology and raw data
     etymology: Etymology | None = None
@@ -233,7 +236,7 @@ class DictionaryEntry(Document, BaseMetadata):
         indexes = [
             "word_id",  # FK lookup
             "provider",  # Provider filtering
-            "language",  # Language filtering
+            "languages",  # Language filtering
             [("word_id", 1), ("provider", 1)],  # Combined lookup
         ]
 

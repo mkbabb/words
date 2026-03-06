@@ -66,6 +66,7 @@ class AccessTrackingMixin(BaseModel):
         try:
             self.mark_updated()
         except AttributeError:
+            # TODO[HIGH]: Remove silent mixin fallback and enforce a typed `mark_updated` contract.
             pass  # Method not available
 
 

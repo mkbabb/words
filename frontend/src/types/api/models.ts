@@ -44,7 +44,7 @@ export interface Word extends BaseMetadata {
     id: string;
     text: string;
     normalized: string;
-    language: Language;
+    languages: Language[];
     homograph_number?: number;
     offensive_flag: boolean;
     first_known_use?: string;
@@ -199,7 +199,7 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
     id: string;
     word_id: string;
     word: string; // The word text (populated in responses)
-    language?: string; // ISO language code: "en", "fr", "es", etc.
+    languages: string[]; // Language precedence list (primary first)
     pronunciation_id?: string;
     pronunciation?: Pronunciation; // Populated in responses
     definition_ids: string[];

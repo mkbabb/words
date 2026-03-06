@@ -54,6 +54,7 @@ export interface ErrorResponse {
 // Dictionary Entry Response Types
 export interface DictionaryEntryResponse {
     word: string;
+    languages: Language[];
     pronunciation?: {
         phonetic: string;
         ipa: string;
@@ -87,7 +88,7 @@ export interface SearchResponse {
     query: string;
     results: SearchResult[];
     total_found: number;
-    language: Language;
+    languages: Language[];
 }
 
 // Streaming Progress Types
