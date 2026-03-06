@@ -33,9 +33,12 @@
       <!-- Mobile Sidebar Content -->
       <div
         :class="cn(
-          'bg-background/[0.98] border-border pointer-events-auto fixed top-0 left-0 z-50 flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl backdrop-blur-sm transition-transform duration-400 ease-apple-smooth',
+          'bg-background/[0.98] border-border pointer-events-auto fixed top-0 left-0 z-[61] flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl backdrop-blur-sm transition-transform duration-400 ease-apple-smooth',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
+        @touchstart.passive="onTouchStart"
+        @touchmove.passive="onTouchMove"
+        @touchend.passive="onTouchEnd"
       >
         <SidebarHeader :collapsed="false" :mobile="true" />
         <SidebarContent :collapsed="false" :mobile="true" />
@@ -46,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { cn } from '@/utils';
 import SidebarHeader from './sidebar/SidebarHeader.vue';
@@ -57,5 +60,32 @@ const ui = useUIStore();
 // CRITICAL: Use computed() to preserve reactivity from readonly refs
 const sidebarOpen = computed(() => ui.sidebarOpen);
 const sidebarCollapsed = computed(() => ui.sidebarCollapsed);
+
+// Swipe-to-close gesture for mobile sidebar
+const touchStartX = ref(0);
+const touchCurrentX = ref(0);
+const isSwiping = ref(false);
+const SWIPE_THRESHOLD = 50;
+
+const onTouchStart = (e: TouchEvent) => {
+    touchStartX.value = e.touches[0].clientX;
+    touchCurrentX.value = touchStartX.value;
+    isSwiping.value = true;
+};
+
+const onTouchMove = (e: TouchEvent) => {
+    if (!isSwiping.value) return;
+    touchCurrentX.value = e.touches[0].clientX;
+};
+
+const onTouchEnd = () => {
+    if (!isSwiping.value) return;
+    const deltaX = touchStartX.value - touchCurrentX.value;
+    // Swipe left to close
+    if (deltaX > SWIPE_THRESHOLD && sidebarOpen.value) {
+        ui.toggleSidebar();
+    }
+    isSwiping.value = false;
+};
 </script>
 

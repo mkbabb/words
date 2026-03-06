@@ -141,6 +141,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { FileText, Plus, Upload } from 'lucide-vue-next';
@@ -157,6 +158,9 @@ import { logger } from '@/utils/logger';
 const searchBarStore = useSearchBarStore();
 const wordlistMode = useWordlistMode();
 const { toast } = useToast();
+
+// Access UI store for sidebar control
+const { ui } = useStores();
 
 // Component state
 const fileInput = ref<HTMLInputElement>();
@@ -322,6 +326,11 @@ const handleWordlistSelect = async (wordlist: WordList) => {
     wordlistMode.setWordlist(wordlist.id);
     // ✅ Use simple mode system - just change the mode
     searchBarStore.setMode('wordlist');
+
+    // Close mobile sidebar if open (match SidebarLookupView pattern)
+    if (ui.sidebarOpen) {
+        ui.toggleSidebar();
+    }
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
@@ -421,6 +430,11 @@ const handleWordlistCreated = async (wordlist: WordList) => {
     wordlistMode.setWordlist(wordlist.id);
     // ✅ Use simple mode system - just change the mode
     searchBarStore.setMode('wordlist');
+
+    // Close mobile sidebar if open
+    if (ui.sidebarOpen) {
+        ui.toggleSidebar();
+    }
 };
 
 // Lifecycle
