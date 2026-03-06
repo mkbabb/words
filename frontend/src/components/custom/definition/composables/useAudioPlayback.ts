@@ -25,6 +25,13 @@ export function useAudioPlayback(
     cachedUrl = null;
   }
 
+  function matchesRequestedLanguage(file: AudioFile, requestedLanguage: string): boolean {
+    if (requestedLanguage === 'en') {
+      return !file.accent || file.accent === 'en' || file.accent === 'american' || file.accent === 'british';
+    }
+    return file.accent === requestedLanguage;
+  }
+
   async function resolveAudioUrl(): Promise<string> {
     // If we already have a cached URL for this word, reuse it
     if (cachedUrl) return cachedUrl;
@@ -33,8 +40,10 @@ export function useAudioPlayback(
     if (!triedExistingFiles) {
       const files = audioFiles.value;
       if (files && files.length > 0) {
-        const file = files[0];
-        if (file.url) {
+        const file = files.find((candidate) =>
+          matchesRequestedLanguage(candidate, language.value)
+        );
+        if (file?.url) {
           triedExistingFiles = true;
           cachedUrl = audioApi.getAudioContentUrl(file.url);
           return cachedUrl;

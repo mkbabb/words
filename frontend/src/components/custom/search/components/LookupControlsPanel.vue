@@ -101,6 +101,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useStores } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
@@ -132,13 +133,13 @@ defineEmits<{
 }>();
 
 const { lookupMode } = useStores();
+const { semanticStatus } = storeToRefs(lookupMode);
 const currentSearchMode = computed(() => {
     const mode = lookupMode.searchMode;
     return Array.isArray(mode) ? mode[0] || 'smart' : mode;
 });
 
 // Semantic status computeds
-const semanticStatus = computed(() => lookupMode.semanticStatus);
 const semanticAvailable = computed(() => semanticStatus.value?.ready === true);
 const semanticUnavailable = computed(() => !semanticAvailable.value && semanticStatus.value !== null);
 
@@ -187,9 +188,14 @@ const toggleSource = (sourceId: string) => {
 const toggleLanguage = (languageCode: string) => {
     const index = selectedLanguages.value.indexOf(languageCode);
     if (index > -1) {
-        selectedLanguages.value.splice(index, 1);
+        selectedLanguages.value = selectedLanguages.value.filter(
+            (value) => value !== languageCode
+        );
     } else {
-        selectedLanguages.value.push(languageCode);
+        selectedLanguages.value = [
+            languageCode,
+            ...selectedLanguages.value.filter((value) => value !== languageCode),
+        ];
     }
 };
 

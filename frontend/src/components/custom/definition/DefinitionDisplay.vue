@@ -76,14 +76,15 @@
 
             <!-- Progressive Header with Smart Skeletons -->
             <WordHeader
-                v-if="entry.word"
+                v-if="entry.word && entry.languages?.length"
                 :word="entry.word"
-                :language="entry.language || 'en'"
+                :languages="entry.languages"
                 :pronunciation="entry.pronunciation"
                 :pronunciationMode="lookupMode.pronunciationMode"
                 :providers="usedProviders"
                 :isAISynthesized="!!entry.model_info"
                 :activeSource="activeSourceTab"
+                :sourceSelectionDisabled="sourceSelectionDisabled"
                 @toggle-pronunciation="lookupMode.togglePronunciation"
                 @select-source="activeSourceTab = $event"
             />
@@ -109,6 +110,7 @@
                 v-model="activeSourceTab"
                 :word="entry?.word || ''"
                 :available-providers="usedProviders"
+                :show-synthesis="!!entry?.model_info"
             >
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
@@ -359,6 +361,10 @@ const entry = computed(() => {
             pronunciation:
                 contentStore.partialEntry.pronunciation ||
                 contentStore.currentEntry?.pronunciation,
+            languages:
+                contentStore.partialEntry.languages ||
+                contentStore.currentEntry?.languages ||
+                [],
             etymology:
                 contentStore.partialEntry.etymology ||
                 contentStore.currentEntry?.etymology,
@@ -451,20 +457,49 @@ const { allImages, handleImageClick, handleImageError } =
     useImageManagement(entry);
 const actions = useDefinitionActions({ entry, editModeEnabled });
 
-// Default source tab: premium/admin → synthesis (if available), free → first provider
+const hasAISynthesis = computed(() => !!entry.value?.model_info);
+const selectableSources = computed(() => {
+    const sources: string[] = [];
+    if (hasAISynthesis.value) {
+        sources.push('synthesis');
+    }
+    sources.push(...usedProviders.value);
+    return sources;
+});
+
+const sourceSelectionDisabled = computed(() => {
+    return selectableSources.value.length <= 1;
+});
+
+// Keep source selection valid and auto-lock when only one source exists
 watch(
-    () => entry.value?.word,
+    () => [
+        entry.value?.word,
+        selectableSources.value.join('|'),
+        effectivelyPremium.value,
+    ],
     () => {
-        if (!entry.value) return;
-        const hasAISynthesis = !!entry.value.model_info;
-        if (hasAISynthesis && effectivelyPremium.value) {
+        const sources = selectableSources.value;
+        if (sources.length === 0) {
             activeSourceTab.value = 'synthesis';
-        } else if (usedProviders.value.length > 0) {
-            activeSourceTab.value = usedProviders.value[0];
-        } else {
+            return;
+        }
+
+        if (sources.length === 1) {
+            activeSourceTab.value = sources[0];
+            return;
+        }
+
+        if (hasAISynthesis.value && effectivelyPremium.value) {
             activeSourceTab.value = 'synthesis';
+            return;
+        }
+
+        if (!sources.includes(activeSourceTab.value)) {
+            activeSourceTab.value = sources[0];
         }
     },
+    { immediate: true },
 );
 
 // Version rollback handler: re-fetch the word after rollback

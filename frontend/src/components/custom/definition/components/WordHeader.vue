@@ -19,6 +19,13 @@
                 </div>
             </div>
 
+            <span
+                v-if="primaryLanguage && primaryLanguage !== 'en'"
+                class="ml-2 inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground"
+            >
+                {{ languageLabel }}
+            </span>
+
             <!-- Plus button flows after invisible text -->
             <HoverCard>
                 <HoverCardTrigger as-child>
@@ -75,6 +82,7 @@
                 :providers="providers"
                 :active-source="activeSource"
                 :show-synthesis="isAISynthesized"
+                :interactive="!sourceSelectionDisabled"
                 @select-source="$emit('select-source', $event)"
             />
         </div>
@@ -104,10 +112,11 @@ import AddToWordlistModal from './AddToWordlistModal.vue';
 import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
 import type { AudioFile } from '@/types/api';
+import { LanguageNames } from '@/stores/types/constants';
 
 interface WordHeaderProps {
     word: string;
-    language?: string;
+    languages: string[];
     pronunciation?: {
         phonetic: string;
         ipa: string;
@@ -117,6 +126,7 @@ interface WordHeaderProps {
     providers: string[];
     isAISynthesized?: boolean;
     activeSource?: string;
+    sourceSelectionDisabled?: boolean;
 }
 
 const props = defineProps<WordHeaderProps>();
@@ -134,10 +144,21 @@ const handleWordAdded = (_wordlistName: string) => {
     showAddToWordlistModal.value = false;
 };
 
+const primaryLanguage = computed(() => {
+    return props.languages[0];
+});
+
+const languageLabel = computed(() => {
+    if (!primaryLanguage.value) return '';
+    const mapped =
+        LanguageNames[primaryLanguage.value as keyof typeof LanguageNames];
+    return mapped ?? primaryLanguage.value.toUpperCase();
+});
+
 // Audio playback
 const wordRef = toRef(props, 'word');
 const audioFilesRef = computed(() => props.pronunciation?.audio_files);
-const languageRef = toRef(() => props.language ?? 'en');
+const languageRef = toRef(() => primaryLanguage.value);
 const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef, languageRef);
 
 // Check if we have valid pronunciation data
@@ -186,4 +207,3 @@ const currentPronunciation = computed(() => {
     return '';
 });
 </script>
-

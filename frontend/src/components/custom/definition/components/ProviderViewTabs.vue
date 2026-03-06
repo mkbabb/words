@@ -7,7 +7,7 @@
     <!-- No TabsList — source switching is controlled by ProviderIcons in WordHeader -->
 
     <!-- AI Synthesis content (default slot) -->
-    <TabsContent value="synthesis" class="mt-0">
+    <TabsContent v-if="showSynthesis" value="synthesis" class="mt-0">
       <slot />
     </TabsContent>
 
@@ -45,10 +45,12 @@ interface Props {
   modelValue: string;
   word: string;
   availableProviders?: string[];
+  showSynthesis?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   availableProviders: () => [],
+  showSynthesis: true,
 });
 
 const emit = defineEmits<{
@@ -84,8 +86,29 @@ watch(() => props.modelValue, (tab) => {
 watch(() => props.word, () => {
   loaded.value = false;
   providers.value = [];
-  emit('update:modelValue', 'synthesis');
+  if (props.showSynthesis) {
+    emit('update:modelValue', 'synthesis');
+    return;
+  }
+
+  if (props.availableProviders.length > 0) {
+    emit('update:modelValue', props.availableProviders[0]);
+  }
 });
+
+watch(
+  () => [props.availableProviders, props.showSynthesis, props.modelValue] as const,
+  ([availableProviders, showSynthesis, activeTab]) => {
+    const validTabs = showSynthesis
+      ? ['synthesis', ...availableProviders]
+      : [...availableProviders];
+
+    if (validTabs.length === 0) return;
+    if (validTabs.includes(activeTab)) return;
+    emit('update:modelValue', validTabs[0]);
+  },
+  { immediate: true },
+);
 
 // Pre-load on mount
 onMounted(loadProviders);

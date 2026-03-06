@@ -13,8 +13,13 @@ export function useProviders(
             // Check providers_data array for each definition
             if (def.providers_data && Array.isArray(def.providers_data)) {
                 def.providers_data.forEach((providerData: any) => {
-                    if (providerData.provider) {
-                        providers.add(providerData.provider);
+                    const provider = providerData.provider;
+                    if (
+                        typeof provider === 'string' &&
+                        provider.length > 0 &&
+                        provider !== 'synthesis'
+                    ) {
+                        providers.add(provider);
                     }
                 });
             }
