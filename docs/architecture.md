@@ -174,7 +174,7 @@ Single MongoDB database via Motor (async driver) + Beanie ODM. Connection pool: 
 
 Collections: `words`, `definitions`, `dictionary_entries`, `pronunciations`, `examples`, `facts`, `word_relationships`, `search_indices`, `trie_indices`, `semantic_indices`, `word_lists`, `corpora`, `language_corpora`, `literature_corpora`, plus versioned data and cache collections.
 
-Auto-detects localhost connections to skip TLS (development). Production uses DocumentDB with TLS certificate.
+Runtime and development both target hosted MongoDB (`mbabb.friday.institute`) with explicit TLS policy.
 
 ## Anki Export (`anki/`)
 
@@ -182,7 +182,7 @@ Auto-detects localhost connections to skip TLS (development). Production uses Do
 
 ## Configuration
 
-API keys and database URLs live in `auth/config.toml` (not in git). The `Config` singleton (`utils/config.py`) loads it once. Environment-specific database URLs (`development_url`, `production_url`) selected by `ENVIRONMENT` env var.
+API keys and database URLs live in `auth/config.toml` (not in git). The `Config` singleton (`utils/config.py`) loads it once. Database config is strict: `runtime_url`, `test_url`, and `runtime_tls_required`.
 
 AI config is code-level: model selection in `ai/model_selection.py`, temperature routing in `get_temperature_for_model()`. No config file for model parameters—it's all in the `TASK_COMPLEXITY_MAP` and `COMPLEXITY_TO_MODEL` dicts.
 

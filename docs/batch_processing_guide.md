@@ -160,8 +160,8 @@ docker run -d \\
 # Required
 export OPENAI_API_KEY="sk-..."
 
-# Optional MongoDB (defaults to localhost:27017)
-export MONGODB_URL="mongodb://localhost:27017"
+# Optional MongoDB (defaults to hosted remote MongoDB)
+export MONGODB_URL="mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
 export MONGODB_DATABASE="floridify"
 
 # Optional cache directory
@@ -437,7 +437,7 @@ docker run -d \\
     -v $(pwd)/cache:/app/cache \\
     -v $(pwd)/batch_output:/app/batch_output \\
     -e OPENAI_API_KEY=sk-your-key \\
-    -e MONGODB_URL=mongodb://host.docker.internal:27017 \\
+    -e MONGODB_URL=mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true \\
     floridify-batch \\
     --frequency daily --run-time "02:00" --max-cost 50.0
 
@@ -497,7 +497,7 @@ echo $OPENAI_API_KEY | cut -c1-10  # Should show 'sk-proj-...'
 # Check MongoDB connection
 uv run python -c "
 from pymongo import MongoClient
-client = MongoClient('mongodb://localhost:27017')
+client = MongoClient('mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true')
 print('MongoDB ping:', client.admin.command('ping'))
 "
 ```

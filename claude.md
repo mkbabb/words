@@ -2,7 +2,7 @@
 
 AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. MongoDB storage, OpenAI GPT-5 synthesis, FAISS semantic search.
 
-**Production**: https://mbabb.fi.ncsu.edu/words/
+**Production**: https://mbabb.friday.institute/words/
 
 ## Project Structure
 
@@ -90,7 +90,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 **Search**: marisa-trie (exact), RapidFuzz (fuzzy), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
 **Frontend**: Vue ^3.5, TypeScript ^5.9, Pinia ^3.0, shadcn/ui (Reka UI), Tailwind CSS ^4.2, Vite ^7.3
-**Infra**: Docker multi-stage, self-hosted (mbabb.fridayinstitute.net:1022, behind VPN), MongoDB, nginx
+**Infra**: Docker multi-stage, self-hosted (mbabb.friday.institute:1022, behind VPN), MongoDB, nginx
 
 ## Key Pipelines
 
@@ -136,8 +136,9 @@ model = "gpt-5"
 model = "Qwen/Qwen3-Embedding-0.6B"
 
 [database]
-development_url = "mongodb://localhost:27017/..."
-production_url = "mongodb://..."
+runtime_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
+test_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/test_floridify?tls=true"
+runtime_tls_required = true
 ```
 
 ## Development
@@ -173,9 +174,9 @@ prettier --write .               # Format
 
 ```bash
 ./scripts/deploy                 # SSH to server, sync secrets, build, deploy
-# Server: mbabb@mbabb.fridayinstitute.net -p 1022 (behind VPN)
+# Server: mbabb@mbabb.friday.institute -p 1022 (behind VPN)
 # No CI/CD — deploy manually
-# URL: https://mbabb.fi.ncsu.edu/words/
+# URL: https://mbabb.friday.institute/words/
 ```
 
 ## macOS Note

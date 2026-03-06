@@ -109,19 +109,19 @@ Create production `.env` files:
 ```bash
 # backend/.env.production
 ENVIRONMENT=production
-BACKEND_CORS_ORIGINS=["https://floridify.com"]
+BACKEND_CORS_ORIGINS=["https://mbabb.friday.institute"]
 
 # frontend/.env.production
-VITE_API_URL=https://api.floridify.com
+VITE_API_URL=https://mbabb.friday.institute/words/api/v1
 VITE_VAPID_PUBLIC_KEY=your_production_public_key
 
 # notification-server/.env.production
 NODE_ENV=production
 VAPID_PUBLIC_KEY=your_production_public_key
 VAPID_PRIVATE_KEY=your_production_private_key
-MONGO_URI=mongodb://production-mongo:27017
-API_URL=http://backend:8000
-CORS_ORIGINS=https://floridify.com
+MONGO_URI=mongodb://username:password@mbabb.friday.institute:27017/floridify?retryWrites=true&tls=true
+API_URL=https://mbabb.friday.institute/words/api/v1
+CORS_ORIGINS=https://mbabb.friday.institute
 ```
 
 ### 2. Build and Deploy

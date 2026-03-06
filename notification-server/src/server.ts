@@ -15,7 +15,7 @@ dotenv.config();
 // Configuration
 const config = {
   port: process.env.PORT || 3001,
-  mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017',
+  mongoUri: process.env.MONGO_URI,
   dbName: process.env.DB_NAME || 'floridify',
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY!,
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY!,
@@ -27,6 +27,10 @@ const config = {
 // Validate required environment variables
 if (!config.vapidPublicKey || !config.vapidPrivateKey) {
   console.error('VAPID keys are required. Run npm run generate-vapid-keys to generate them.');
+  process.exit(1);
+}
+if (!config.mongoUri) {
+  console.error('MONGO_URI is required and must point to the remote MongoDB cluster.');
   process.exit(1);
 }
 
@@ -64,7 +68,7 @@ let mongoClient: MongoClient;
 
 async function connectToDatabase() {
   try {
-    mongoClient = new MongoClient(config.mongoUri);
+    mongoClient = new MongoClient(config.mongoUri!);
     await mongoClient.connect();
     db = mongoClient.db(config.dbName);
     console.log('Connected to MongoDB');

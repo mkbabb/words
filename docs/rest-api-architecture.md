@@ -165,7 +165,7 @@ const debouncedSearch = debounce(async (query) => {
 
 ### Configuration
 ```bash
-MONGODB_URL=mongodb://localhost:27017
+MONGODB_URL=mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true
 DATABASE_NAME=floridify
 API_HOST=0.0.0.0
 API_PORT=8000

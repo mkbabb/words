@@ -18,7 +18,7 @@ VAPID_PRIVATE_KEY=${vapidKeys.privateKey}
 VAPID_SUBJECT=mailto:notifications@floridify.com
 
 # MongoDB Configuration
-MONGO_URI=mongodb://localhost:27017
+MONGO_URI=mongodb://username:password@mbabb.friday.institute:27017/floridify?retryWrites=true&tls=true
 DB_NAME=floridify
 
 # Server Configuration

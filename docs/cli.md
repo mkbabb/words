@@ -145,7 +145,7 @@ uv run ./scripts/floridify database stats --connection-string mongodb://user:pas
 **Test MongoDB connection**
 
 ```bash
-uv run ./scripts/floridify database connect                  # Default localhost:27017
+uv run ./scripts/floridify database connect                  # Default mbabb.friday.institute:27017
 uv run ./scripts/floridify database connect --host remote.mongo.com --port 27017
 ```
 

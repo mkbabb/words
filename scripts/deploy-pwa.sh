@@ -18,7 +18,7 @@ if [ -z "$VAPID_PUBLIC_KEY" ] || [ -z "$VAPID_PRIVATE_KEY" ]; then
 fi
 
 # Configuration
-DEPLOY_HOST="${DEPLOY_HOST:-mbabb.fridayinstitute.net}"
+DEPLOY_HOST="${DEPLOY_HOST:-mbabb.friday.institute}"
 DEPLOY_PORT="${DEPLOY_PORT:-1022}"
 DEPLOY_USER="${DEPLOY_USER:-mbabb}"
 

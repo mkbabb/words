@@ -2,7 +2,7 @@
 
 AI-enhanced dictionary and word-collecting tool. Fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage.
 
-[mbabb.fi.ncsu.edu/words/](https://mbabb.fi.ncsu.edu/words/)
+[mbabb.friday.institute/words/](https://mbabb.friday.institute/words/)
 
 ## Quick Start
 
@@ -67,7 +67,7 @@ GET  /api/v1/wordlist/{id}/due          # due words for review
 **Search**: marisa-trie, RapidFuzz, FAISS HNSW, Bloom filter
 **Cache**: OrderedDict LRU, DiskCache + ZSTD, MongoDB versioned (SHA-256)
 **Frontend**: Vue 3.5, TypeScript 5.9 strict, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4.2, Vite 7.3
-**Infra**: Docker multi-stage, self-hosted (mbabb.fridayinstitute.net:1022, behind VPN), nginx
+**Infra**: Docker multi-stage, self-hosted (mbabb.friday.institute:1022, behind VPN), nginx
 
 ## Development
 
@@ -105,7 +105,9 @@ model = "gpt-5"
 model = "Qwen/Qwen3-Embedding-0.6B"
 
 [database]
-development_url = "mongodb://localhost:27018/..."
+runtime_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
+test_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/test_floridify?tls=true"
+runtime_tls_required = true
 ```
 
 ## Deployment
@@ -114,7 +116,7 @@ development_url = "mongodb://localhost:27018/..."
 ./scripts/deploy    # SSH to server, sync secrets, build, deploy, health check
 ```
 
-Server: `mbabb@mbabb.fridayinstitute.net -p 1022` (behind VPN). No CI/CD — deploy manually.
+Server: `mbabb@mbabb.friday.institute -p 1022` (behind VPN). No CI/CD — deploy manually.
 
 ## Why
 
@@ -124,4 +126,4 @@ Architecture docs, module guides, and technical references live in [`CLAUDE.md`]
 
 ---
 
-**License**: MIT | **Author**: Mike Babb (mike@babb.dev) | **Production**: [mbabb.fi.ncsu.edu/words/](https://mbabb.fi.ncsu.edu/words/)
+**License**: MIT | **Author**: Mike Babb (mike@babb.dev) | **Production**: [mbabb.friday.institute/words/](https://mbabb.friday.institute/words/)
