@@ -100,6 +100,7 @@ async def list_examples(
         item = example.model_dump()
         if fields.include or fields.exclude:
             # Apply field filtering if needed
+            # TODO[MEDIUM]: Implement explicit field-selection handling; remove silent no-op branch.
             pass
         items.append(item)
 

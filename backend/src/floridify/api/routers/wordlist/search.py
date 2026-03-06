@@ -59,6 +59,7 @@ async def search_wordlist_words(
     # Extract items and total from search response
     # Serialize SearchResult objects to dicts for the response model
     all_items = [
+        # TODO[HIGH]: Remove hasattr polymorphism and standardize SearchResponse result serialization.
         r.model_dump(mode="json") if hasattr(r, "model_dump") else r
         for r in search_response.results
     ]

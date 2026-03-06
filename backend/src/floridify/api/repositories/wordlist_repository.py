@@ -244,7 +244,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Bulk lookup existing words
         existing_words = await Word.find(
-            {"normalized": {"$in": unique_normalized}, "language": Language.ENGLISH},
+            {"normalized": {"$in": unique_normalized}, "languages": Language.ENGLISH.value},
         ).to_list()
 
         # Create a map of normalized text to word ObjectId
@@ -256,7 +256,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Bulk create missing words if any
         if missing_normalized:
             new_words = [
-                Word(text=normalized_map[norm], language=Language.ENGLISH)
+                Word(text=normalized_map[norm], languages=[Language.ENGLISH])
                 for norm in missing_normalized
             ]
 

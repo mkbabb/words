@@ -221,6 +221,7 @@ def get_client_key(request: Request) -> str:
     try:
         return f"user:{request.state.user_id}"
     except AttributeError:
+        # TODO[HIGH]: Remove auth-state fallthrough and require typed identity context before rate limiting.
         pass  # Fall through to IP-based identification
 
     # Fall back to IP address with proper CIDR validation
@@ -433,6 +434,7 @@ class SpendingTracker:
             loop = asyncio.get_running_loop()
             self._flush_task = loop.create_task(self._debounced_flush())
         except RuntimeError:
+            # TODO[MEDIUM]: Replace silent flush skip with explicit startup-time invariant for running loop.
             pass
 
     async def _debounced_flush(self) -> None:

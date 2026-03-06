@@ -18,6 +18,12 @@ from ...caching.models import CacheNamespace
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
+from ...models.dictionary import (
+    Definition as DefModel,
+    DictionaryEntry as DictEntry,
+    DictionaryProvider,
+    Word as WordModel,
+)
 from ...models.parameters import LookupParams
 from ...storage.mongodb import get_synthesized_entry
 from ...models.user import UserRole
@@ -39,7 +45,7 @@ class DictionaryEntryResponse(BaseModel):
 
     # Entry metadata
     word: str = Field(..., description="The word that was looked up")
-    language: str = Field("en", description="ISO language code (en, fr, es, de, it)")
+    languages: list[str] = Field(..., description="Language precedence list (primary first)")
     id: str | None = Field(None, description="ID of the synthesized dictionary entry")
     last_updated: datetime = Field(..., description="When this entry was last updated")
     model_info: dict[str, Any] | None = Field(
@@ -172,7 +178,24 @@ async def lookup_word(
     start_time = time.perf_counter()
 
     try:
-        result = await _cached_lookup(word, params)
+        if params.force_refresh:
+            entry = await lookup_word_pipeline(
+                word=word,
+                providers=params.providers,
+                languages=params.languages,
+                force_refresh=True,
+                no_ai=params.no_ai,
+                state_tracker=None,
+            )
+            if not entry:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No definition found for word: {word}",
+                )
+            response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=entry)
+            result = DictionaryEntryResponse(**response_dict)
+        else:
+            result = await _cached_lookup(word, params)
 
         if not result:
             raise HTTPException(status_code=404, detail=f"No definition found for word: {word}")
@@ -429,12 +452,6 @@ async def get_word_providers(word: str) -> list[dict[str, Any]]:
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    from ...models.dictionary import (
-        Definition as DefModel,
-        DictionaryEntry as DictEntry,
-        Word as WordModel,
-    )
-
     # Find the word
     word_doc = await WordModel.find_one(WordModel.text == word)
     if not word_doc:
@@ -447,7 +464,11 @@ async def get_word_providers(word: str) -> list[dict[str, Any]]:
 
     result = []
     for entry in entries:
-        provider_str = entry.provider.value if hasattr(entry.provider, "value") else str(entry.provider) if entry.provider else "unknown"
+        provider_str = (
+            entry.provider.value
+            if isinstance(entry.provider, DictionaryProvider)
+            else str(entry.provider)
+        )
         provider_data: dict[str, Any] = {
             "provider": provider_str,
             "id": str(entry.id),

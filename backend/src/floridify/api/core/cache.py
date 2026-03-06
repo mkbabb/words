@@ -34,6 +34,7 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
         # Include body hash for write operations
         # Note: Cannot access async body() in sync function
         # Body hashing should be handled at the async decorator level
+        # TODO[HIGH]: Remove this no-op branch and enforce async body hashing for write methods.
         # For now, skip body hashing in sync key generation
         pass
 
@@ -44,6 +45,7 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
         try:
             user_id = request.state.user_id
         except AttributeError:
+            # TODO[CRITICAL]: Stop silently degrading to anonymous; fail when auth state is required.
             pass  # Use default anonymous
         parts.append(str(user_id))
 

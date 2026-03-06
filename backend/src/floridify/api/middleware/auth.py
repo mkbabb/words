@@ -135,6 +135,7 @@ def _is_admin_endpoint(path: str) -> bool:
 
 async def _get_jwks(clerk_domain: str) -> dict[str, Any]:
     """Fetch and cache Clerk's JWKS (JSON Web Key Set)."""
+    # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
     import time
 
     global _jwks_cache, _jwks_cache_time
@@ -232,6 +233,8 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
         clerk_domain = os.getenv("CLERK_DOMAIN", "")
         environment = os.getenv("ENVIRONMENT", "development")
         if not clerk_domain and environment == "development":
+            # TODO[CRITICAL]: Keep dev path, but centralize it as an explicit DevAuthPolicy
+            # (single gate, audited logs, and shared behavior across middleware/dependencies).
             request.state.user_id = "dev_user"
             request.state.user_role = UserRole.ADMIN
             request.state.user = None  # No DB user in dev passthrough
@@ -283,6 +286,7 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
                 request.state.user_role = user.role
                 request.state.user = user
             except Exception as e:
+                # TODO[HIGH]: Eliminate JWT-claim fallback; reject request when user persistence fails.
                 # If DB upsert fails, still allow request with JWT claims
                 logger.warning(f"User upsert failed, using JWT claims: {e}")
                 request.state.user_id = clerk_id
@@ -340,6 +344,8 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
         clerk_domain = os.getenv("CLERK_DOMAIN", "")
         environment = os.getenv("ENVIRONMENT", "development")
         if not clerk_domain and environment == "development":
+            # TODO[CRITICAL]: Keep optional-auth dev path, but route through the same explicit
+            # DevAuthPolicy used by protected endpoints to avoid split behavior.
             request.state.user_id = "dev_user"
             request.state.user_role = UserRole.ADMIN
             request.state.user = None
@@ -382,10 +388,12 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
                 request.state.user_role = user.role
                 request.state.user = user
             except Exception:
+                # TODO[HIGH]: Stop masking persistence failures as USER role; surface explicit auth-state error.
                 request.state.user_id = clerk_id
                 request.state.user_role = UserRole.USER
                 request.state.user = None
         except Exception:
+            # TODO[HIGH]: Replace silent optional-auth failure with explicit telemetry + typed failure path.
             # Silent failure on public endpoints — user just won't be authenticated
             request.state.user_id = None
             request.state.user_role = None
@@ -397,6 +405,7 @@ async def get_current_user(request: Request) -> str:
 
     Use as Depends(get_current_user) on endpoints that require auth.
     """
+    # TODO[CRITICAL]: Remove getattr fallback; require middleware to set typed auth state fields.
     user_id = getattr(request.state, "user_id", None)
     if not user_id:
         raise HTTPException(
@@ -412,14 +421,18 @@ async def get_current_user_object(request: Request) -> User:
 
     Use as Depends(get_current_user_object) on endpoints that need user details.
     """
+    # TODO[CRITICAL]: Remove dynamic request.state access; enforce explicit state contract.
     user = getattr(request.state, "user", None)
     if user is not None:
         return user
 
+    # TODO[HIGH]: Revisit this fallback DB lookup; dependency should not recover missing middleware state.
     # Fallback: look up by user_id
     user_id = await get_current_user(request)
     user = await User.find_one(User.clerk_id == user_id)
     if not user:
+        # TODO[HIGH]: Keep dev principal support, but move synthetic user creation to a
+        # dedicated factory so this dependency does not embed environment-specific branching.
         # Dev passthrough: create a synthetic admin user
         if user_id == "dev_user":
             return User(
@@ -441,6 +454,7 @@ async def require_admin(request: Request) -> str:
     Use as Depends(require_admin) on admin-only endpoints.
     """
     user_id = await get_current_user(request)
+    # TODO[CRITICAL]: Remove getattr default role; explicit auth state must be mandatory.
     role = getattr(request.state, "user_role", UserRole.USER)
     if role != UserRole.ADMIN:
         raise HTTPException(
@@ -456,6 +470,7 @@ async def require_premium(request: Request) -> str:
     Use as Depends(require_premium) on premium endpoints.
     """
     user_id = await get_current_user(request)
+    # TODO[CRITICAL]: Remove getattr default role; explicit auth state must be mandatory.
     role = getattr(request.state, "user_role", UserRole.USER)
     if role not in (UserRole.PREMIUM, UserRole.ADMIN):
         raise HTTPException(
@@ -470,9 +485,11 @@ def get_optional_user(request: Request) -> str | None:
 
     Use for endpoints that work with or without auth (e.g., personalized results).
     """
+    # TODO[HIGH]: Remove dynamic optional auth lookup and return from a typed auth context object.
     return getattr(request.state, "user_id", None)
 
 
 def get_optional_user_role(request: Request) -> UserRole | None:
     """FastAPI dependency: returns user role if authenticated, None otherwise."""
+    # TODO[HIGH]: Remove dynamic optional auth lookup and return from a typed auth context object.
     return getattr(request.state, "user_role", None)

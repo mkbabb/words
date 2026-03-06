@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from typing import Any
@@ -10,11 +11,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..ai import get_definition_synthesizer, get_openai_connector
+from ..audio import get_audio_synthesizer
 from ..caching.core import get_global_cache, shutdown_global_cache
+from ..core.search_pipeline import get_search_engine_manager
 from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .middleware.auth import ClerkAuthMiddleware
+from .middleware.exception_handlers import register_exception_handlers
 from .middleware.rate_limiting import RateLimitMiddleware
 from .routers import (
     ai,
@@ -73,17 +77,11 @@ async def lifespan(app: FastAPI) -> Any:
         print("✅ Background TTL cleanup task started (interval=60s)")
 
         # Initialize TTS backends (downloads models on first run, cached after)
-        import asyncio
-
-        from ..audio import get_audio_synthesizer
-
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: get_audio_synthesizer().initialize())
         print("✅ TTS backends initialized (KittenTTS + Kokoro-ONNX)")
 
         # Start search engine initialization in background (non-blocking)
-        from ..core.search_pipeline import get_search_engine_manager
-
         manager = get_search_engine_manager()
         await manager.start_background_init()
         print("🔍 Search engine initialization started in background")
@@ -102,6 +100,7 @@ async def lifespan(app: FastAPI) -> Any:
         await shutdown_global_cache()
         print("✅ Cache cleanup task stopped and cache shut down")
     except Exception as e:
+        # TODO[MEDIUM]: Convert shutdown warning path to explicit shutdown failure policy.
         print(f"⚠️ Cache shutdown error: {e}")
 
 
@@ -120,7 +119,6 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8080",
         "https://mbabb.friday.institute",
-        "https://mbabb.fi.ncsu.edu",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -141,8 +139,6 @@ app.add_middleware(RateLimitMiddleware)  # Rate limiting after auth
 app.add_middleware(ClerkAuthMiddleware)  # Auth check (innermost - runs first)
 
 # Register global exception handlers
-from .middleware.exception_handlers import register_exception_handlers
-
 register_exception_handlers(app)
 
 

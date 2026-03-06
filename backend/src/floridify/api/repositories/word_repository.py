@@ -25,7 +25,10 @@ class WordCreate(BaseModel):
     """Schema for creating a word."""
 
     text: str = Field(..., min_length=1, max_length=100)
-    language: Language = Language.ENGLISH
+    languages: list[Language] = Field(
+        default_factory=lambda: [Language.ENGLISH],
+        min_length=1,
+    )
     homograph_number: int | None = None
     offensive_flag: bool = False
     first_known_use: str | None = None
@@ -35,7 +38,7 @@ class WordUpdate(BaseModel):
     """Schema for updating a word."""
 
     text: str | None = Field(None, min_length=1, max_length=100)
-    language: Language | None = None
+    languages: list[Language] | None = None
     homograph_number: int | None = None
     offensive_flag: bool | None = None
     first_known_use: str | None = None
@@ -61,7 +64,7 @@ class WordFilter(BaseModel):
             query["text"] = RegEx(self.text_pattern, "i")
 
         if self.language:
-            query["language"] = self.language.value  # Use enum value
+            query["languages"] = self.language.value
 
         if self.offensive_flag is not None:
             query["offensive_flag"] = self.offensive_flag
@@ -85,7 +88,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
 
     async def find_by_text(self, text: str, language: Language = Language.ENGLISH) -> Word | None:
         """Find word by text and language."""
-        return await Word.find_one({"text": text, "language": language})
+        return await Word.find_one({"text": text, "languages": language.value})
 
     async def find_by_normalized(
         self,
@@ -93,7 +96,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         language: Language = Language.ENGLISH,
     ) -> list[Word]:
         """Find words by normalized form."""
-        return await Word.find({"normalized": normalized, "language": language.value}).to_list()
+        return await Word.find({"normalized": normalized, "languages": language.value}).to_list()
 
     async def search(
         self,
@@ -104,7 +107,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         """Search words by text pattern."""
         filter_dict: dict[str, Any] = {"text": RegEx(f"^{query}", "i")}
         if language:
-            filter_dict["language"] = language.value
+            filter_dict["languages"] = language.value
 
         return await Word.find(filter_dict).limit(limit).to_list()
 

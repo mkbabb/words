@@ -100,6 +100,7 @@ async def list_words(
         item = word.model_dump()
         if fields.include or fields.exclude:
             # Apply field filtering if needed
+            # TODO[MEDIUM]: Implement explicit field-selection handling; remove silent no-op branch.
             pass
         items.append(item)
 
@@ -136,7 +137,8 @@ async def create_word(
 
     """
     # Check if word already exists
-    existing = await repo.find_by_text(data.text, data.language)
+    primary_language = data.languages[0]
+    existing = await repo.find_by_text(data.text, primary_language)
     if existing:
         raise HTTPException(
             409,
@@ -145,7 +147,7 @@ async def create_word(
                 details=[
                     ErrorDetail(
                         field="text",
-                        message=f"Word '{data.text}' already exists in {data.language}",
+                        message=f"Word '{data.text}' already exists in {primary_language}",
                         code="duplicate_word",
                     ),
                 ],

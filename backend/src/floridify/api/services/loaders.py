@@ -15,6 +15,7 @@ from ...models.dictionary import (
     Pronunciation,
     Word,
 )
+from ...utils.language_precedence import to_language_codes
 
 T = TypeVar("T", bound=Document)
 
@@ -247,10 +248,17 @@ class DictionaryEntryLoader(DataLoader):
                     image_dict = image.model_dump(mode="json", exclude={"data"})
                     images.append(image_dict)
 
-        # Build the response dictionary
+        # Build the response dictionary from canonical Word language precedence.
+        response_languages = to_language_codes(list(word_obj.languages))
+        if not response_languages:
+            raise ValueError(
+                f"Word '{word_obj.id}' is missing languages. "
+                "Migration is required to provide a non-empty languages list.",
+            )
+
         return {
             "word": word_obj.text,
-            "language": word_obj.language,
+            "languages": response_languages,
             "pronunciation": pronunciation,
             "definitions": definitions,
             "etymology": (entry.etymology.model_dump(mode="json") if entry.etymology else None),

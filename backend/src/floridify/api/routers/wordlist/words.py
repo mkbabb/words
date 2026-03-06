@@ -46,6 +46,7 @@ def _get_attr(item: Any, key: str, default: Any = None) -> Any:
     """Get attribute from dict or Pydantic model uniformly."""
     if isinstance(item, dict):
         return item.get(key, default)
+    # TODO[CRITICAL]: Remove getattr-based polymorphism and normalize items to one concrete type.
     return getattr(item, key, default)
 
 
@@ -70,6 +71,7 @@ async def apply_wordlist_filters_and_sort(
         filtered = [
             w
             for w in filtered
+            # TODO[HIGH]: Remove hasattr/runtime-method probing; require a stable review-state interface.
             if hasattr(w, "is_due_for_review")
             and w.is_due_for_review()
             or _get_attr(w, "is_due", False)
@@ -116,6 +118,7 @@ async def convert_wordlist_items_to_response(
     # Convert Pydantic models to dicts for JSON serialization
     result = []
     for item in items:
+        # TODO[HIGH]: Eliminate duck-typed model detection and enforce explicit response adapter contracts.
         if hasattr(item, "model_dump"):
             result.append(item.model_dump(mode="json"))
         elif isinstance(item, dict):

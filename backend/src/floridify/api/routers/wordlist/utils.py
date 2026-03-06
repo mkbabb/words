@@ -19,6 +19,7 @@ async def search_wordlist_names(
     query: str,
     owner_id: str | None = None,
     max_results: int = 20,
+    # TODO[MEDIUM]: Remove compatibility-only `min_score` parameter once callers migrate.
     min_score: float = 0.6,  # noqa: ARG001 - retained for signature compatibility
     _repo: WordListRepository | None = None,
 ) -> list[dict[str, Any]]:

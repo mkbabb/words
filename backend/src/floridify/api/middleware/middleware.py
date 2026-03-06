@@ -95,8 +95,11 @@ class CacheHeadersMiddleware(BaseHTTPMiddleware):
         """Add appropriate cache headers based on endpoint."""
         response = await call_next(request)
 
-        # Only add cache headers for successful responses
-        if response.status_code == 200:
+        # Only add cache headers for successful responses; skip SSE streams
+        # (BaseHTTPMiddleware + call_next buffers StreamingResponse bodies,
+        # so we must not interfere with event-stream responses at all.)
+        content_type = response.headers.get("content-type", "")
+        if response.status_code == 200 and "text/event-stream" not in content_type:
             path = request.url.path
             query_params = str(request.query_params) if request.query_params else ""
 
