@@ -534,7 +534,9 @@ class MongoDBBackend(CacheBackend):
         """Initialize with dedicated cache collection."""
         from motor.motor_asyncio import AsyncIOMotorClient
         
-        self.client = AsyncIOMotorClient("mongodb://localhost:27017")
+        self.client = AsyncIOMotorClient(
+            "mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
+        )
         self.db = self.client.floridify
         self.collection = self.db[collection_name]
         
