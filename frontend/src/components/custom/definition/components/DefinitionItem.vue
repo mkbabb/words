@@ -92,7 +92,7 @@
             <ExampleListEditable
                 v-if="definition.examples && definition.examples.length > 0"
                 :examples="definition.examples"
-                :word="contentStore.currentEntry?.word || ''"
+                :word="props.word || contentStore.currentEntry?.word || ''"
                 :edit-mode="props.editModeEnabled"
                 :isStreaming="isStreaming"
                 @update:example="handleExampleUpdate"
@@ -170,6 +170,7 @@ interface DefinitionItemProps {
     isAISynthesized?: boolean;
     editModeEnabled?: boolean;
     isStreaming?: boolean;
+    word?: string;
 }
 
 const contentStore = useContentStore();
