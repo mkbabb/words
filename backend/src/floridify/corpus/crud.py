@@ -19,6 +19,7 @@ from ..models.base import Language
 from ..utils.logging import get_logger
 from .core import Corpus
 from .models import CorpusType
+from .semantic_policy import recompute_semantic_effective_upward
 
 logger = get_logger(__name__)
 
@@ -91,6 +92,9 @@ async def save_corpus_simple(
     metadata.parent_uuid = corpus.parent_uuid
     metadata.child_uuids = corpus.child_uuids or []
     metadata.is_master = corpus.is_master
+    metadata.semantic_enabled_explicit = corpus.semantic_enabled_explicit
+    metadata.semantic_enabled_effective = corpus.semantic_enabled_effective
+    metadata.semantic_model = corpus.semantic_model
 
     # Store content
     content = corpus.model_dump(mode="json")
@@ -137,6 +141,9 @@ async def save_corpus(
     parent_uuid: str | None = None,
     child_uuids: list[str] | None = None,
     is_master: bool | None = None,
+    semantic_enabled_explicit: bool | None = None,
+    semantic_enabled_effective: bool | None = None,
+    semantic_model: str | None = None,
     config: VersionConfig | None = None,
     metadata: dict[str, Any] | None = None,
     get_corpus_fn: Any = None,
@@ -157,6 +164,9 @@ async def save_corpus(
         parent_uuid: Parent corpus uuid (saved as data only)
         child_uuids: Child corpus uuids (saved as data only)
         is_master: Whether this is a master corpus
+        semantic_enabled_explicit: Explicit semantic toggle for this corpus
+        semantic_enabled_effective: Effective semantic state computed over descendants
+        semantic_model: Preferred semantic model for this corpus
         config: Version configuration
         metadata: Additional metadata
         get_corpus_fn: Callable to get a corpus (for auto-update parent logic)
@@ -189,6 +199,17 @@ async def save_corpus(
         language = language if language != Language.ENGLISH else corpus.language
         parent_uuid = parent_uuid if parent_uuid is not None else corpus.parent_uuid
         child_uuids = child_uuids if child_uuids is not None else corpus.child_uuids
+        semantic_enabled_explicit = (
+            semantic_enabled_explicit
+            if semantic_enabled_explicit is not None
+            else corpus.semantic_enabled_explicit
+        )
+        semantic_enabled_effective = (
+            semantic_enabled_effective
+            if semantic_enabled_effective is not None
+            else corpus.semantic_enabled_effective
+        )
+        semantic_model = semantic_model if semantic_model is not None else corpus.semantic_model
         logger.debug(
             f"save_corpus: corpus has {len(corpus.child_uuids) if corpus.child_uuids else 0} children, using {len(child_uuids) if child_uuids else 0} children"
         )
@@ -215,7 +236,15 @@ async def save_corpus(
         existing = await Corpus.Metadata.get(corpus_id)
         if existing and not corpus_name:
             corpus_name = existing.resource_id  # Use existing name
+        if existing:
+            if semantic_enabled_explicit is None:
+                semantic_enabled_explicit = existing.semantic_enabled_explicit
+            if semantic_enabled_effective is None:
+                semantic_enabled_effective = existing.semantic_enabled_effective
+            if semantic_model is None:
+                semantic_model = existing.semantic_model
 
+    # TODO[CRITICAL]: Remove resource-id fallback chain and require canonical corpus_name/corpus_uuid inputs.
     # Use corpus_name as resource_id, or fallback to corpus_id, or generate
     if corpus_name:
         resource_id = corpus_name
@@ -228,6 +257,12 @@ async def save_corpus(
     corpus_type_value = corpus_type.value if isinstance(corpus_type, CorpusType) else corpus_type
     language_value = language.value if isinstance(language, Language) else language
 
+    default_semantic_effective = (
+        semantic_enabled_effective
+        if semantic_enabled_effective is not None
+        else bool(semantic_enabled_explicit is True)
+    )
+
     full_metadata = {
         "corpus_name": corpus_name or "",
         "corpus_type": corpus_type_value,
@@ -237,6 +272,9 @@ async def save_corpus(
         if child_uuids is not None
         else [],  # List of stable UUID strings
         "is_master": is_master if is_master is not None else False,  # Default to False if None
+        "semantic_enabled_explicit": semantic_enabled_explicit,
+        "semantic_enabled_effective": default_semantic_effective,
+        "semantic_model": semantic_model,
         **(metadata or {}),
     }
 
@@ -277,6 +315,23 @@ async def save_corpus(
                     parent_uuid=parent_corpus.parent_uuid,
                     child_uuids=updated_children,
                     is_master=parent_corpus.is_master,
+                    semantic_enabled_explicit=parent_corpus.semantic_enabled_explicit,
+                    semantic_enabled_effective=parent_corpus.semantic_enabled_effective,
+                    semantic_model=parent_corpus.semantic_model,
+                )
+                async def _save_for_semantic(**kwargs: Any) -> Corpus | None:
+                    return await save_corpus(
+                        vm=vm,
+                        get_corpus_fn=get_corpus_fn,
+                        **kwargs,
+                    )
+
+                await recompute_semantic_effective_upward(
+                    start_corpus_uuid=parent_uuid,
+                    get_corpus_fn=get_corpus_fn,
+                    get_corpora_by_uuids_fn=None,
+                    save_corpus_fn=_save_for_semantic,
+                    config=VersionConfig(use_cache=False),
                 )
                 logger.debug(f"Auto-added new child UUID {child_uuid} to parent {parent_uuid}")
 
@@ -294,6 +349,9 @@ async def save_corpus(
                     "parent_uuid": parent_uuid,
                     "child_uuids": child_uuids if child_uuids is not None else [],
                     "is_master": is_master if is_master is not None else False,
+                    "semantic_enabled_explicit": saved.semantic_enabled_explicit,
+                    "semantic_enabled_effective": saved.semantic_enabled_effective,
+                    "semantic_model": saved.semantic_model,
                 }
             )
             # Preserve original corpus_id if updating, otherwise use new ID
@@ -310,6 +368,7 @@ async def save_corpus(
             logger.info(f"✅ Saved corpus '{resource_id}' with {len(result.vocabulary):,} words")
             return result
     logger.warning("save_corpus: saved_content is None, returning None")
+    # TODO[HIGH]: Replace None return on save failure with explicit persistence error.
     return None
 
 
@@ -327,6 +386,7 @@ async def get_corpus_metadata(corpus_name: str) -> Corpus.Metadata | None:
 
 
 async def get_stats() -> dict[str, Any]:
+    # TODO[MEDIUM]: Remove compatibility-only stats shape once all callers migrate to typed metrics endpoint.
     """Return lightweight corpus statistics for compatibility.
 
     Returns:
@@ -410,6 +470,9 @@ async def get_corpus(
             "parent_uuid": metadata.parent_uuid,
             "child_uuids": metadata.child_uuids or [],
             "is_master": metadata.is_master,
+            "semantic_enabled_explicit": metadata.semantic_enabled_explicit,
+            "semantic_enabled_effective": metadata.semantic_enabled_effective,
+            "semantic_model": metadata.semantic_model,
         }
     )
 
@@ -495,6 +558,9 @@ async def get_corpora_by_ids(
             content["corpus_name"] = metadata.corpus_name
             content["corpus_type"] = metadata.corpus_type  # Pydantic v2 handles enum conversion
             content["language"] = metadata.language  # Pydantic v2 handles enum conversion
+            content["semantic_enabled_explicit"] = metadata.semantic_enabled_explicit
+            content["semantic_enabled_effective"] = metadata.semantic_enabled_effective
+            content["semantic_model"] = metadata.semantic_model
             # Add version information
             if metadata.version_info:
                 content["version_info"] = metadata.version_info
@@ -554,6 +620,9 @@ async def get_corpora_by_uuids(
             content["corpus_name"] = metadata.corpus_name
             content["corpus_type"] = metadata.corpus_type
             content["language"] = metadata.language
+            content["semantic_enabled_explicit"] = metadata.semantic_enabled_explicit
+            content["semantic_enabled_effective"] = metadata.semantic_enabled_effective
+            content["semantic_model"] = metadata.semantic_model
 
             if metadata.version_info:
                 content["version_info"] = metadata.version_info

@@ -21,6 +21,7 @@ from ..utils.logging import get_logger
 from . import aggregation as _agg, crud as _crud, tree as _tree
 from .core import Corpus
 from .models import CorpusType
+from .semantic_policy import recompute_semantic_effective_upward
 
 logger = get_logger(__name__)
 
@@ -78,6 +79,9 @@ class TreeCorpusManager:
         parent_uuid: str | None = None,
         child_uuids: list[str] | None = None,
         is_master: bool | None = None,
+        semantic_enabled_explicit: bool | None = None,
+        semantic_enabled_effective: bool | None = None,
+        semantic_model: str | None = None,
         config: VersionConfig | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Corpus | None:
@@ -93,6 +97,9 @@ class TreeCorpusManager:
             parent_uuid=parent_uuid,
             child_uuids=child_uuids,
             is_master=is_master,
+            semantic_enabled_explicit=semantic_enabled_explicit,
+            semantic_enabled_effective=semantic_enabled_effective,
+            semantic_model=semantic_model,
             config=config,
             metadata=metadata,
             get_corpus_fn=self.get_corpus,
@@ -106,6 +113,7 @@ class TreeCorpusManager:
         language: Language = Language.ENGLISH,
         config: VersionConfig | None = None,
     ) -> Corpus:
+        # TODO[MEDIUM]: Remove backwards-compatible helper once callers use explicit create+save workflow.
         """Backwards compatible corpus creation helper."""
         corpus = await Corpus.create(
             corpus_name=corpus_name,
@@ -122,6 +130,7 @@ class TreeCorpusManager:
         return await _crud.get_corpus_metadata(corpus_name)
 
     async def get_stats(self) -> dict[str, Any]:
+        # TODO[MEDIUM]: Remove compatibility stats adapter once consumers migrate to typed metrics endpoints.
         """Return lightweight corpus statistics for compatibility."""
         return await _crud.get_stats()
 
@@ -177,6 +186,7 @@ class TreeCorpusManager:
             update_parent=update_parent,
             get_corpus_fn=self.get_corpus,
             save_corpus_fn=self.save_corpus,
+            recompute_semantic_fn=self._recompute_semantic_policy,
         )
 
     async def get_vocabulary(
@@ -273,6 +283,7 @@ class TreeCorpusManager:
             get_corpus_fn=self.get_corpus,
             save_corpus_fn=self.save_corpus,
             would_create_cycle_fn=self._would_create_cycle,
+            recompute_semantic_fn=self._recompute_semantic_policy,
         )
 
     async def update_corpus(
@@ -306,6 +317,9 @@ class TreeCorpusManager:
                 "is_master",
                 "corpus_type",
                 "language",
+                "semantic_enabled_explicit",
+                "semantic_enabled_effective",
+                "semantic_model",
             ]:
                 if field in metadata:
                     corpus_specific_fields[field] = metadata.pop(field)
@@ -320,6 +334,12 @@ class TreeCorpusManager:
         # Preserve existing is_master if not explicitly provided
         if "is_master" not in corpus_specific_fields:
             corpus_specific_fields["is_master"] = corpus.is_master
+        if "semantic_enabled_explicit" not in corpus_specific_fields:
+            corpus_specific_fields["semantic_enabled_explicit"] = corpus.semantic_enabled_explicit
+        if "semantic_enabled_effective" not in corpus_specific_fields:
+            corpus_specific_fields["semantic_enabled_effective"] = corpus.semantic_enabled_effective
+        if "semantic_model" not in corpus_specific_fields:
+            corpus_specific_fields["semantic_model"] = corpus.semantic_model
 
         # Save updated corpus with corpus-specific fields
         logger.info(
@@ -412,7 +432,30 @@ class TreeCorpusManager:
             get_corpus_fn=self.get_corpus,
             save_corpus_fn=self.save_corpus,
             delete_corpus_fn=self.delete_corpus,
+            recompute_semantic_fn=self._recompute_semantic_policy,
         )
+
+    async def _recompute_semantic_policy(
+        self,
+        start_corpus_uuid: str | None,
+        config: VersionConfig | None = None,
+    ) -> None:
+        """Recompute effective semantic flags from a node to root."""
+        await recompute_semantic_effective_upward(
+            start_corpus_uuid=start_corpus_uuid,
+            get_corpus_fn=self.get_corpus,
+            get_corpora_by_uuids_fn=self.get_corpora_by_uuids,
+            save_corpus_fn=self.save_corpus,
+            config=config,
+        )
+
+    async def recompute_semantic_policy(
+        self,
+        start_corpus_uuid: str | None,
+        config: VersionConfig | None = None,
+    ) -> None:
+        """Public wrapper for semantic policy recomputation."""
+        await self._recompute_semantic_policy(start_corpus_uuid=start_corpus_uuid, config=config)
 
     async def _would_create_cycle(
         self,

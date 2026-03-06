@@ -153,6 +153,7 @@ async def update_parent(
     get_corpus_fn: Any = None,
     save_corpus_fn: Any = None,
     would_create_cycle_fn: Any = None,
+    recompute_semantic_fn: Any = None,
 ) -> bool | None:
     """Simple tree operation: add child to parent.
 
@@ -201,6 +202,32 @@ async def update_parent(
         logger.warning("update_parent failed: parent or child not found")
         return False
 
+    old_parent_uuid = child.parent_uuid
+
+    # Reparenting: remove child reference from old parent when moving across branches.
+    if (
+        old_parent_uuid
+        and old_parent_uuid != parent.corpus_uuid
+        and child.corpus_uuid is not None
+    ):
+        old_parent = await get_corpus_fn(corpus_uuid=old_parent_uuid, config=config)
+        if old_parent and old_parent.corpus_id and child.corpus_uuid in old_parent.child_uuids:
+            updated_old_children = [cid for cid in old_parent.child_uuids if cid != child.corpus_uuid]
+            await save_corpus_fn(
+                corpus_id=old_parent.corpus_id,
+                corpus_name=old_parent.corpus_name,
+                content=old_parent.model_dump(mode="json"),
+                corpus_type=old_parent.corpus_type,
+                language=old_parent.language,
+                parent_uuid=old_parent.parent_uuid,
+                child_uuids=updated_old_children,
+                is_master=old_parent.is_master,
+                semantic_enabled_explicit=old_parent.semantic_enabled_explicit,
+                semantic_enabled_effective=old_parent.semantic_enabled_effective,
+                semantic_model=old_parent.semantic_model,
+                config=config,
+            )
+
     # Update parent's children list via save_corpus to maintain versioning
     parent_updated = False
     if child.corpus_uuid not in parent.child_uuids:
@@ -218,6 +245,9 @@ async def update_parent(
             parent_uuid=parent.parent_uuid,  # preserve parent
             child_uuids=updated_children,
             is_master=parent.is_master,  # preserve master status
+            semantic_enabled_explicit=parent.semantic_enabled_explicit,
+            semantic_enabled_effective=parent.semantic_enabled_effective,
+            semantic_model=parent.semantic_model,
             config=config,
         )
         parent_updated = True
@@ -243,6 +273,9 @@ async def update_parent(
             parent_uuid=parent.corpus_uuid,  # Use UUID, not corpus_id!
             child_uuids=child.child_uuids,  # preserve children
             is_master=child.is_master,  # preserve master status
+            semantic_enabled_explicit=child.semantic_enabled_explicit,
+            semantic_enabled_effective=child.semantic_enabled_effective,
+            semantic_model=child.semantic_model,
             config=config,
         )
         child_updated = True
@@ -250,7 +283,14 @@ async def update_parent(
     else:
         logger.info(f"Child already has parent UUID {parent.corpus_uuid}")
 
-    return parent_updated or child_updated
+    updated = parent_updated or child_updated
+    if updated and recompute_semantic_fn:
+        if parent.corpus_uuid:
+            await recompute_semantic_fn(parent.corpus_uuid, config=config)
+        if old_parent_uuid and old_parent_uuid != parent.corpus_uuid:
+            await recompute_semantic_fn(old_parent_uuid, config=config)
+
+    return updated
 
 
 async def add_child(
@@ -338,12 +378,12 @@ async def delete_corpus(
                 config=config,
             )
 
-    # Store the corpus name and id before deletion
+    # Store the corpus identifiers before deletion
     corpus_name_to_clear = corpus.corpus_name
-    corpus_id_to_delete = corpus.corpus_id
+    corpus_uuid_to_delete = corpus.corpus_uuid
 
     # Delete associated search indices
-    if corpus_id_to_delete:
+    if corpus_uuid_to_delete:
         from ..search.search_index import SearchIndex
         from ..search.semantic.models import SemanticIndex
         from ..search.trie_index import TrieIndex
@@ -352,11 +392,11 @@ async def delete_corpus(
         # These are stored in BaseVersionedData collection
         await asyncio.gather(
             # Delete TrieIndex metadata
-            TrieIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+            TrieIndex.Metadata.find({"corpus_uuid": corpus_uuid_to_delete}).delete(),
             # Delete SearchIndex metadata
-            SearchIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+            SearchIndex.Metadata.find({"corpus_uuid": corpus_uuid_to_delete}).delete(),
             # Delete SemanticIndex metadata
-            SemanticIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+            SemanticIndex.Metadata.find({"corpus_uuid": corpus_uuid_to_delete}).delete(),
             return_exceptions=True,
         )
         logger.info(f"Deleted search indices for corpus {corpus_name_to_clear}")
@@ -538,6 +578,7 @@ async def remove_child(
     get_corpus_fn: Any = None,
     save_corpus_fn: Any = None,
     delete_corpus_fn: Any = None,
+    recompute_semantic_fn: Any = None,
 ) -> bool:
     """Simple tree operation: remove child from parent.
 
@@ -598,6 +639,9 @@ async def remove_child(
             is_master=parent.is_master,
             corpus_type=parent.corpus_type,
             language=parent.language,
+            semantic_enabled_explicit=parent.semantic_enabled_explicit,
+            semantic_enabled_effective=parent.semantic_enabled_effective,
+            semantic_model=parent.semantic_model,
             config=fresh_config,
         )
         logger.info(
@@ -618,6 +662,9 @@ async def remove_child(
                 is_master=child.is_master,
                 corpus_type=child.corpus_type,
                 language=child.language,
+                semantic_enabled_explicit=child.semantic_enabled_explicit,
+                semantic_enabled_effective=child.semantic_enabled_effective,
+                semantic_model=child.semantic_model,
                 config=fresh_config,
             )
             logger.info(f"Cleared parent reference from child {child_id}")
@@ -625,6 +672,9 @@ async def remove_child(
         logger.info(f"Deleting child corpus {child_id}")
         # Delete the child corpus
         await delete_corpus_fn(corpus_id=child_id, cascade=False, config=fresh_config)
+
+    if recompute_semantic_fn and parent.corpus_uuid:
+        await recompute_semantic_fn(parent.corpus_uuid, config=fresh_config)
 
     return True
 

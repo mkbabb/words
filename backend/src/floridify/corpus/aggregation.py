@@ -27,7 +27,9 @@ async def aggregate_vocabularies(
     update_parent: bool = True,
     get_corpus_fn: Any = None,
     save_corpus_fn: Any = None,
+    recompute_semantic_fn: Any = None,
 ) -> list[str]:
+    # TODO[HIGH]: Drop deprecated ObjectId-based aggregation entrypoint and require UUID-only traversal.
     """Aggregate vocabularies from a corpus and its children.
 
     Args:
@@ -119,9 +121,14 @@ async def aggregate_vocabularies(
         logger.info(f"Saving aggregated corpus {corpus_id} with all indices")
         await save_corpus_fn(
             corpus=corpus,
+            semantic_enabled_explicit=corpus.semantic_enabled_explicit,
+            semantic_enabled_effective=corpus.semantic_enabled_effective,
+            semantic_model=corpus.semantic_model,
             config=config,
         )
         logger.info(f"Saved corpus {corpus_id} with vocabulary of size {len(aggregated)}")
+        if recompute_semantic_fn and corpus.corpus_uuid:
+            await recompute_semantic_fn(corpus.corpus_uuid, config=config)
 
     return aggregated
 
@@ -164,6 +171,7 @@ async def aggregate_from_children(
     get_corpus_fn: Any = None,
     save_corpus_fn: Any = None,
 ) -> Corpus | None:
+    # TODO[HIGH]: Drop deprecated parent_corpus_id support and require parent_corpus_uuid exclusively.
     """Aggregate vocabularies from parent and all children into a new corpus.
 
     Args:

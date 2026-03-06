@@ -100,6 +100,11 @@ class Corpus(BaseModel):
     child_uuids: list[str] = Field(default_factory=list)  # Children's UUIDs
     is_master: bool = False
 
+    # Semantic policy (explicit setting + computed effective state)
+    semantic_enabled_explicit: bool | None = None
+    semantic_enabled_effective: bool = False
+    semantic_model: str | None = None
+
     # Word frequency data
     word_frequencies: dict[str, int] = Field(default_factory=dict)
 
@@ -148,6 +153,9 @@ class Corpus(BaseModel):
         parent_uuid: str | None = None
         child_uuids: list[str] = Field(default_factory=list)
         is_master: bool = False
+        semantic_enabled_explicit: bool | None = None
+        semantic_enabled_effective: bool = False
+        semantic_model: str | None = None
 
         # Vocabulary metadata (versioning)
         vocabulary_size: int = 0
@@ -258,6 +266,9 @@ class Corpus(BaseModel):
             language=language,
             total_word_count=len(vocabulary),
             vocabulary_hash=get_vocabulary_hash(unique_normalized),
+            semantic_enabled_explicit=semantic,
+            semantic_enabled_effective=semantic,
+            semantic_model=model_name,
         )
 
         # Create unified indices
@@ -672,6 +683,7 @@ class Corpus(BaseModel):
         """
         data = super().model_dump(**kwargs)
 
+        # TODO[MEDIUM]: Remove backward-compatibility corpus_id injection after API/test migration to corpus_uuid.
         # Ensure corpus_id is present for backward compatibility with tests/API consumers
         # If corpus_id is None but corpus_uuid exists, keep both fields in response
         if "corpus_uuid" in data and "corpus_id" not in data:

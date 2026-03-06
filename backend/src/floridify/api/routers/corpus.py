@@ -7,6 +7,7 @@ from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import BaseModel, Field
 
 from ...caching.models import VersionConfig
 from ...corpus.core import Corpus
@@ -22,6 +23,34 @@ from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+class CorpusSemanticToggleRequest(BaseModel):
+    """Request payload for explicit corpus semantic policy."""
+
+    enabled: bool = Field(..., description="Explicit semantic toggle for this corpus")
+    model_name: str | None = Field(
+        default=None,
+        description="Optional semantic model to pin for this corpus",
+    )
+
+
+class CorpusSemanticToggleResponse(BaseModel):
+    """Response payload for corpus semantic policy updates."""
+
+    corpus_id: str
+    semantic_enabled_explicit: bool | None
+    semantic_enabled_effective: bool
+    semantic_model: str | None
+
+
+def _semantic_statistics(corpus: Corpus) -> dict[str, Any]:
+    """Build semantic policy stats payload for corpus responses."""
+    return {
+        "semantic_enabled_explicit": corpus.semantic_enabled_explicit,
+        "semantic_enabled_effective": corpus.semantic_enabled_effective,
+        "semantic_model": corpus.semantic_model,
+    }
 
 
 def parse_corpus_list_params(
@@ -112,6 +141,7 @@ async def list_corpora(
                             "vocabulary_hash": corpus.vocabulary_hash,
                             "is_master": corpus.is_master,
                             "child_count": len(corpus.child_uuids),
+                            **_semantic_statistics(corpus),
                         }
                         if params.include_stats
                         else {},
@@ -151,6 +181,7 @@ async def get_corpus_stats() -> dict[str, Any]:
             "status": "success",
             "cache": {
                 "size": total_corpora,
+                # TODO[MEDIUM]: Remove compatibility alias after API consumers migrate to `size`.
                 "cache_size": total_corpora,  # Alias for compatibility
                 "max_size": 1000,  # Default max size
                 "total_searches": total_searches,
@@ -215,6 +246,7 @@ async def get_corpus(
                 "has_trie": search_index.has_trie if search_index else False,
                 "ttl_hours": metadata.ttl_hours,
                 "search_count": metadata.search_count,
+                **_semantic_statistics(corpus),
             }
             if include_stats
             else {}
@@ -277,6 +309,8 @@ async def create_corpus(
 
         # Set corpus type after creation
         corpus.corpus_type = corpus_type
+        corpus.semantic_enabled_explicit = params.enable_semantic
+        corpus.semantic_enabled_effective = params.enable_semantic
 
         # Save corpus
         corpus = await manager.save_corpus(corpus)
@@ -315,6 +349,7 @@ async def create_corpus(
                 "is_master": corpus.is_master,
                 "ttl_hours": params.ttl_hours,
                 "search_count": 0,
+                **_semantic_statistics(corpus),
             },
         }
 
@@ -325,6 +360,64 @@ async def create_corpus(
     except Exception as e:
         logger.error(f"Failed to create corpus: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create corpus: {e!s}")
+
+
+@router.patch("/corpus/{corpus_id}/semantic", response_model=CorpusSemanticToggleResponse)
+async def update_corpus_semantic_policy(
+    request: CorpusSemanticToggleRequest,
+    corpus_id: str = Path(..., description="Corpus ID"),
+) -> CorpusSemanticToggleResponse:
+    """Set explicit semantic policy for a corpus and recompute effective policy."""
+    try:
+        try:
+            obj_id = PydanticObjectId(corpus_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid corpus ID format")
+
+        manager = get_tree_corpus_manager()
+        corpus = await manager.get_corpus(corpus_id=obj_id, config=VersionConfig(use_cache=False))
+        if not corpus:
+            raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
+
+        corpus.semantic_enabled_explicit = request.enabled
+        if request.model_name is not None:
+            corpus.semantic_model = request.model_name
+
+        await manager.save_corpus(
+            corpus_id=corpus.corpus_id,
+            corpus_name=corpus.corpus_name,
+            content=corpus.model_dump(mode="json"),
+            corpus_type=corpus.corpus_type,
+            language=corpus.language,
+            parent_uuid=corpus.parent_uuid,
+            child_uuids=corpus.child_uuids,
+            is_master=corpus.is_master,
+            semantic_enabled_explicit=corpus.semantic_enabled_explicit,
+            semantic_enabled_effective=corpus.semantic_enabled_effective,
+            semantic_model=corpus.semantic_model,
+            config=VersionConfig(use_cache=False),
+        )
+
+        await manager.recompute_semantic_policy(
+            start_corpus_uuid=corpus.corpus_uuid,
+            config=VersionConfig(use_cache=False),
+        )
+
+        refreshed = await manager.get_corpus(corpus_id=obj_id, config=VersionConfig(use_cache=False))
+        if not refreshed:
+            raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
+
+        return CorpusSemanticToggleResponse(
+            corpus_id=corpus_id,
+            semantic_enabled_explicit=refreshed.semantic_enabled_explicit,
+            semantic_enabled_effective=refreshed.semantic_enabled_effective,
+            semantic_model=refreshed.semantic_model,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update semantic policy for corpus {corpus_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update corpus semantic policy: {e!s}")
 
 
 @router.post("/corpus/{corpus_id}/search")

@@ -12,9 +12,14 @@ from beanie import PydanticObjectId
 
 from ...caching.models import VersionConfig
 from ...models.base import Language
+from ...models.dictionary import Word
 from ...providers.language.models import LanguageSource
 from ...providers.language.scraper.url import URLLanguageConnector
 from ...providers.language.sources import LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE
+from ...utils.language_precedence import (
+    merge_language_precedence,
+    to_language_codes,
+)
 from ...utils.logging import get_logger
 from ..core import Corpus
 from ..manager import get_tree_corpus_manager
@@ -42,6 +47,59 @@ class LanguageCorpus(Corpus):
 
         class Settings(Corpus.Metadata.Settings):
             class_id = "_class_id"
+
+    async def _link_corpus_vocabulary_words(self, child: Corpus) -> None:
+        """Link corpus vocabulary to Word documents via FK and merge language lists."""
+        if not child.corpus_id:
+            return
+        if not child.vocabulary:
+            return
+
+        child_language_codes = to_language_codes([child.language])
+        child_corpus_id = child.corpus_id
+        batch_size = 1000
+        for offset in range(0, len(child.vocabulary), batch_size):
+            vocabulary_batch = child.vocabulary[offset : offset + batch_size]
+            existing_words = await Word.find({"text": {"$in": vocabulary_batch}}).to_list()
+            existing_by_text = {word.text: word for word in existing_words}
+
+            words_to_create: list[Word] = []
+            words_to_update: list[Word] = []
+
+            for text in vocabulary_batch:
+                existing_word = existing_by_text.get(text)
+
+                if existing_word is None:
+                    words_to_create.append(
+                        Word(
+                            text=text,
+                            languages=child_language_codes,
+                            corpus_ids=[child_corpus_id],
+                        )
+                    )
+                    continue
+
+                merged_languages = merge_language_precedence(
+                    requested_languages=list(existing_word.languages),
+                    existing_languages=child_language_codes,
+                )
+                merged_corpus_ids = list(existing_word.corpus_ids)
+                if child_corpus_id not in merged_corpus_ids:
+                    merged_corpus_ids.append(child_corpus_id)
+
+                if (
+                    merged_languages != list(existing_word.languages)
+                    or merged_corpus_ids != list(existing_word.corpus_ids)
+                ):
+                    existing_word.languages = merged_languages
+                    existing_word.corpus_ids = merged_corpus_ids
+                    words_to_update.append(existing_word)
+
+            if words_to_create:
+                await Word.insert_many(words_to_create)
+
+            for word in words_to_update:
+                await word.save()
 
     async def add_language_source(
         self,
@@ -96,6 +154,8 @@ class LanguageCorpus(Corpus):
         if not child.corpus_id:
             logger.warning(f"Failed to save child corpus for source: {source.name}")
             return None
+
+        await self._link_corpus_vocabulary_words(child)
 
         # Update tree relationships via TreeCorpusManager
         manager = get_tree_corpus_manager()
@@ -235,9 +295,6 @@ class LanguageCorpus(Corpus):
 
         successful = sum(1 for r in results if r is True)
         logger.info(f"Successfully added {successful}/{len(sources)} sources")
-
-        # FIX: Aggregate ONCE after all sources are added
-        from ...caching.models import VersionConfig
 
         manager = get_tree_corpus_manager()
 
