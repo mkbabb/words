@@ -1,7 +1,7 @@
 <template>
     <div
         ref="controlsDropdown"
-        class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/20 backdrop-blur-3xl"
+        class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
         tabindex="0"
         @mousedown.prevent
         @click="$emit('interaction')"

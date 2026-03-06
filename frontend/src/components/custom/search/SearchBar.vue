@@ -25,10 +25,10 @@
                         ? 'border-2 border-amber-500 bg-amber-50 backdrop-blur-sm dark:border-amber-700/40 dark:bg-amber-950/30'
                         : searchBar.hasErrorAnimation
                           ? 'border-2 border-red-400/50 bg-gradient-to-br from-red-50/20 to-red-50/10 dark:border-red-600/50 dark:from-red-900/20 dark:to-red-900/10'
-                          : 'border-2 border-border bg-background/20 backdrop-blur-3xl',
+                          : 'border-2 border-border bg-background backdrop-blur-xl',
                     {
                         'cartoon-shadow-sm-hover': uiState.isContainerHovered,
-                        'bg-background/30':
+                        'bg-background':
                             uiState.isContainerHovered && !searchBar.isAIQuery,
                         'shake-error': searchBar.hasErrorAnimation,
                     },
@@ -262,7 +262,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue';
-import { showError } from '@/plugins/toast';
+import { useRouter } from 'vue-router';
 // Modular stores - direct imports
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
@@ -332,6 +332,7 @@ const content = useContentStore();
 const historyStore = useHistoryStore();
 const ui = useUIStore();
 const loading = useLoadingStore();
+const router = useRouter();
 const { iconOpacity, uiState } = useSearchBarUI();
 
 // All functionality now uses modular stores directly - no reactive wrapper needed
@@ -561,30 +562,14 @@ const toggleControls = () => {
     searchBar.toggleSearchControls();
 };
 
-const selectWord = async (word: string) => {
+const selectWord = (word: string) => {
     searchBar.hideDropdown();
     searchBar.hideControls();
     searchBar.clearResults();
-    searchBar.setDirectLookup(true);
-    try {
-        const subMode = searchBar.getSubMode('lookup');
-        if (subMode === 'thesaurus') {
-            await orchestrator.getThesaurusData(word);
-        } else {
-            await orchestrator.getDefinition(word);
-        }
-    } catch (error: any) {
-        content.setError({
-            hasError: true,
-            errorType: 'unknown',
-            errorMessage: error.message || 'Failed to look up word',
-            canRetry: true,
-            originalWord: word,
-        });
-        showError(error.message || 'Failed to look up word');
-    } finally {
-        searchBar.setDirectLookup(false);
-    }
+    // Navigate — the route watcher in Home.vue handles the fetch
+    const subMode = searchBar.getSubMode('lookup');
+    const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word } });
 };
 
 const handleForceRegenerate = () => {

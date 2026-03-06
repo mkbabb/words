@@ -5,7 +5,7 @@
         <div
             v-if="show"
             ref="searchResultsDropdown"
-            class="dropdown-element cartoon-shadow-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/20 backdrop-blur-3xl"
+            class="dropdown-element cartoon-shadow-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
             @mousedown.prevent
             @click="$emit('interaction')"
         >
@@ -36,7 +36,7 @@
                     wordlistResults.length > 0
                 "
                 ref="searchResultsContainer"
-                class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
+                class="max-h-64 overflow-y-auto bg-background backdrop-blur-xl"
             >
                 <button
                     v-for="(result, index) in wordlistResults.slice(0, 10)"
@@ -104,7 +104,7 @@
             <div
                 v-else-if="!wordlistMode && results.length > 0"
                 ref="searchResultsContainer"
-                class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
+                class="max-h-64 overflow-y-auto bg-background backdrop-blur-xl"
             >
                 <button
                     v-for="(result, index) in results"
@@ -155,7 +155,7 @@
             <!-- Recent Searches (shown when query is empty and we have history) -->
             <div
                 v-if="!loading && results.length === 0 && query.length === 0 && recentSearches && recentSearches.length > 0"
-                class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
+                class="max-h-64 overflow-y-auto bg-background backdrop-blur-xl"
             >
                 <div class="px-4 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">Recent</div>
                 <button
