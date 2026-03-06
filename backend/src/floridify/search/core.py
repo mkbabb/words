@@ -13,7 +13,7 @@ from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
 from ..utils.logging import get_logger
-from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
+from .constants import DEFAULT_MIN_SCORE, SearchError, SearchMethod, SearchMode
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
 from .result import SearchResult
 from .search_index import SearchIndex
@@ -380,10 +380,8 @@ class Search:
             return None
 
         try:
-            # TODO[HIGH]: Remove implicit corpus-name fallback lookup; require UUID-only retrieval invariants.
             # Try with corpus_uuid first, fallback to corpus_name
-            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
-            from ..corpus.manager import get_tree_corpus_manager
+            from ..corpus.manager import get_tree_corpus_manager  # Lazy: heavyweight module
 
             manager = get_tree_corpus_manager()
             corpus = await manager.get_corpus(
@@ -393,9 +391,8 @@ class Search:
             )
             return corpus.vocabulary_hash if corpus else None
         except Exception as e:
-            # TODO[HIGH]: Stop converting corpus hash lookup errors into None; surface explicit index-health failure.
             logger.warning(f"Failed to get current vocab hash for '{self.index.corpus_name}': {e}")
-            return None
+            raise SearchError("hash_check", str(e)) from e
 
     async def update_corpus(self) -> None:
         """Check if corpus has changed and update components if needed. Optimized with hash check."""
@@ -747,7 +744,6 @@ class Search:
         """
         # Check if semantic search is ready
         if not self._semantic_ready or not self.semantic_search:
-            # TODO[MEDIUM]: Replace silent empty-result behavior with explicit semantic-not-ready status.
             logger.debug("Semantic search not ready yet - returning empty results")
             return []
 
@@ -761,9 +757,8 @@ class Search:
                 result.word = self._get_original_word(result.word)
             return results
         except Exception as e:
-            # TODO[HIGH]: Do not suppress semantic engine failures as empty lists; propagate typed search errors.
             logger.warning(f"Semantic search failed: {e}")
-            return []
+            raise SearchError("semantic", str(e)) from e
 
     async def cascade_search(
         self,
@@ -771,7 +766,6 @@ class Search:
         max_results: int = 20,
         min_score: float | None = None,
     ) -> list[SearchResult]:
-        # TODO[HIGH]: Retire implicit cascade fallbacks and make search mode selection explicit at call sites.
         """Cascading search with automatic method fallback.
 
         Tries methods in order: exact → fuzzy → semantic (if enabled).

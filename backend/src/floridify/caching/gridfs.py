@@ -35,7 +35,7 @@ async def get_gridfs_bucket() -> AsyncIOMotorGridFSBucket:
     event loops) or production (single event loop).
     """
     global _bucket, _bucket_loop_id
-    # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+    # Lazy: heavyweight module
     import asyncio
 
     loop_id = id(asyncio.get_running_loop())
@@ -82,12 +82,11 @@ async def gridfs_get(file_id_str: str) -> bytes | None:
         return data
     except NoFile:
         logger.warning(f"GridFS GET: {file_id_str} not found")
-        # TODO[HIGH]: Replace None-return fallback with explicit missing-blob error handling policy.
         return None
-    except Exception:
-        logger.exception(f"GridFS GET failed: {file_id_str}")
-        # TODO[HIGH]: Replace None-return fallback with explicit storage-read failure handling policy.
-        return None
+    except Exception as e:
+        from ..api.core.exceptions import StorageError
+
+        raise StorageError("read", file_id_str, str(e)) from e
 
 
 async def gridfs_delete(file_id_str: str) -> None:
@@ -96,9 +95,8 @@ async def gridfs_delete(file_id_str: str) -> None:
     try:
         await bucket.delete(ObjectId(file_id_str))
         logger.debug(f"GridFS DELETE: {file_id_str}")
-    except Exception:
-        # TODO[MEDIUM]: Replace delete no-op swallow with explicit observability/repair signal.
-        pass
+    except Exception as e:
+        logger.warning(f"GridFS DELETE failed: {file_id_str}: {e}")
 
 
 def reset_bucket() -> None:

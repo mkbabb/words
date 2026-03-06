@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from ebooklib import epub
 from pypdf import PdfReader
 
+from ...api.core.exceptions import ParseError
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -98,28 +99,22 @@ def parse_html(content: str | dict[str, Any]) -> str:
 
 
 def parse_epub(content: bytes | str | dict[str, Any]) -> str:
-    # TODO[CRITICAL]: Remove dict/string fallback parsing and require EPUB-bytes input contract.
     """Parse EPUB content to plain text.
 
     Extracts text from all chapters in the EPUB document.
 
     Args:
-        content: EPUB content as bytes, or text/dict for fallback
+        content: EPUB content as bytes
 
     Returns:
         Clean text extracted from EPUB chapters
 
-    """
-    # TODO[HIGH]: Delete permissive fallback coercion; reject non-EPUB payloads explicitly.
-    # Handle dict/string input - fallback to text parser
-    if isinstance(content, dict):
-        if "content" in content:
-            content = content["content"]
-        else:
-            return parse_text(content)
+    Raises:
+        ParseError: If content is not bytes or parsing fails
 
-    if isinstance(content, str):
-        return parse_text(content)
+    """
+    if not isinstance(content, bytes):
+        raise ParseError("EPUB", "expected bytes input")
 
     # Parse EPUB from bytes
     # ebooklib's read_epub requires a file path, not a file-like object,
@@ -145,41 +140,34 @@ def parse_epub(content: bytes | str | dict[str, Any]) -> str:
 
     except Exception as e:
         logger.error(f"Failed to parse EPUB content: {e}", exc_info=True)
-        # TODO[HIGH]: Replace empty-string fallback with explicit parse failure error.
-        return ""
+        raise ParseError("EPUB", str(e)) from e
 
     finally:
         if tmp_path is not None:
             try:
                 os.unlink(tmp_path)
             except OSError:
-                # TODO[MEDIUM]: Surface temp-file cleanup failures in structured telemetry.
+                # By design: temp file cleanup is best-effort, OS will reclaim
                 pass
 
 
 def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
-    # TODO[CRITICAL]: Remove dict/string fallback parsing and require PDF-bytes input contract.
     """Parse PDF content to plain text.
 
     Extracts text from all pages in the PDF document.
 
     Args:
-        content: PDF content as bytes, or text/dict for fallback
+        content: PDF content as bytes
 
     Returns:
         Clean text extracted from PDF pages
 
-    """
-    # TODO[HIGH]: Delete permissive fallback coercion; reject non-PDF payloads explicitly.
-    # Handle dict/string input - fallback to text parser
-    if isinstance(content, dict):
-        if "content" in content:
-            content = content["content"]
-        else:
-            return parse_text(content)
+    Raises:
+        ParseError: If content is not bytes or parsing fails
 
-    if isinstance(content, str):
-        return parse_text(content)
+    """
+    if not isinstance(content, bytes):
+        raise ParseError("PDF", "expected bytes input")
 
     # Parse PDF from bytes
     try:
@@ -197,8 +185,7 @@ def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
 
     except Exception as e:
         logger.error(f"Failed to parse PDF content: {e}", exc_info=True)
-        # TODO[HIGH]: Replace empty-string fallback with explicit parse failure error.
-        return ""
+        raise ParseError("PDF", str(e)) from e
 
 
 def extract_metadata(content: str | dict[str, Any]) -> dict[str, Any]:

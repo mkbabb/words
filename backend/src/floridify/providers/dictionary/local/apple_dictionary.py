@@ -27,7 +27,9 @@ from ..core import DictionaryConnector
 logger = get_logger(__name__)
 
 try:
-    from CoreServices import DCSCopyTextDefinition as CORE_SERVICES_COPY_TEXT_DEFINITION  # type: ignore[import-untyped]
+    from CoreServices import (
+        DCSCopyTextDefinition as CORE_SERVICES_COPY_TEXT_DEFINITION,  # type: ignore[import-untyped]
+    )
 except ImportError:
     CORE_SERVICES_COPY_TEXT_DEFINITION = None
 
@@ -62,11 +64,17 @@ class AppleDictionaryConnector(DictionaryConnector):
         self._initialize_service()
 
     def _check_platform_compatibility(self) -> bool:
-        """Check if running on macOS (Darwin)."""
+        """Check if running on macOS (Darwin).
+
+        Raises:
+            ServiceUnavailableException: If not running on macOS
+        """
         if platform.system() != "Darwin":
-            # TODO[HIGH]: Replace platform fallback behavior with explicit provider-unavailable failure semantics.
-            logger.warning(f"Apple Dictionary Services not available on {platform.system()}")
-            return False
+            from ....api.core.exceptions import ServiceUnavailableException
+
+            raise ServiceUnavailableException(
+                "Apple Dictionary", f"Only available on macOS (current: {platform.system()})"
+            )
         return True
 
     def _initialize_service(self) -> None:
@@ -76,13 +84,13 @@ class AppleDictionaryConnector(DictionaryConnector):
             return
 
         if CORE_SERVICES_COPY_TEXT_DEFINITION is None:
-            # TODO[HIGH]: Fail explicitly when CoreServices dependency is missing instead of silently disabling provider.
-            logger.warning(
-                "Failed to import CoreServices.DictionaryServices. "
+            from ....api.core.exceptions import ServiceUnavailableException
+
+            raise ServiceUnavailableException(
+                "Apple Dictionary",
+                "CoreServices.DictionaryServices not available. "
                 "Install PyObjC with: pip install pyobjc-framework-CoreServices",
             )
-            self._dictionary_service = None
-            return
 
         self._dictionary_service = CORE_SERVICES_COPY_TEXT_DEFINITION
         logger.info("Apple Dictionary Services initialized successfully")
@@ -101,14 +109,12 @@ class AppleDictionaryConnector(DictionaryConnector):
             Definition text or None if not found
 
         """
-        if not self._is_available():
-            # TODO[MEDIUM]: Revisit None-return fallback for unavailable local provider and emit structured failure.
-            return None
+        if not self._is_available() or not self._dictionary_service:
+            from ....api.core.exceptions import ProviderFetchError
+
+            raise ProviderFetchError("apple", "Dictionary service not available")
 
         try:
-            if not self._dictionary_service:
-                return None
-
             # Create CFRange for the entire word
             word_range = (0, len(word))
 
@@ -116,9 +122,10 @@ class AppleDictionaryConnector(DictionaryConnector):
             definition = self._dictionary_service(None, word, word_range)
             return str(definition) if definition else None
         except Exception as e:
+            from ....api.core.exceptions import ProviderFetchError
+
             logger.error(f"Dictionary lookup failed for '{word}': {e}")
-            # TODO[HIGH]: Do not collapse lookup exceptions to None; propagate explicit connector failure.
-            return None
+            raise ProviderFetchError("apple", str(e)) from e
 
     def _clean_definition_text(self, text: str) -> str:
         """Clean raw definition text from Apple Dictionary.
@@ -431,8 +438,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         # Extract basic information from raw definition
         # Extract part of speech directly from definition text
-        # TODO[MEDIUM]: Replace default POS fallback with explicit unknown/validation flow.
-        part_of_speech = "noun"  # Default fallback
+        part_of_speech = "unknown"  # Default when POS cannot be determined from text
         # Look for part of speech indicators in the raw definition
         pos_pattern = r"(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)"
         match = re.search(pos_pattern, raw_definition, re.IGNORECASE)

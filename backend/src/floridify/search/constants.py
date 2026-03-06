@@ -37,3 +37,12 @@ class FuzzySearchMethod(Enum):
 
 # Search scoring constants
 DEFAULT_MIN_SCORE = 0.3  # Default minimum score threshold - lowered for better typo tolerance
+
+
+class SearchError(RuntimeError):
+    """Raised when a search operation fails."""
+
+    def __init__(self, method: str, reason: str):
+        self.method = method
+        self.reason = reason
+        super().__init__(f"Search failed (method: {method}): {reason}")

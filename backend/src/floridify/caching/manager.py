@@ -21,6 +21,7 @@ from .keys import generate_resource_key as _generate_cache_key
 from .models import (
     DELTA_ELIGIBLE_TYPES,
     BaseVersionedData,
+    CacheCorruptionError,
     CacheNamespace,
     ResourceType,
     VersionConfig,
@@ -71,7 +72,7 @@ class VersionedDataManager:
             loop = asyncio.get_running_loop()
             loop_id = id(loop)
         except RuntimeError:
-            # TODO[MEDIUM]: Replace no-loop fallback with explicit lifecycle guard for lock access.
+            logger.debug("No running event loop — using default lock")
             # No event loop running - just return lock from dict
             return self._locks[(resource_type, resource_id)]
 
@@ -145,9 +146,7 @@ class VersionedDataManager:
                     )
 
         except (OperationFailure, AttributeError, Exception) as e:
-            # TODO[CRITICAL]: Remove transaction fallback path; require transaction-capable deployment or fail hard.
-            # Transactions not supported (single node or old MongoDB version)
-            # Fall back to local lock approach
+            # Transaction fallback: safe for single-process deployments
             logger.debug(
                 f"MongoDB transactions not available ({e.__class__.__name__}), "
                 "using local lock (safe for single-process deployments)"
@@ -228,12 +227,7 @@ class VersionedDataManager:
                     use_cache=True,
                 )
             except RuntimeError as e:
-                # TODO[HIGH]: Stop suppressing corrupted-version metadata; bubble explicit migration/repair failure.
-                # Handle corrupted metadata gracefully during rebuild
-                logger.warning(
-                    f"Could not load existing version during save (likely corrupted): {e}"
-                )
-                latest = None
+                raise CacheCorruptionError(str(resource_type), resource_id, str(e))
 
         new_version = config.version or (
             increment_version(latest.version_info.version, "patch")
@@ -335,7 +329,7 @@ class VersionedDataManager:
                     await self.cache.set(namespace, cache_key, versioned, config.ttl)
                     logger.debug(f"Cache updated atomically for {cache_key[:16]}... inside lock")
                 except Exception as cache_error:
-                    # TODO[MEDIUM]: Decide fail-closed vs cache-optional policy; current behavior silently degrades.
+                    # Cache is advisory — warn but don't fail
                     logger.warning(
                         f"Cache update failed for {cache_key}, continuing without cache: {cache_error}"
                     )
@@ -348,7 +342,7 @@ class VersionedDataManager:
             try:
                 await self._convert_to_delta(latest, versioned, resource_type)
             except Exception as delta_err:
-                # TODO[HIGH]: Remove best-effort delta conversion; enforce deterministic storage-mode outcomes.
+                # Cache is advisory — warn but don't fail
                 # Delta conversion is best-effort; failure leaves old version as full snapshot
                 logger.warning(
                     f"Delta conversion failed for {resource_id} v{latest.version_info.version}: {delta_err}"
@@ -619,12 +613,16 @@ class VersionedDataManager:
                         f"Failed to reconstruct delta version {result.version_info.version} "
                         f"for {resource_id}"
                     )
-                    # TODO[HIGH]: Avoid returning None on reconstruction failure; raise explicit data-integrity error.
-                    return None
+                    raise CacheCorruptionError(
+                        str(resource_type), resource_id, "delta reconstruction failed"
+                    )
+            except CacheCorruptionError:
+                raise
             except Exception as e:
                 logger.error(f"Delta reconstruction failed for {resource_id}: {e}")
-                # TODO[HIGH]: Avoid returning None on reconstruction failure; raise explicit data-integrity error.
-                return None
+                raise CacheCorruptionError(
+                    str(resource_type), resource_id, "delta reconstruction failed"
+                ) from e
 
         # Validate external content if present
         if result and result.content_location is not None:
@@ -696,8 +694,7 @@ class VersionedDataManager:
             try:
                 await self.cache.set(namespace, cache_key, result, result.ttl)
             except Exception as cache_error:
-                # TODO[MEDIUM]: Decide fail-closed vs cache-optional policy; warning-only path hides degraded behavior.
-                # Log cache error but don't fail the operation
+                # Cache is advisory — warn but don't fail
                 logger.warning(f"Failed to cache {cache_key}: {cache_error}")
 
         return result

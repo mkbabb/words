@@ -9,6 +9,12 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis import cluster_definitions
+from ..api.core.exceptions import (
+    NotFoundException,
+    ProviderFetchError,
+    ProviderTimeoutError,
+    SynthesisError,
+)
 from ..models import Etymology
 from ..models.base import Language
 from ..models.dictionary import (
@@ -232,9 +238,8 @@ async def lookup_word_pipeline(
                 )
                 return None
             except Exception as e:
-                # TODO[HIGH]: Stop collapsing synthesis exceptions to None; propagate typed pipeline errors.
                 logger.error(f"❌ AI synthesis failed for '{best_match}': {e}")
-                return None
+                raise SynthesisError(best_match, "synthesis", str(e)) from e
         else:
             # When AI is disabled, create a non-AI synthesized entry from provider data
             logger.info(f"🔧 Creating non-AI synthesized entry for '{best_match}'")
@@ -251,9 +256,8 @@ async def lookup_word_pipeline(
             return None
 
     except Exception as e:
-        # TODO[HIGH]: Replace blanket top-level catch with explicit exception taxonomy + fail-closed behavior.
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")
-        return None
+        raise
 
 
 @log_timing
@@ -277,9 +281,7 @@ async def _get_provider_definition(
         try:
             connector = create_connector(provider)
         except ValueError as e:
-            # TODO[HIGH]: Stop swallowing connector construction errors; surface unsupported-provider failure explicitly.
-            logger.warning(f"Failed to create connector for {provider.value}: {e}")
-            return None
+            raise ProviderFetchError(provider.value, str(e))
 
         storage = await get_storage()
         word_obj = await storage.get_word(word)
@@ -303,9 +305,8 @@ async def _get_provider_definition(
                     timeout=30.0,
                 )
             except TimeoutError:
-                # TODO[MEDIUM]: Replace timeout-to-None behavior with structured timeout errors per provider.
                 logger.warning(f"⏱️ Provider {provider.value} timed out after 30s for '{word}'")
-                return None
+                raise ProviderTimeoutError(provider.value, 30.0)
 
             fetch_duration = time.perf_counter() - fetch_start
 
@@ -332,11 +333,10 @@ async def _get_provider_definition(
     except Exception as e:
         log_provider_fetch(provider_name=provider.value, word=word, success=False)
 
-        # TODO[HIGH]: Do not mask provider exceptions as empty results; bubble explicit failure state.
         logger.error(f"❌ Provider {provider.value} failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
-        return None
+        raise ProviderFetchError(provider.value, str(e)) from e
 
 
 @log_timing
@@ -375,10 +375,9 @@ async def _synthesize_with_ai(
 
         return result
     except Exception as e:
-        # TODO[HIGH]: Propagate synthesis errors instead of returning None to preserve failure causality.
         logger.error(f"❌ AI synthesis failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
-        return None
+        raise SynthesisError(word, "ai", str(e)) from e
 
 
 @log_timing
@@ -402,8 +401,7 @@ async def _create_provider_mapped_entry(
         word_obj = await Word.get(provider_data.word_id)
         if not word_obj:
             logger.error(f"Word object not found for ID: {provider_data.word_id}")
-            # TODO[HIGH]: Convert this implicit None path into explicit not-found failure.
-            return None
+            raise NotFoundException("Word", str(provider_data.word_id))
 
         # Load all definitions from provider
         all_definitions: list[Definition] = []
@@ -414,8 +412,7 @@ async def _create_provider_mapped_entry(
 
         if not all_definitions:
             logger.warning("No definitions found for provider data")
-            # TODO[HIGH]: Convert missing-definition fallback into explicit provider-data validation failure.
-            return None
+            raise ProviderFetchError("mapping", "No definitions found for provider data")
 
         if no_ai:
             # Skip all AI operations — use raw provider definitions as-is
@@ -504,6 +501,5 @@ async def _create_provider_mapped_entry(
         return synthesized_entry
 
     except Exception as e:
-        # TODO[HIGH]: Replace catch-all/None return with explicit provider-mapping error propagation.
         logger.error(f"❌ Failed to create provider-mapped entry: {e}")
-        return None
+        raise SynthesisError(word, "mapping", str(e)) from e

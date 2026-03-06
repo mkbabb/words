@@ -18,6 +18,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pymongo import IndexModel
 
 
+class CacheCorruptionError(RuntimeError):
+    """Raised when cached data is corrupted or unrecoverable."""
+
+    def __init__(self, resource_type: str, resource_id: str, reason: str):
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+        self.reason = reason
+        super().__init__(f"Cache corruption: {resource_type}/{resource_id}: {reason}")
+
+
 class CompressionType(str, Enum):
     """Compression algorithms for cache data.
 
@@ -140,13 +150,6 @@ class ContentLocation(BaseModel):
     size_compressed: int | None = None
     checksum: str
 
-    def __eq__(self, other: object) -> bool:
-        # TODO[HIGH]: Remove string-comparison compatibility path; compare only typed ContentLocation values.
-        """Allow comparison with strings for backward compatibility."""
-        if isinstance(other, str):
-            return self.path == other
-        return super().__eq__(other)
-
 
 class VersionInfo(BaseModel):
     """Version tracking with chain management.
@@ -163,8 +166,7 @@ class VersionInfo(BaseModel):
     supersedes: PydanticObjectId | None = None
     dependencies: list[PydanticObjectId] = Field(default_factory=list)
 
-    # TODO[MEDIUM]: Remove backward-compatible delta defaults after full storage-mode migration.
-    # Delta versioning fields (backward-compatible defaults)
+    # Delta versioning fields
     storage_mode: Literal["snapshot", "delta"] = "snapshot"
     delta_base_id: PydanticObjectId | None = None  # Nearest snapshot this delta reconstructs from
 
@@ -244,7 +246,12 @@ class BaseVersionedData(Document):
             # PRIMARY: Latest version lookup (most frequent query)
             # Covers: resource_type + resource_id + is_latest filter + _id sort
             IndexModel(
-                [("resource_type", 1), ("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
+                [
+                    ("resource_type", 1),
+                    ("resource_id", 1),
+                    ("version_info.is_latest", 1),
+                    ("_id", -1),
+                ],
                 name="resource_type_id_latest_idx",
             ),
             # Specific version lookup
@@ -307,8 +314,7 @@ class BaseVersionedData(Document):
             settings = cls.get_settings()
             settings.class_id = "_class_id"
         except Exception:
-            # TODO[MEDIUM]: Replace best-effort class-id sync with explicit initialization invariant.
-            # get_settings may fail before Beanie initialization; best-effort update only
+            # get_settings() may fail before Beanie initialization
             pass
 
     @field_validator("namespace", mode="before")

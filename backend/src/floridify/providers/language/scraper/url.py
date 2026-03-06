@@ -102,9 +102,10 @@ class URLLanguageConnector(LanguageConnector):
                     json_data = json.loads(content)
                     if isinstance(json_data, dict) and "idioms" in json_data:
                         idioms = list(dict.fromkeys(json_data.get("idioms", [])))
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # TODO[MEDIUM]: Replace JSON parse swallow with explicit metadata-parse error reporting.
-                    pass
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
+                    logger.warning(
+                        f"Failed to parse idioms from JSON metadata for {source.name}: {e}"
+                    )
 
             if isinstance(content, dict):
                 idioms = list(dict.fromkeys(content.get("idioms", [])))
@@ -127,5 +128,6 @@ class URLLanguageConnector(LanguageConnector):
                     message=f"Failed to fetch {source.name}: {e!s}",
                     error=str(e),
                 )
-            # TODO[HIGH]: Replace None fallback with explicit source-fetch failure propagation.
-            return None
+            raise RuntimeError(
+                f"Source fetch failed for '{source.name}' ({source.url}): {e}"
+            ) from e

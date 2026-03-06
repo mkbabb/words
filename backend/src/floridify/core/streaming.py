@@ -183,8 +183,7 @@ async def create_streaming_response(
                         try:
                             await process_task
                         except asyncio.CancelledError:
-                            # TODO[MEDIUM]: Emit explicit timeout-cancellation outcome instead of silent swallow.
-                            pass
+                            logger.info("Stream timeout: task cancelled")
                         error_event = SSEEvent(
                             event_type="error",
                             data={"type": "error", "message": "Stream timeout exceeded"},
@@ -258,8 +257,7 @@ async def create_streaming_response(
                 try:
                     await process_task
                 except asyncio.CancelledError:
-                    # TODO[MEDIUM]: Emit explicit disconnect-cancellation outcome instead of silent swallow.
-                    pass
+                    logger.info("Client disconnect: task cancelled")
         except Exception as e:
             logger.error(f"Streaming generator error: {e}")
             error_event = SSEEvent(
@@ -273,9 +271,8 @@ async def create_streaming_response(
                 process_task.cancel()
                 try:
                     await process_task
-                except (asyncio.CancelledError, Exception):
-                    # TODO[MEDIUM]: Differentiate cancellation vs task failure; avoid blanket swallow in cleanup.
-                    pass
+                except (asyncio.CancelledError, Exception) as e:
+                    logger.debug(f"Cleanup: {type(e).__name__}")
 
     return StreamingResponse(
         event_generator(),
