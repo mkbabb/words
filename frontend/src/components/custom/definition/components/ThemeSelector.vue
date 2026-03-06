@@ -62,14 +62,8 @@
                 />
             </button>
 
-            <Transition
-                enter-active-class="transition-all duration-400 ease-apple-spring"
-                leave-active-class="transition-all duration-250 ease-apple-bounce-in"
-                enter-from-class="opacity-0 scale-95 -translate-y-2"
-                enter-to-class="opacity-100 scale-100 translate-y-0"
-                leave-from-class="opacity-100 scale-100 translate-y-0"
-                leave-to-class="opacity-0 scale-95 -translate-y-2"
-            >
+            <Transition name="theme-dropdown">
+
                 <div
                     v-if="showDropdown"
                     class="absolute top-full right-0 z-60 mt-4 min-w-[140px] origin-top-right rounded-md border bg-popover text-popover-foreground shadow-md"
@@ -150,3 +144,37 @@ const selectTheme = (theme: CardVariant) => {
     emit('toggle-dropdown'); // Close dropdown after selection
 };
 </script>
+
+<style scoped>
+.theme-dropdown-enter-active {
+    transition:
+        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        transform 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.theme-dropdown-leave-active {
+    transition:
+        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1),
+        transform 200ms cubic-bezier(0.4, 0.0, 1, 1);
+}
+
+.theme-dropdown-enter-from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+}
+
+.theme-dropdown-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.theme-dropdown-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.theme-dropdown-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+}
+</style>

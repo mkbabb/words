@@ -183,12 +183,13 @@
             <div class="absolute top-full right-0 left-0 z-40 pt-2">
                 <!-- Controls Dropdown — height transition wrapper -->
                 <div
-                    class="overflow-hidden transition-all duration-350 ease-apple-spring"
-                    :style="{
-                        maxHeight: searchBar.showSearchControls ? '500px' : '0px',
-                        opacity: searchBar.showSearchControls ? 1 : 0,
-                        marginBottom: searchBar.showSearchControls ? '0.5rem' : '0px',
-                    }"
+                    :class="[
+                        'overflow-hidden',
+                        'controls-dropdown-wrapper',
+                        searchBar.showSearchControls
+                            ? 'controls-dropdown-open'
+                            : 'controls-dropdown-closed',
+                    ]"
                 >
                     <SearchControls
                         :show="true"
@@ -475,9 +476,10 @@ const { performSearch, clearSearch, cleanup: cleanupSearch } = orchestrator;
 const aiQueryDetection = useAIQueryDetection();
 const semanticPoller = useSemanticStatusPoller();
 
-// Start both immediately (lookup is the default mode)
-aiQueryDetection.start();
-semanticPoller.start();
+if (searchBar.searchMode === 'lookup') {
+    aiQueryDetection.start();
+    semanticPoller.start();
+}
 
 // Restart/stop when the search mode changes
 watch(
@@ -560,6 +562,9 @@ const toggleControls = () => {
 };
 
 const selectWord = async (word: string) => {
+    searchBar.hideDropdown();
+    searchBar.hideControls();
+    searchBar.clearResults();
     searchBar.setDirectLookup(true);
     try {
         const subMode = searchBar.getSubMode('lookup');
@@ -709,6 +714,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/*
+ * Controls dropdown: split opacity and transform onto separate easings.
+ * Opacity uses a fast ease-out (no overshoot) so content is fully opaque
+ * early in the animation. Height/margin use the spring easing for bounce.
+ */
+.controls-dropdown-wrapper {
+    will-change: max-height, opacity, margin-bottom;
+}
+
+.controls-dropdown-open {
+    max-height: 500px;
+    opacity: 1;
+    margin-bottom: 0.5rem;
+    transition:
+        max-height 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
+        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        margin-bottom 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.controls-dropdown-closed {
+    max-height: 0px;
+    opacity: 0;
+    margin-bottom: 0px;
+    transition:
+        max-height 250ms cubic-bezier(0.4, 0.0, 1, 1),
+        opacity 180ms cubic-bezier(0.4, 0.0, 1, 1) 40ms,
+        margin-bottom 250ms cubic-bezier(0.4, 0.0, 1, 1);
+}
+
 /* Disable animations for reduced motion */
 @media (prefers-reduced-motion: reduce) {
     * {

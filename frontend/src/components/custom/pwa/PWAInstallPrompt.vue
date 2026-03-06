@@ -1,11 +1,6 @@
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition-all duration-500 ease-apple-spring"
-      leave-active-class="transition-all duration-350 ease-apple-smooth"
-      enter-from-class="opacity-0 scale-95 translate-y-8"
-      leave-to-class="opacity-0 scale-95 translate-y-8"
-    >
+    <Transition name="pwa-prompt">
       <div
         v-if="showPrompt && !isMinimized"
         class="fixed bottom-6 left-6 right-6 z-50 max-w-md mx-auto"
@@ -137,12 +132,7 @@
     </Transition>
 
     <!-- Minimized state -->
-    <Transition
-      enter-active-class="transition-all duration-350 ease-apple-spring"
-      leave-active-class="transition-all duration-250 ease-apple-smooth"
-      enter-from-class="opacity-0 scale-90"
-      leave-to-class="opacity-0 scale-90"
-    >
+    <Transition name="pwa-minimized">
       <button
         v-if="showPrompt && isMinimized"
         @click="restore"
@@ -282,3 +272,55 @@ onUnmounted(() => {
   window.removeEventListener('show-pwa-prompt', handleShowPWAPrompt);
 });
 </script>
+
+<style scoped>
+/* PWA prompt: opacity fast ease-out, transform spring */
+.pwa-prompt-enter-active {
+    transition:
+        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        transform 450ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pwa-prompt-leave-active {
+    transition:
+        opacity 200ms cubic-bezier(0.4, 0.0, 0.2, 1),
+        transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.pwa-prompt-enter-from,
+.pwa-prompt-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+}
+
+.pwa-prompt-enter-to,
+.pwa-prompt-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+/* PWA minimized button */
+.pwa-minimized-enter-active {
+    transition:
+        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pwa-minimized-leave-active {
+    transition:
+        opacity 150ms cubic-bezier(0.4, 0.0, 0.2, 1),
+        transform 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.pwa-minimized-enter-from,
+.pwa-minimized-leave-to {
+    opacity: 0;
+    transform: scale(0.9);
+}
+
+.pwa-minimized-enter-to,
+.pwa-minimized-leave-from {
+    opacity: 1;
+    transform: scale(1);
+}
+</style>

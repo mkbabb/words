@@ -1,13 +1,13 @@
 <template>
     <div class="space-y-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
+        <!-- Header (only when a wordlist is selected) -->
+        <div v-if="currentWordlist" class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">
-                    {{ currentWordlist?.name || 'Wordlist' }}
+                    {{ currentWordlist.name }}
                 </h1>
                 <p
-                    v-if="currentWordlist?.description"
+                    v-if="currentWordlist.description"
                     class="mt-1 text-muted-foreground"
                 >
                     {{ currentWordlist.description }}
@@ -15,8 +15,9 @@
             </div>
         </div>
 
-        <!-- Statistics -->
+        <!-- Statistics (only when a wordlist is selected) -->
         <WordlistStatsBar
+            v-if="currentWordlist"
             :wordlist="currentWordlist"
             :mastered="masteryStats.gold"
             :due-for-review="dueForReview"
@@ -32,35 +33,30 @@
             </div>
         </div>
 
-        <!-- Empty State -->
+        <!-- Empty State / Help Screen -->
         <div
             v-else-if="!currentWordlist || currentWords.length === 0"
-            class="py-16 text-center"
+            class="py-8"
         >
-            <div class="mx-auto max-w-sm">
-                <div v-if="!currentWordlist" class="space-y-4">
-                    <BookOpen
-                        class="mx-auto h-16 w-16 text-muted-foreground/50"
-                    />
-                    <h3 class="text-lg font-semibold">No Wordlist Selected</h3>
-                    <p class="text-muted-foreground">
-                        Select a wordlist from the sidebar to start learning.
-                    </p>
-                </div>
-                <div v-else class="space-y-4">
-                    <FileText
-                        class="mx-auto h-16 w-16 text-muted-foreground/50"
-                    />
-                    <h3 class="text-lg font-semibold">No Words Found</h3>
-                    <p class="text-muted-foreground">
-                        {{
-                            searchBar.searchQuery
-                                ? 'Try adjusting your search or filters.'
-                                : 'Add some words to get started.'
-                        }}
-                    </p>
-                </div>
-            </div>
+            <!-- No wordlist selected (or none available) -->
+            <EmptyState
+                v-if="!currentWordlist"
+                title="Start with a wordlist"
+                message="Create a new wordlist or select one from the sidebar to begin reviewing words."
+                empty-type="generic"
+            />
+
+            <!-- Selected wordlist but no words / no matches -->
+            <EmptyState
+                v-else
+                title="This wordlist is feeling empty"
+                :message="
+                    searchBar.searchQuery
+                        ? 'No words match this search. Try changing your query or filters.'
+                        : 'Add words to this list or upload a file to get started.'
+                "
+                empty-type="generic"
+            />
         </div>
 
         <!-- Word Cards Grid -->
@@ -139,7 +135,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useStores } from '@/stores';
-import { BookOpen, FileText } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import type { WordListItem, WordList } from '@/types';
 import { wordlistApi } from '@/api';
@@ -154,6 +149,7 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { applySortCriteria } from './utils/sortWords';
 import { logger } from '@/utils/logger';
+import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 
 const { searchBar } = useStores();
 const wordlistMode = useWordlistMode();

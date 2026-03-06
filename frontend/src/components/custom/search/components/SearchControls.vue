@@ -36,28 +36,33 @@
                 <div class="w-10 lg:hidden"></div>
             </div>
 
-            <!-- Lookup Mode Controls -->
-            <LookupControlsPanel
-                v-if="searchMode === 'lookup'"
-                v-model:selected-sources="selectedSources"
-                v-model:selected-languages="selectedLanguages"
-                v-model:no-a-i="noAI"
-                :ai-suggestions="aiSuggestions"
-                :is-development="isDevelopment"
-                :show-refresh-button="showRefreshButton"
-                :force-refresh-mode="forceRefreshMode"
-                @word-select="$emit('word-select', $event)"
-                @clear-storage="emit('clear-storage')"
-                @toggle-sidebar="emit('toggle-sidebar')"
-                @toggle-refresh="emit('toggle-refresh')"
-            />
+            <!-- Mode-Specific Controls (animated switch) -->
+            <Transition name="controls-mode-switch" mode="out-in">
+                <div :key="searchMode">
+                    <!-- Lookup Mode Controls -->
+                    <LookupControlsPanel
+                        v-if="searchMode === 'lookup'"
+                        v-model:selected-sources="selectedSources"
+                        v-model:selected-languages="selectedLanguages"
+                        v-model:no-a-i="noAI"
+                        :ai-suggestions="aiSuggestions"
+                        :is-development="isDevelopment"
+                        :show-refresh-button="showRefreshButton"
+                        :force-refresh-mode="forceRefreshMode"
+                        @word-select="$emit('word-select', $event)"
+                        @clear-storage="emit('clear-storage')"
+                        @toggle-sidebar="emit('toggle-sidebar')"
+                        @toggle-refresh="emit('toggle-refresh')"
+                    />
 
-            <!-- Wordlist Mode Controls -->
-            <WordlistControlsPanel
-                v-if="searchMode === 'wordlist'"
-                v-model:wordlist-filters="wordlistFilters"
-                v-model:wordlist-sort-criteria="wordlistSortCriteria"
-            />
+                    <!-- Wordlist Mode Controls -->
+                    <WordlistControlsPanel
+                        v-else-if="searchMode === 'wordlist'"
+                        v-model:wordlist-filters="wordlistFilters"
+                        v-model:wordlist-sort-criteria="wordlistSortCriteria"
+                    />
+                </div>
+            </Transition>
     </div>
 </template>
 
@@ -179,3 +184,38 @@ defineExpose({
     element: controlsDropdown,
 });
 </script>
+
+<style scoped>
+/* Mode switch transitions — opacity uses fast ease-out, transform uses spring */
+.controls-mode-switch-enter-active {
+    transition:
+        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        transform 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.controls-mode-switch-leave-active {
+    transition:
+        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1),
+        transform 200ms cubic-bezier(0.4, 0.0, 1, 1);
+}
+
+.controls-mode-switch-enter-from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+}
+
+.controls-mode-switch-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.controls-mode-switch-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.controls-mode-switch-leave-to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+}
+</style>

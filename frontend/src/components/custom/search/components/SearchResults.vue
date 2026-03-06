@@ -1,11 +1,6 @@
 <template>
     <Transition
-        enter-active-class="transition-all duration-350 ease-apple-elastic"
-        leave-active-class="transition-all duration-200 ease-apple-bounce-in"
-        enter-from-class="opacity-0 scale-90 translate-y-6 rotate-1"
-        enter-to-class="opacity-100 scale-100 translate-y-0 rotate-0"
-        leave-from-class="opacity-100 scale-100 translate-y-0 rotate-0"
-        leave-to-class="opacity-0 scale-90 translate-y-6 rotate-1"
+        name="results-dropdown"
     >
         <div
             v-if="show"
@@ -251,3 +246,42 @@ defineExpose({
     resultRefs,
 });
 </script>
+
+<style scoped>
+/*
+ * Results dropdown: split opacity (fast ease-out) from transform (elastic spring).
+ * Opacity reaches 1 within the first ~40% of the animation so content is solid
+ * while the transform spring is still resolving.
+ */
+.results-dropdown-enter-active {
+    transition:
+        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
+        transform 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.results-dropdown-leave-active {
+    transition:
+        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1) 30ms,
+        transform 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045);
+}
+
+.results-dropdown-enter-from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+}
+
+.results-dropdown-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.results-dropdown-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.results-dropdown-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+}
+</style>
