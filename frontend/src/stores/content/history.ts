@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, readonly, computed } from 'vue'
 import { generateId } from '@/utils'
 import { suggestionsApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import { logger } from '@/utils/logger'
 import type {
   SearchHistory,
@@ -224,6 +225,10 @@ export const useHistoryStore = defineStore('history', () => {
 
   // Vocabulary suggestions management
   const refreshVocabularySuggestions = async (forceRefresh = false) => {
+    // Suggestions endpoint requires authentication
+    const auth = useAuthStore()
+    if (!auth.isAuthenticated) return
+
     const ONE_HOUR = 60 * 60 * 1000
     const currentWord = lookupHistory.value[0]?.word // Most recent lookup
     const cache = suggestionsCache.value
@@ -272,6 +277,9 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   const getHistoryBasedSuggestions = async (): Promise<string[]> => {
+    const auth = useAuthStore()
+    if (!auth.isAuthenticated) return []
+
     try {
       const recentWords = recentLookupWords.value.slice(0, 10)
       const response = await suggestionsApi.getVocabulary(recentWords)

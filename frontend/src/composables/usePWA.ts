@@ -51,8 +51,10 @@ export function usePWA() {
     }
     
     try {
-      const registration = await navigator.serviceWorker.register('/service-worker.js', {
-        scope: '/'
+      const basePath = import.meta.env.BASE_URL || '/';
+      const swPath = `${basePath}service-worker.js`.replace(/\/\//g, '/');
+      const registration = await navigator.serviceWorker.register(swPath, {
+        scope: basePath
       });
       
       serviceWorkerRegistration.value = registration;

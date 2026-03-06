@@ -103,6 +103,11 @@ api.interceptors.response.use(
     return response;
   },
   error => {
+    // Don't log cancelled/aborted requests — these are normal during rapid typing
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+
     logger.error('API Error:', {
       url: error.config?.url,
       method: error.config?.method,

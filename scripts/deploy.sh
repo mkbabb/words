@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-DEPLOY_HOST="${DEPLOY_HOST:-mbabb.friday.institute}"
+DEPLOY_HOST="${DEPLOY_HOST:-mbabb.fridayinstitute.net}"
 DEPLOY_PORT="${DEPLOY_PORT:-1022}"
 DEPLOY_USER="${DEPLOY_USER:-mbabb}"
 DOMAIN="${DOMAIN:-mbabb.friday.institute}"
@@ -142,7 +142,7 @@ verify_deployment() {
 
     # Check if the application responds
     print_info "Testing application endpoint..."
-    response=$(curl -s -o /dev/null -w "%{http_code}" -L https://$DOMAIN/words/api/health || echo "000")
+    response=$(curl -s -o /dev/null -w "%{http_code}" -L https://$DOMAIN/words/api/v1/health || echo "000")
 
     if [ "$response" = "200" ]; then
         print_status "Application is healthy at https://$DOMAIN/words/"
@@ -188,13 +188,13 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  4. Building and running Docker containers with SSL profile"
     echo ""
     echo "Prerequisites:"
-    echo "  - SSH access to deployment server (mbabb.friday.institute:1022)"
+    echo "  - SSH access to deployment server (mbabb.fridayinstitute.net:1022)"
     echo "  - Local auth/ directory with config.toml"
     echo "  - Local .env.production file"
     echo "  - Docker and Docker Compose installed on server"
     echo ""
     echo "Environment Variables:"
-    echo "  DEPLOY_HOST   - Server hostname (default: mbabb.friday.institute)"
+    echo "  DEPLOY_HOST   - SSH hostname (default: mbabb.fridayinstitute.net)"
     echo "  DEPLOY_PORT   - SSH port (default: 1022)"
     echo "  DEPLOY_USER   - SSH username (default: mbabb)"
     echo "  DOMAIN        - Domain name (default: mbabb.friday.institute)"
