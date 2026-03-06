@@ -1,7 +1,5 @@
 """API middleware for logging, error handling, and caching."""
 
-from __future__ import annotations
-
 import hashlib
 import time
 import uuid

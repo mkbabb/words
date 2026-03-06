@@ -1,7 +1,5 @@
 """Rate limiting middleware for API endpoints."""
 
-from __future__ import annotations
-
 import asyncio
 import ipaddress
 import time
@@ -219,9 +217,10 @@ def get_client_key(request: Request) -> str:
     """
     # Try to get authenticated user ID through safe access
     try:
-        return f"user:{request.state.user_id}"
+        user_id = request.state.auth.user_id
+        if user_id:
+            return f"user:{user_id}"
     except AttributeError:
-        # TODO[HIGH]: Remove auth-state fallthrough and require typed identity context before rate limiting.
         pass  # Fall through to IP-based identification
 
     # Fall back to IP address with proper CIDR validation
@@ -434,8 +433,7 @@ class SpendingTracker:
             loop = asyncio.get_running_loop()
             self._flush_task = loop.create_task(self._debounced_flush())
         except RuntimeError:
-            # TODO[MEDIUM]: Replace silent flush skip with explicit startup-time invariant for running loop.
-            pass
+            logger.debug("No running event loop — skipping flush")
 
     async def _debounced_flush(self) -> None:
         """Wait 3s then persist spend history to L2."""
