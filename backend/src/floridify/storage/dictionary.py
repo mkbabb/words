@@ -76,6 +76,9 @@ async def save_entry_versioned(
         else:
             metadata["model_info"] = entry.model_info.model_dump(mode="json")
 
+    if entry.source_entries:
+        metadata["source_entries"] = [se.model_dump(mode="json") for se in entry.source_entries]
+
     if extra_metadata:
         metadata.update(extra_metadata)
 
@@ -101,6 +104,7 @@ async def save_entry_versioned(
             existing_live.fact_ids = entry.fact_ids
             existing_live.languages = entry.languages
             existing_live.etymology = entry.etymology
+            existing_live.source_entries = entry.source_entries
             existing_live.model_info = entry.model_info
             existing_live.raw_data = entry.raw_data
             await existing_live.save()

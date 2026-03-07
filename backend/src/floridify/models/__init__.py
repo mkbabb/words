@@ -15,6 +15,7 @@ from .dictionary import (
     Fact,
     LiteratureSourceExample,
     Pronunciation,
+    SourceReference,
     Word,
 )
 from .literature import AuthorInfo, Genre, Period
@@ -76,6 +77,7 @@ __all__ = [
     "ModelInfo",
     "Period",
     "Pronunciation",
+    "SourceReference",
     "UsageNote",
     "Word",
     "WordForm",

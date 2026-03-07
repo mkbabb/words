@@ -6,15 +6,18 @@ import asyncio
 from enum import Enum
 from pathlib import Path
 
+from ..caching.manager import get_version_manager
+from ..caching.models import ResourceType
 from ..core.state_tracker import Stages, StateTracker
 from ..models.base import Language
 from ..models.dictionary import (
     Definition,
     DictionaryEntry,
     DictionaryProvider,
+    SourceReference,
     Word,
 )
-from ..storage.dictionary import save_definition_versioned, save_entry_versioned
+from ..storage.dictionary import _provider_str, save_definition_versioned, save_entry_versioned
 from ..storage.mongodb import get_storage
 from ..utils.language_precedence import (
     to_language_codes,
@@ -96,6 +99,27 @@ class DefinitionSynthesizer:
         if not all_definitions:
             logger.warning(f"No definitions found for '{word}'")
             return None
+
+        # Build provenance: which provider entry + version contributed which definitions
+        source_entries: list[SourceReference] = []
+        manager = get_version_manager()
+        for provider_entry in providers_data:
+            provider_value = _provider_str(provider_entry.provider)
+            resource_id = f"{word_obj.text if isinstance(word, Word) else word}:{provider_value}"
+            try:
+                latest = await manager.get_latest(resource_id, ResourceType.DICTIONARY)
+                entry_version = latest.version_info.version if latest else "1.0.0"
+            except Exception:
+                entry_version = "1.0.0"
+
+            source_entries.append(
+                SourceReference(
+                    provider=provider_entry.provider,
+                    entry_id=provider_entry.id,
+                    entry_version=entry_version,
+                    definition_ids=list(provider_entry.definition_ids),
+                )
+            )
 
         # DEDUPLICATION: Use AI to identify and merge near-duplicates before clustering
         logger.info(f"Deduplicating {len(all_definitions)} definitions before clustering")
@@ -199,6 +223,7 @@ class DefinitionSynthesizer:
             definition_ids=[d.id for d in synthesized_definitions if d.id is not None],
             etymology=etymology,
             fact_ids=[f.id for f in facts if f.id is not None],
+            source_entries=source_entries,
             model_info=self.ai.last_model_info,  # Use full model info from AI
         )
 
@@ -280,6 +305,19 @@ class DefinitionSynthesizer:
                 if d.providers:
                     providers_set.update(d.providers)
 
+            # Track which provider defs contributed to this synthesized definition
+            source_defs: list[SourceReference] = []
+            for d in cluster_defs:
+                if d.dictionary_entry_id and d.providers:
+                    source_defs.append(
+                        SourceReference(
+                            provider=d.providers[0],
+                            entry_id=d.dictionary_entry_id,
+                            entry_version="",  # Filled from parent entry provenance
+                            definition_ids=[d.id] if d.id else [],
+                        )
+                    )
+
             definition = Definition(
                 word_id=word.id,
                 part_of_speech=synthesis_result["part_of_speech"],
@@ -288,6 +326,7 @@ class DefinitionSynthesizer:
                 providers=(
                     list(providers_set) if providers_set else [DictionaryProvider.SYNTHESIS]
                 ),
+                source_definitions=source_defs,
                 model_info=self.ai.last_model_info,  # Set model info from AI connector
             )
             await save_definition_versioned(definition, word.text)

@@ -49,6 +49,15 @@ class DictionaryProvider(Enum):
         return display_names.get(self, self.value.title())
 
 
+class SourceReference(BaseModel):
+    """Links a synthesized definition back to its source provider data."""
+
+    provider: DictionaryProvider
+    entry_id: PydanticObjectId  # Provider DictionaryEntry._id
+    entry_version: str = ""  # e.g. "1.0.3" — version at time of synthesis
+    definition_ids: list[PydanticObjectId] = Field(default_factory=list)
+
+
 class Word(Document, BaseMetadata):
     """Core word entity."""
 
@@ -201,6 +210,7 @@ class Definition(Document, BaseMetadata):
         None  # FK to DictionaryEntry - optimized with ObjectId
     )
     providers: list[DictionaryProvider] = []  # List of providers this definition is sourced from
+    source_definitions: list[SourceReference] = Field(default_factory=list)
     model_info: ModelInfo | None = None  # If AI-generated/synthesized
 
     class Settings:
@@ -227,6 +237,9 @@ class DictionaryEntry(Document, BaseMetadata):
     etymology: Etymology | None = None
     raw_data: dict[str, Any] | None = None  # Original API response
 
+    # Provenance: which provider entries/versions fed this synthesis
+    source_entries: list[SourceReference] = Field(default_factory=list)
+
     # Synthesis metadata (populated for synthesized entries)
     model_info: ModelInfo | None = None  # AI model info for synthesized entries
 
@@ -249,5 +262,6 @@ __all__ = [
     "Fact",
     "LiteratureSourceExample",
     "Pronunciation",
+    "SourceReference",
     "Word",
 ]
