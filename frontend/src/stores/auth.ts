@@ -15,8 +15,11 @@ export const useAuthStore = defineStore('auth', () => {
   const profileLoading = ref(false);
   const profileError = ref<string | null>(null);
 
+  // Dev mode: grant admin access without login (dev only)
+  const devAdmin = import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN === 'true';
+
   // Computed auth state
-  const isAuthenticated = computed(() => isSignedIn.value === true);
+  const isAuthenticated = computed(() => devAdmin || isSignedIn.value === true);
   const user = computed(() => {
     if (!clerkUser.value) return null;
     return {
@@ -26,7 +29,10 @@ export const useAuthStore = defineStore('auth', () => {
     };
   });
 
-  const role = computed<UserRole>(() => profile.value?.role ?? 'user');
+  const role = computed<UserRole>(() => {
+    if (devAdmin) return 'admin';
+    return profile.value?.role ?? 'user';
+  });
   const isAdmin = computed(() => role.value === 'admin');
   const isPremium = computed(
     () => role.value === 'premium' || role.value === 'admin'

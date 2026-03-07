@@ -186,6 +186,10 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'dictionary');
         searchBar.setQuery(word);
 
+        // Close controls and results dropdowns on definition route entry
+        searchBar.hideControls();
+        searchBar.hideDropdown();
+
         // Always fetch when the word changes — skip only if we already have this exact word.
         // This is the single source of truth for definition fetches on route changes.
         if (!content.currentEntry || content.currentEntry.word !== word) {
@@ -200,6 +204,9 @@ watch(() => route.fullPath, async () => {
                 });
                 if (definition) {
                     content.setCurrentEntry(definition);
+                    // Close dropdowns after lookup completes
+                    searchBar.hideControls();
+                    searchBar.hideDropdown();
                 }
             } catch (error: any) {
                 const message = error?.message || '';
@@ -222,6 +229,10 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'thesaurus');
         searchBar.setQuery(word);
 
+        // Close controls and results dropdowns on thesaurus route entry
+        searchBar.hideControls();
+        searchBar.hideDropdown();
+
         // Always fetch when the word changes
         const hasThesaurus = content.currentThesaurus &&
             content.currentThesaurus.word === word;
@@ -230,6 +241,9 @@ watch(() => route.fullPath, async () => {
                 const data = await orchestrator.getThesaurusData(word);
                 if (data) {
                     content.setCurrentThesaurus(data);
+                    // Close dropdowns after lookup completes
+                    searchBar.hideControls();
+                    searchBar.hideDropdown();
                 }
             } catch (error: any) {
                 const message = error?.message || '';
