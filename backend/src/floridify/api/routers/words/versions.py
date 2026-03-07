@@ -149,6 +149,106 @@ async def diff_word_versions(
     )
 
 
+# --- Per-Provider Version Endpoints ---
+
+
+@router.get("/{word}/providers/{provider}/versions", response_model=VersionHistoryResponse)
+async def list_provider_versions(word: str, provider: str) -> VersionHistoryResponse:
+    """List all versions of a word's provider entry (e.g. wiktionary, oxford)."""
+    resource_id = f"{word}:{provider}"
+    manager = get_version_manager()
+
+    versions = await manager.list_versions(resource_id, ResourceType.DICTIONARY)
+    if not versions:
+        raise HTTPException(status_code=404, detail=f"No versions found for {word}:{provider}")
+
+    versions.sort(key=lambda v: v.version_info.created_at, reverse=True)
+
+    summaries = [
+        VersionSummary(
+            version=v.version_info.version,
+            created_at=v.version_info.created_at,
+            data_hash=v.version_info.data_hash,
+            storage_mode=v.version_info.storage_mode,
+            is_latest=v.version_info.is_latest,
+        )
+        for v in versions
+    ]
+
+    return VersionHistoryResponse(
+        resource_id=resource_id,
+        total_versions=len(summaries),
+        versions=summaries,
+    )
+
+
+@router.get("/{word}/providers/{provider}/versions/{version}")
+async def get_provider_version(word: str, provider: str, version: str) -> dict[str, Any]:
+    """Get specific version of a provider entry."""
+    resource_id = f"{word}:{provider}"
+    manager = get_version_manager()
+
+    result = await manager.get_by_version(
+        resource_id, ResourceType.DICTIONARY, version, use_cache=False
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version {version} not found for {word}:{provider}",
+        )
+
+    return {
+        "resource_id": resource_id,
+        "version": result.version_info.version,
+        "created_at": result.version_info.created_at.isoformat(),
+        "data_hash": result.version_info.data_hash,
+        "storage_mode": result.version_info.storage_mode,
+        "is_latest": result.version_info.is_latest,
+        "content": result.content_inline,
+    }
+
+
+@router.get("/{word}/providers/{provider}/diff", response_model=VersionDiffResponse)
+async def diff_provider_versions(
+    word: str,
+    provider: str,
+    from_version: str = Query(..., alias="from", description="Source version"),
+    to_version: str = Query(..., alias="to", description="Target version"),
+) -> VersionDiffResponse:
+    """Diff two versions of a provider entry."""
+    resource_id = f"{word}:{provider}"
+    manager = get_version_manager()
+
+    from_result = await manager.get_by_version(
+        resource_id, ResourceType.DICTIONARY, from_version, use_cache=False
+    )
+    to_result = await manager.get_by_version(
+        resource_id, ResourceType.DICTIONARY, to_version, use_cache=False
+    )
+
+    if from_result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version {from_version} not found for {word}:{provider}",
+        )
+    if to_result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version {to_version} not found for {word}:{provider}",
+        )
+
+    from_content = from_result.content_inline or {}
+    to_content = to_result.content_inline or {}
+
+    changes = compute_diff_between(from_content, to_content)
+
+    return VersionDiffResponse(
+        from_version=from_version,
+        to_version=to_version,
+        changes=changes,
+    )
+
+
 @router.post("/{word}/rollback")
 async def rollback_word_version(
     word: str,

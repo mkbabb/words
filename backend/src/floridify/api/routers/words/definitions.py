@@ -288,18 +288,24 @@ async def delete_definition(
 async def update_definition_partial(
     definition_id: PydanticObjectId,
     update: DefinitionUpdate,
+    increment_version: bool = Query(True, description="Auto-increment version or edit in place"),
     _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
     if_match: str | None = Depends(check_etag),
 ) -> ResourceResponse:
     """Partially update definition fields.
 
-    This endpoint replaces the specific bind_image_to_definition endpoint
-    with a more generic update that can handle any field updates including images.
+    Query Parameters:
+        - increment_version: If True (default), saves with version history.
+          If False, updates the live document directly without creating a new version.
     """
     # Convert if_match header to version for optimistic locking
     version = int(if_match) if if_match else None
     definition = await repo.update(definition_id, update, version=version)
+
+    if increment_version:
+        word_text = await _resolve_word_text(definition.word_id)
+        await save_definition_versioned(definition, word_text)
 
     return ResourceResponse(
         data=definition.model_dump(mode="json"),

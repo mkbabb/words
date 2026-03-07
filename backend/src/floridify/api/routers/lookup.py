@@ -438,6 +438,87 @@ async def re_synthesize_word(
         raise HTTPException(500, f"Re-synthesis failed: {e!s}")
 
 
+class SourceVersionSpec(BaseModel):
+    """Specifies a provider and version to synthesize from."""
+
+    provider: str
+    version: str
+
+
+class SynthesizeFromRequest(BaseModel):
+    """Request body for synthesize-from-versions."""
+
+    sources: list[SourceVersionSpec]
+    auto_increment: bool = True
+
+
+@router.post("/lookup/{word}/synthesize-from", response_model=DictionaryEntryResponse)
+async def synthesize_from_versions(
+    word: str,
+    request: SynthesizeFromRequest,
+    _admin: str = Depends(require_admin),
+) -> DictionaryEntryResponse:
+    """Re-synthesize a word from specific provider versions (admin only).
+
+    Retrieves historical provider data at specified versions and runs
+    AI synthesis from those specific snapshots.
+    """
+    from ...ai.synthesizer import get_definition_synthesizer
+    from ...caching.manager import get_version_manager
+    from ...caching.models import ResourceType
+    from ...models.base import Language
+
+    try:
+        word = validate_word_input(word)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    manager = get_version_manager()
+    provider_entries: list[DictEntry] = []
+
+    for source in request.sources:
+        resource_id = f"{word}:{source.provider}"
+        result = await manager.get_by_version(
+            resource_id, ResourceType.DICTIONARY, source.version, use_cache=False
+        )
+        if result is None:
+            raise HTTPException(
+                404,
+                f"Version {source.version} not found for {word}:{source.provider}",
+            )
+
+        content = result.content_inline
+        if not content:
+            raise HTTPException(
+                422,
+                f"Version {source.version} of {word}:{source.provider} has no content",
+            )
+
+        # Reconstruct DictionaryEntry from versioned content
+        # Remove MongoDB _id to avoid conflicts during synthesis
+        content.pop("_id", None)
+        entry = DictEntry(**content)
+        provider_entries.append(entry)
+
+    if not provider_entries:
+        raise HTTPException(400, "No valid provider sources specified")
+
+    # Run synthesis from the specific provider versions
+    synthesizer = get_definition_synthesizer()
+    synthesized = await synthesizer.synthesize_entry(
+        word=word,
+        providers_data=provider_entries,
+        languages=[Language.ENGLISH],
+        force_refresh=True,
+    )
+
+    if not synthesized:
+        raise HTTPException(500, f"Synthesis from versions failed for: {word}")
+
+    response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=synthesized)
+    return DictionaryEntryResponse(**response_dict)
+
+
 @router.get("/lookup/{word}/providers")
 async def get_word_providers(word: str) -> list[dict[str, Any]]:
     """Get all provider entries for a word (public endpoint).
