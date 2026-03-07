@@ -88,6 +88,21 @@
                 <div class="h-4 w-4/5 rounded bg-muted" />
             </div>
 
+            <!-- Source Attribution Labels (admin edit mode) -->
+            <div
+                v-if="editModeEnabled && definition.source_definitions?.length"
+                class="mt-1 flex flex-wrap gap-1"
+            >
+                <span
+                    v-for="src in definition.source_definitions"
+                    :key="src.entry_id"
+                    class="inline-flex items-center rounded border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                >
+                    {{ getProviderDisplayName(src.provider) }}
+                    <span v-if="src.entry_version" class="ml-0.5 opacity-60">v{{ src.entry_version }}</span>
+                </span>
+            </div>
+
             <!-- Progressive Examples -->
             <ExampleListEditable
                 v-if="definition.examples && definition.examples.length > 0"
@@ -148,6 +163,131 @@
                     />
                 </div>
             </div>
+
+            <!-- Antonyms (reuses SynonymListEditable pattern) -->
+            <SynonymListEditable
+                v-if="editModeEnabled && definition.antonyms && definition.antonyms.length > 0"
+                :synonyms="fields.antonyms.value"
+                :edit-mode="editModeEnabled"
+                :can-regenerate="canRegenerate('antonyms')"
+                :is-regenerating="fields.antonyms.isRegenerating"
+                @update:synonyms="
+                    (val) => {
+                        fields.antonyms.value = val;
+                        save();
+                    }
+                "
+                @regenerate="regenerateComponent('antonyms')"
+                @synonym-click="emit('searchWord', $event)"
+            />
+
+            <!-- Domain, Region, Frequency (edit mode only) -->
+            <div v-if="editModeEnabled" class="mt-3 flex flex-wrap gap-3">
+                <EditableField
+                    v-if="definition.domain || editModeEnabled"
+                    v-model="fields.domain.value"
+                    field-name="domain"
+                    :edit-mode="editModeEnabled"
+                    :can-regenerate="canRegenerate('domain')"
+                    :is-regenerating="fields.domain.isRegenerating"
+                    @regenerate="regenerateComponent('domain')"
+                    @update:model-value="
+                        (val) => {
+                            fields.domain.value = String(val || '');
+                            fields.domain.isDirty = true;
+                            save();
+                        }
+                    "
+                >
+                    <template #display>
+                        <span v-if="definition.domain" class="text-xs text-muted-foreground">
+                            Domain: {{ definition.domain }}
+                        </span>
+                    </template>
+                </EditableField>
+
+                <EditableField
+                    v-if="definition.region || editModeEnabled"
+                    v-model="fields.region.value"
+                    field-name="region"
+                    :edit-mode="editModeEnabled"
+                    @update:model-value="
+                        (val) => {
+                            fields.region.value = String(val || '');
+                            fields.region.isDirty = true;
+                            save();
+                        }
+                    "
+                >
+                    <template #display>
+                        <span v-if="definition.region" class="text-xs text-muted-foreground">
+                            Region: {{ definition.region }}
+                        </span>
+                    </template>
+                </EditableField>
+
+                <div v-if="definition.frequency_band || editModeEnabled" class="flex items-center gap-1">
+                    <span class="text-xs text-muted-foreground">Freq:</span>
+                    <div class="flex gap-0.5">
+                        <button
+                            v-for="star in 5"
+                            :key="star"
+                            @click="
+                                fields.frequency_band.value = star;
+                                fields.frequency_band.isDirty = true;
+                                save();
+                            "
+                            class="text-xs transition-colors"
+                            :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
+                        >
+                            &#9733;
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Notes (edit mode) -->
+            <div v-if="editModeEnabled && definition.usage_notes?.length" class="mt-3 space-y-1">
+                <div class="text-xs font-medium text-muted-foreground">Usage Notes</div>
+                <div
+                    v-for="(note, i) in definition.usage_notes"
+                    :key="i"
+                    class="rounded border border-border/50 bg-muted/20 px-2 py-1 text-xs"
+                >
+                    <span class="font-medium text-muted-foreground">{{ note.type }}:</span>
+                    {{ note.text }}
+                </div>
+            </div>
+
+            <!-- Grammar Patterns (edit mode) -->
+            <div v-if="editModeEnabled && definition.grammar_patterns?.length" class="mt-3 space-y-1">
+                <div class="text-xs font-medium text-muted-foreground">Grammar Patterns</div>
+                <div
+                    v-for="(pattern, i) in definition.grammar_patterns"
+                    :key="i"
+                    class="rounded border border-border/50 bg-muted/20 px-2 py-1 text-xs font-mono"
+                >
+                    {{ pattern.pattern }}
+                    <span v-if="pattern.description" class="ml-1 font-sans text-muted-foreground">
+                        — {{ pattern.description }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Collocations (edit mode) -->
+            <div v-if="editModeEnabled && definition.collocations?.length" class="mt-3">
+                <div class="text-xs font-medium text-muted-foreground mb-1">Collocations</div>
+                <div class="flex flex-wrap gap-1">
+                    <span
+                        v-for="(coll, i) in definition.collocations"
+                        :key="i"
+                        class="rounded border border-border/50 bg-muted/30 px-1.5 py-0.5 text-xs"
+                    >
+                        {{ coll.text }}
+                        <span class="text-muted-foreground/60">{{ coll.type }}</span>
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -160,7 +300,23 @@ import type { TransformedDefinition } from '@/types';
 import ExampleListEditable from './ExampleListEditable.vue';
 import SynonymListEditable from './SynonymListEditable.vue';
 import EditableField from './EditableField.vue';
+import { DictionaryProvider } from '@/types/api';
 import { logger } from '@/utils/logger';
+
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    [DictionaryProvider.WIKTIONARY]: 'Wiktionary',
+    [DictionaryProvider.OXFORD]: 'Oxford',
+    [DictionaryProvider.APPLE_DICTIONARY]: 'Apple Dict',
+    [DictionaryProvider.MERRIAM_WEBSTER]: 'Merriam-Webster',
+    [DictionaryProvider.FREE_DICTIONARY]: 'Free Dict',
+    [DictionaryProvider.WORDHIPPO]: 'WordHippo',
+    [DictionaryProvider.AI_FALLBACK]: 'AI Fallback',
+    [DictionaryProvider.SYNTHESIS]: 'Synthesis',
+};
+
+function getProviderDisplayName(provider: string): string {
+    return PROVIDER_DISPLAY_NAMES[provider] || provider.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 interface DefinitionItemProps {
     definition: TransformedDefinition;

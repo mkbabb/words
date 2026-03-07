@@ -87,6 +87,7 @@
                 :isMounted="isMounted"
                 :showDropdown="actions.showThemeDropdown.value"
                 :editModeEnabled="editModeEnabled"
+                :word="entry?.word"
                 @toggle-dropdown="
                     actions.showThemeDropdown.value =
                         !actions.showThemeDropdown.value
@@ -119,6 +120,7 @@
                 :isAISynthesized="!!entry.model_info"
                 :activeSource="activeSourceTab"
                 :sourceSelectionDisabled="sourceSelectionDisabled"
+                :sourceEntries="entry?.source_entries"
                 @toggle-pronunciation="lookupMode.togglePronunciation"
                 @select-source="activeSourceTab = $event"
             />
@@ -145,6 +147,7 @@
                 :word="entry?.word || ''"
                 :available-providers="usedProviders"
                 :show-synthesis="!!entry?.model_info"
+                :show-version-history="editModeEnabled"
             >
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
@@ -411,6 +414,9 @@ const entry = computed(() => {
             definitions:
                 contentStore.partialEntry.definitions ||
                 contentStore.currentEntry?.definitions ||
+                [],
+            source_entries:
+                contentStore.currentEntry?.source_entries ||
                 [],
             _isStreaming: true,
             _streamingProgress: 0,

@@ -50,6 +50,19 @@
             </HoverCard>
         </CardTitle>
 
+        <!-- Provenance Summary (when source_entries exist) -->
+        <div
+            v-if="sourceEntries && sourceEntries.length > 0"
+            class="flex flex-wrap items-center gap-1 pt-1 text-xs text-muted-foreground/70"
+        >
+            <span class="font-medium">Synthesized from:</span>
+            <span v-for="(src, i) in sourceEntries" :key="src.entry_id">
+                {{ getProviderDisplayName(src.provider) }}
+                <span v-if="src.entry_version" class="font-mono opacity-60">v{{ src.entry_version }}</span>
+                <span v-if="i < sourceEntries.length - 1">,&nbsp;</span>
+            </span>
+        </div>
+
         <!-- Pronunciation & Audio Row -->
         <div class="flex items-center gap-3 pt-2">
             <!-- Pronunciation text (only when available) -->
@@ -111,8 +124,24 @@ import ProviderIcons from './ProviderIcons.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
 import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
-import type { AudioFile } from '@/types/api';
+import type { AudioFile, SourceReference } from '@/types/api';
+import { DictionaryProvider } from '@/types/api';
 import { LanguageNames } from '@/stores/types/constants';
+
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    [DictionaryProvider.WIKTIONARY]: 'Wiktionary',
+    [DictionaryProvider.OXFORD]: 'Oxford',
+    [DictionaryProvider.APPLE_DICTIONARY]: 'Apple Dict',
+    [DictionaryProvider.MERRIAM_WEBSTER]: 'Merriam-Webster',
+    [DictionaryProvider.FREE_DICTIONARY]: 'Free Dict',
+    [DictionaryProvider.WORDHIPPO]: 'WordHippo',
+    [DictionaryProvider.AI_FALLBACK]: 'AI Fallback',
+    [DictionaryProvider.SYNTHESIS]: 'Synthesis',
+};
+
+function getProviderDisplayName(provider: string): string {
+    return PROVIDER_DISPLAY_NAMES[provider] || provider.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 interface WordHeaderProps {
     word: string;
@@ -127,6 +156,7 @@ interface WordHeaderProps {
     isAISynthesized?: boolean;
     activeSource?: string;
     sourceSelectionDisabled?: boolean;
+    sourceEntries?: SourceReference[];
 }
 
 const props = defineProps<WordHeaderProps>();

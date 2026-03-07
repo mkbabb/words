@@ -15,6 +15,7 @@ import type {
     ModelInfo,
     SearchMethod,
     DictionaryProvider,
+    SourceReference,
 } from './models';
 
 // Generic API Response Types
@@ -74,6 +75,7 @@ export interface DictionaryEntryResponse {
     model_info?: ModelInfo | null;
     id?: string | null;
     images?: ImageMedia[];
+    source_entries?: SourceReference[];
 }
 
 // Search Response Types

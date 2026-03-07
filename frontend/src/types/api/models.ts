@@ -87,6 +87,19 @@ export interface Collocation {
     frequency: number; // 0.0-1.0
 }
 
+// Provenance — links synthesized content to source provider data
+export interface SourceReference {
+    provider: DictionaryProvider;
+    entry_id: string;
+    entry_version: string;
+    definition_ids: string[];
+}
+
+export interface SourceVersionSpec {
+    provider: string;
+    version: string;
+}
+
 // Etymology
 export interface Etymology {
     text: string;
@@ -192,6 +205,7 @@ export interface Definition extends BaseMetadata {
     validation_status?: string;
     metadata: Record<string, any>;
     providers_data?: Record<string, any>; // Provider-specific data from dictionary sources
+    source_definitions?: SourceReference[]; // Provenance: which provider defs contributed
 }
 
 // Synthesized Entry
@@ -210,6 +224,7 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
     images?: ImageMedia[]; // Populated in responses
     model_info?: ModelInfo | null;
     source_provider_data_ids: string[];
+    source_entries?: SourceReference[]; // Provenance: which provider entries fed synthesis
     accessed_at?: string;
     access_count: number;
     last_updated: string; // Alias for updated_at for frontend compatibility
@@ -238,8 +253,16 @@ export interface UserPreferences {
 }
 
 export interface UserHistoryData {
-    search_history: Array<{ query: string; timestamp: string; [key: string]: any }>;
-    lookup_history: Array<{ word: string; timestamp: string; [key: string]: any }>;
+    search_history: Array<{
+        query: string;
+        timestamp: string;
+        [key: string]: any;
+    }>;
+    lookup_history: Array<{
+        word: string;
+        timestamp: string;
+        [key: string]: any;
+    }>;
     updated_at?: string;
 }
 

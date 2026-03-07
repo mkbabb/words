@@ -66,6 +66,10 @@ export function useDefinitionEditMode(
             'formal' | 'informal' | 'neutral' | 'slang' | 'technical' | null
         >;
         synonyms: EditableField<string[]>;
+        antonyms: EditableField<string[]>;
+        domain: EditableField<string>;
+        region: EditableField<string>;
+        frequency_band: EditableField<number | null>;
         meaning_cluster_name: EditableField<string | null>;
     }>({
         text: createField(definition.value.text),
@@ -75,6 +79,10 @@ export function useDefinitionEditMode(
             definition.value.language_register ?? null
         ),
         synonyms: createField(definition.value.synonyms || []),
+        antonyms: createField(definition.value.antonyms || []),
+        domain: createField(definition.value.domain || ''),
+        region: createField(definition.value.region || ''),
+        frequency_band: createField(definition.value.frequency_band ?? null),
         meaning_cluster_name: createField(
             definition.value.meaning_cluster?.name ?? null
         ),
@@ -156,6 +164,14 @@ export function useDefinitionEditMode(
         fields.language_register.originalValue = fields.language_register.value;
         fields.synonyms.value = [...(definition.value.synonyms || [])];
         fields.synonyms.originalValue = [...fields.synonyms.value];
+        fields.antonyms.value = [...(definition.value.antonyms || [])];
+        fields.antonyms.originalValue = [...fields.antonyms.value];
+        fields.domain.value = definition.value.domain || '';
+        fields.domain.originalValue = fields.domain.value;
+        fields.region.value = definition.value.region || '';
+        fields.region.originalValue = fields.region.value;
+        fields.frequency_band.value = definition.value.frequency_band ?? null;
+        fields.frequency_band.originalValue = fields.frequency_band.value;
         fields.meaning_cluster_name.value =
             definition.value.meaning_cluster?.name ?? null;
         fields.meaning_cluster_name.originalValue =
@@ -208,6 +224,18 @@ export function useDefinitionEditMode(
             }
             if (fields.synonyms.isDirty) {
                 updateData.synonyms = fields.synonyms.value;
+            }
+            if (fields.antonyms.isDirty) {
+                updateData.antonyms = fields.antonyms.value;
+            }
+            if (fields.domain.isDirty) {
+                updateData.domain = fields.domain.value || undefined;
+            }
+            if (fields.region.isDirty) {
+                updateData.region = fields.region.value || undefined;
+            }
+            if (fields.frequency_band.isDirty) {
+                updateData.frequency_band = fields.frequency_band.value || undefined;
             }
             if (
                 fields.meaning_cluster_name.isDirty &&

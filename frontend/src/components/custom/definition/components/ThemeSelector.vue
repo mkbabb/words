@@ -34,10 +34,10 @@
             />
         </button>
 
-        <!-- Admin: Re-synthesize Button -->
+        <!-- Admin: Re-synthesize Button (opens version selector) -->
         <button
             v-if="editModeEnabled"
-            @click="$emit('resynthesize')"
+            @click="showVersionSelector = !showVersionSelector"
             class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             title="Re-synthesize with AI"
         >
@@ -46,6 +46,21 @@
                 class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
             />
         </button>
+
+        <!-- Provider Version Selector Modal -->
+        <Transition name="theme-dropdown">
+            <div
+                v-if="showVersionSelector && word"
+                class="absolute top-full right-0 z-60 mt-2 w-80 rounded-lg border border-border bg-popover p-4 shadow-lg"
+                @click.stop
+            >
+                <ProviderVersionSelector
+                    :word="word"
+                    @close="showVersionSelector = false"
+                    @synthesized="handleSynthesized"
+                />
+            </div>
+        </Transition>
 
         <!-- Custom dropdown with controlled animations -->
         <div class="relative">
@@ -107,15 +122,18 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { ChevronLeft, Edit2, Check, History, RefreshCw } from 'lucide-vue-next';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';
+import ProviderVersionSelector from './ProviderVersionSelector.vue';
 
 interface ThemeSelectorProps {
     isMounted: boolean;
     showDropdown: boolean;
     editModeEnabled?: boolean;
+    word?: string;
 }
 
 defineProps<ThemeSelectorProps>();
@@ -133,7 +151,13 @@ const emit = defineEmits<{
     'resynthesize': [];
 }>();
 
+const showVersionSelector = ref(false);
 const themes = CARD_THEMES;
+
+const handleSynthesized = () => {
+    showVersionSelector.value = false;
+    emit('resynthesize');
+};
 
 const toggleDropdown = () => {
     emit('toggle-dropdown');
