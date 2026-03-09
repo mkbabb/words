@@ -1,23 +1,25 @@
 <template>
-  <div class="space-y-3">
-    <!-- Header with toggle between list and diff views -->
+  <div class="space-y-4">
+    <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <h3 class="text-sm font-semibold">Version History</h3>
-        <button
+        <Badge v-if="currentVersion" variant="secondary" class="font-mono text-[10px]">
+          v{{ currentVersion }}
+        </Badge>
+        <Button
           v-if="versions.length >= 2"
+          variant="ghost"
+          size="sm"
+          class="h-6 px-2 text-xs"
           @click="showDiff = !showDiff"
-          class="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {{ showDiff ? 'List' : 'Compare' }}
-        </button>
+        </Button>
       </div>
-      <button
-        @click="$emit('close')"
-        class="text-muted-foreground hover:text-foreground rounded p-1 transition-colors"
-      >
-        <X :size="16" />
-      </button>
+      <Button variant="ghost" size="icon" class="h-7 w-7" @click="$emit('close')">
+        <X :size="14" />
+      </Button>
     </div>
 
     <!-- Diff Viewer -->
@@ -31,47 +33,76 @@
     <!-- Version List -->
     <template v-else>
       <div v-if="loading" class="space-y-2">
-        <div v-for="i in 3" :key="i" class="h-12 animate-pulse rounded bg-muted" />
+        <div v-for="i in 3" :key="i" class="h-14 animate-pulse rounded-lg bg-muted" />
       </div>
 
-      <div v-else-if="versions.length === 0" class="text-muted-foreground py-4 text-center text-sm">
+      <div v-else-if="versions.length === 0" class="py-6 text-center text-sm text-muted-foreground">
         No version history available.
       </div>
 
-      <div v-else class="max-h-64 space-y-1 overflow-y-auto">
+      <div v-else class="max-h-72 space-y-1.5 overflow-y-auto">
         <div
           v-for="version in versions"
           :key="version.version"
-          class="flex items-center justify-between rounded-lg border border-border p-2 text-sm"
+          class="rounded-lg border border-border p-3 transition-colors"
+          :class="version.version === currentVersion ? 'bg-primary/5 border-primary/30' : 'bg-background'"
         >
-          <div>
-            <span class="font-mono font-medium">v{{ version.version }}</span>
-            <span class="text-muted-foreground ml-2 text-xs">
-              {{ formatDate(version.created_at) }}
-            </span>
+          <div class="flex items-center justify-between">
+            <!-- Version info -->
+            <div class="flex items-center gap-2">
+              <Badge
+                :variant="version.version === currentVersion ? 'default' : 'outline'"
+                class="font-mono text-[10px]"
+              >
+                v{{ version.version }}
+              </Badge>
+              <span class="text-xs text-muted-foreground">
+                {{ formatDate(version.created_at) }}
+              </span>
+              <Badge
+                v-if="version.is_latest"
+                variant="secondary"
+                class="text-[10px]"
+              >
+                Latest
+              </Badge>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1.5">
+              <Button
+                v-if="auth.isAdmin && version.version !== currentVersion"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-xs text-blue-500 hover:text-blue-600"
+                @click="handlePreview(version.version)"
+              >
+                <Eye :size="12" class="mr-1" />
+                Preview
+              </Button>
+              <Button
+                v-if="auth.isAdmin && version.version !== currentVersion"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-xs text-orange-500 hover:text-orange-600"
+                :disabled="rollingBack"
+                @click="handleRollback(version.version)"
+              >
+                <RotateCcw :size="12" class="mr-1" />
+                Rollback
+              </Button>
+              <Badge
+                v-if="version.version === currentVersion"
+                class="text-[10px]"
+              >
+                Current
+              </Badge>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button
-              v-if="auth.isAdmin && version.version !== currentVersion"
-              @click="handlePreview(version.version)"
-              class="text-xs text-blue-500 hover:text-blue-600 transition-colors"
-            >
-              Preview
-            </button>
-            <button
-              v-if="auth.isAdmin && version.version !== currentVersion"
-              @click="handleRollback(version.version)"
-              class="text-xs text-orange-500 hover:text-orange-600 transition-colors"
-              :disabled="rollingBack"
-            >
-              Rollback
-            </button>
-            <span
-              v-if="version.version === currentVersion"
-              class="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-xs font-medium"
-            >
-              Current
-            </span>
+
+          <!-- Storage mode indicator -->
+          <div class="mt-1 text-[10px] text-muted-foreground/60">
+            {{ version.storage_mode === 'snapshot' ? 'Full snapshot' : 'Delta' }}
           </div>
         </div>
       </div>
@@ -79,20 +110,55 @@
       <!-- Preview panel -->
       <div
         v-if="previewContent"
-        class="mt-3 rounded border border-border bg-muted/30 p-3"
+        class="mt-3 space-y-2.5 rounded-lg border border-primary/20 bg-primary/5 p-3"
       >
-        <div class="mb-2 flex items-center justify-between">
-          <h4 class="text-xs font-semibold text-muted-foreground">
-            Preview: v{{ previewVersion }}
-          </h4>
-          <button
-            @click="previewContent = null"
-            class="text-xs text-muted-foreground hover:text-foreground"
-          >
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h4 class="text-xs font-semibold">Preview</h4>
+            <Badge variant="outline" class="font-mono text-[10px]">v{{ previewVersion }}</Badge>
+          </div>
+          <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="previewContent = null">
             Close
-          </button>
+          </Button>
         </div>
-        <pre class="max-h-40 overflow-auto text-xs whitespace-pre-wrap">{{ JSON.stringify(previewContent, null, 2) }}</pre>
+
+        <!-- Definitions summary -->
+        <div v-if="previewContent.definition_ids" class="flex items-center gap-1.5 text-xs">
+          <span class="text-muted-foreground">Definitions:</span>
+          <span class="font-medium">{{ previewContent.definition_ids.length }}</span>
+        </div>
+
+        <!-- Source entries -->
+        <div v-if="previewContent.source_entries?.length" class="flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-muted-foreground">Sources:</span>
+          <Badge
+            v-for="(src, i) in previewContent.source_entries"
+            :key="i"
+            variant="secondary"
+            class="text-[10px] capitalize"
+          >
+            {{ src.provider }} ({{ src.entry_version }})
+          </Badge>
+        </div>
+
+        <!-- Etymology snippet -->
+        <div v-if="previewContent.etymology?.text" class="text-xs">
+          <span class="text-muted-foreground">Etymology:</span>
+          <p class="mt-0.5 line-clamp-2 italic text-foreground/70">
+            {{ previewContent.etymology.text }}
+          </p>
+        </div>
+
+        <!-- Model info -->
+        <div v-if="previewContent.model_info" class="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>Model: <span class="font-mono font-medium text-foreground/80">{{ previewContent.model_info.name }}</span></span>
+          <span>Tokens: <span class="font-medium text-foreground/80">{{ previewContent.model_info.total_tokens?.toLocaleString() }}</span></span>
+        </div>
+
+        <!-- Created/updated -->
+        <div v-if="previewContent.created_at" class="text-[10px] text-muted-foreground">
+          Created {{ formatDate(previewContent.created_at) }}
+        </div>
       </div>
     </template>
   </div>
@@ -100,7 +166,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X, Eye, RotateCcw } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/auth';
 import { versionsApi } from '@/api';
 import VersionDiffViewer from './VersionDiffViewer.vue';

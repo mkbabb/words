@@ -1,18 +1,21 @@
 <template>
-    <div class="space-y-4">
+    <div class="space-y-5">
+        <!-- Header -->
         <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold">Re-synthesize from Versions</h3>
-            <button
-                @click="$emit('close')"
-                class="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-            >
-                <X :size="16" />
-            </button>
+            <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold">Re-synthesize from Providers</h3>
+                <Badge v-if="currentVersion" variant="secondary" class="font-mono text-[10px]">
+                    v{{ currentVersion }}
+                </Badge>
+            </div>
+            <Button variant="ghost" size="icon" class="h-7 w-7" @click="$emit('close')">
+                <X :size="14" />
+            </Button>
         </div>
 
-        <p class="text-xs text-muted-foreground">
-            Select which provider versions to use for re-synthesis. Defaults to
-            latest.
+        <p class="text-xs leading-relaxed text-muted-foreground">
+            Select which provider versions to include in re-synthesis.
+            Each provider entry contributes its definitions to the AI clustering pipeline.
         </p>
 
         <!-- Loading -->
@@ -20,103 +23,140 @@
             <div
                 v-for="i in 3"
                 :key="i"
-                class="h-10 animate-pulse rounded bg-muted"
+                class="h-14 animate-pulse rounded-lg bg-muted"
             />
         </div>
 
-        <!-- Provider list with version selectors -->
-        <div v-else class="space-y-2">
+        <!-- Provider list -->
+        <div v-else-if="providerList.length > 0" class="space-y-2">
             <div
-                v-for="provider in providerList"
-                :key="provider.name"
-                class="flex items-center justify-between rounded border border-border p-2"
+                v-for="(provider, idx) in providerList"
+                :key="provider.uniqueKey"
+                class="rounded-lg border transition-colors"
+                :class="selectedProviders.has(provider.uniqueKey)
+                    ? 'border-primary/40 bg-primary/5'
+                    : 'border-border bg-background'"
             >
-                <div class="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        :checked="selectedProviders.has(provider.name)"
-                        @change="toggleProvider(provider.name)"
-                        class="rounded border-border"
-                    />
-                    <span class="text-sm font-medium capitalize">
-                        {{ provider.displayName }}
+                <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <!-- Left: toggle + name -->
+                    <button
+                        class="flex items-center gap-2.5"
+                        @click="toggleProvider(provider.uniqueKey)"
+                    >
+                        <div
+                            class="flex h-4 w-4 items-center justify-center rounded border transition-colors"
+                            :class="selectedProviders.has(provider.uniqueKey)
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-muted-foreground/40'"
+                        >
+                            <Check v-if="selectedProviders.has(provider.uniqueKey)" :size="10" />
+                        </div>
+                        <span class="text-sm font-medium">{{ provider.displayName }}</span>
+                        <Badge
+                            v-if="hasDuplicateProvider(provider.name)"
+                            variant="outline"
+                            class="font-mono text-[10px] text-muted-foreground"
+                        >
+                            #{{ idx + 1 }}
+                        </Badge>
+                    </button>
+
+                    <!-- Right: version selector -->
+                    <Select
+                        v-if="selectedProviders.has(provider.uniqueKey) && provider.versions.length > 0"
+                        :model-value="selectedVersions[provider.uniqueKey] || 'latest'"
+                        @update:model-value="selectVersion(provider.uniqueKey, $event)"
+                    >
+                        <SelectTrigger class="h-7 w-auto min-w-[7rem] gap-1 px-2 text-xs">
+                            <SelectValue placeholder="Latest" />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                            <SelectItem value="latest">Latest</SelectItem>
+                            <SelectItem
+                                v-for="v in provider.versions"
+                                :key="v.version"
+                                :value="v.version"
+                            >
+                                v{{ v.version }} — {{ formatDate(v.created_at) }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <span
+                        v-else-if="selectedProviders.has(provider.uniqueKey)"
+                        class="text-[10px] text-muted-foreground"
+                    >
+                        No versions
                     </span>
                 </div>
-                <select
-                    v-if="
-                        selectedProviders.has(provider.name) &&
-                        provider.versions.length > 0
-                    "
-                    :value="selectedVersions[provider.name] || 'latest'"
-                    @change="
-                        selectVersion(
-                            provider.name,
-                            ($event.target as HTMLSelectElement).value
-                        )
-                    "
-                    class="rounded border border-border bg-background px-2 py-1 text-xs"
+
+                <!-- Definition count hint -->
+                <div
+                    v-if="selectedProviders.has(provider.uniqueKey) && provider.definitionCount > 0"
+                    class="border-t border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground"
                 >
-                    <option value="latest">Latest</option>
-                    <option
-                        v-for="v in provider.versions"
-                        :key="v.version"
-                        :value="v.version"
-                    >
-                        v{{ v.version }} — {{ formatDate(v.created_at) }}
-                    </option>
-                </select>
-                <span
-                    v-else-if="selectedProviders.has(provider.name)"
-                    class="text-xs text-muted-foreground"
-                >
-                    No version history
-                </span>
+                    {{ provider.definitionCount }} definition{{ provider.definitionCount !== 1 ? 's' : '' }}
+                </div>
             </div>
         </div>
 
+        <div v-else class="py-4 text-center text-xs text-muted-foreground">
+            No provider data available for this word.
+        </div>
+
         <!-- Options -->
-        <div class="flex items-center gap-3 text-sm">
-            <label class="flex items-center gap-1.5">
-                <input
-                    type="checkbox"
-                    v-model="autoIncrement"
-                    class="rounded border-border"
-                />
-                <span class="text-xs text-muted-foreground"
-                    >Auto-increment version</span
+        <div class="flex items-center gap-2">
+            <button
+                class="flex items-center gap-2"
+                @click="autoIncrement = !autoIncrement"
+            >
+                <div
+                    class="flex h-4 w-4 items-center justify-center rounded border transition-colors"
+                    :class="autoIncrement
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-muted-foreground/40'"
                 >
-            </label>
+                    <Check v-if="autoIncrement" :size="10" />
+                </div>
+                <span class="text-xs text-muted-foreground">Auto-increment version</span>
+            </button>
         </div>
 
         <!-- Actions -->
-        <div class="flex justify-end gap-2">
-            <button
-                @click="$emit('close')"
-                class="rounded px-3 py-1.5 text-sm hover:bg-muted"
-            >
+        <div class="flex justify-end gap-2 border-t border-border/40 pt-3">
+            <Button variant="ghost" size="sm" @click="$emit('close')">
                 Cancel
-            </button>
-            <button
-                @click="handleSynthesize"
+            </Button>
+            <Button
+                size="sm"
                 :disabled="synthesizing || selectedProviders.size === 0"
-                class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                @click="handleSynthesize"
             >
-                <span v-if="synthesizing">Synthesizing...</span>
-                <span v-else>Synthesize from Selected</span>
-            </button>
+                <Loader2 v-if="synthesizing" :size="14" class="mr-1.5 animate-spin" />
+                {{ synthesizing ? 'Synthesizing...' : 'Re-synthesize' }}
+            </Button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { X } from 'lucide-vue-next';
+import { ref, reactive, onMounted, computed } from 'vue';
+import { X, Check, Loader2 } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { versionsApi } from '@/api';
 import { providersApi } from '@/api/providers';
 import type { VersionSummary, SourceVersionSpec } from '@/types/api';
 
 interface Props {
     word: string;
+    currentVersion?: string;
 }
 
 const props = defineProps<Props>();
@@ -127,8 +167,10 @@ const emit = defineEmits<{
 
 interface ProviderInfo {
     name: string;
+    uniqueKey: string;
     displayName: string;
     versions: VersionSummary[];
+    definitionCount: number;
 }
 
 const loadingProviders = ref(true);
@@ -147,16 +189,21 @@ function formatDate(dateStr: string): string {
     });
 }
 
-function toggleProvider(name: string) {
-    if (selectedProviders.has(name)) {
-        selectedProviders.delete(name);
+/** Check if a provider name appears more than once */
+function hasDuplicateProvider(name: string): boolean {
+    return providerList.value.filter(p => p.name === name).length > 1;
+}
+
+function toggleProvider(uniqueKey: string) {
+    if (selectedProviders.has(uniqueKey)) {
+        selectedProviders.delete(uniqueKey);
     } else {
-        selectedProviders.add(name);
+        selectedProviders.add(uniqueKey);
     }
 }
 
-function selectVersion(provider: string, version: string) {
-    selectedVersions[provider] = version;
+function selectVersion(uniqueKey: string, version: string) {
+    selectedVersions[uniqueKey] = version;
 }
 
 async function loadProviders() {
@@ -165,9 +212,15 @@ async function loadProviders() {
         const data = await providersApi.getWordProviders(props.word);
         const providers = data.filter((p) => p.provider !== 'synthesis');
 
+        // Track provider name counts for unique key generation
+        const nameCount: Record<string, number> = {};
+
         // Load version history for each provider in parallel
         const results = await Promise.allSettled(
             providers.map(async (p) => {
+                nameCount[p.provider] = (nameCount[p.provider] || 0) + 1;
+                const idx = nameCount[p.provider];
+
                 let versions: VersionSummary[] = [];
                 try {
                     const history = await versionsApi.getProviderHistory(
@@ -180,10 +233,12 @@ async function loadProviders() {
                 }
                 return {
                     name: p.provider,
+                    uniqueKey: `${p.provider}__${p.id || idx}`,
                     displayName: p.provider
                         .replace(/_/g, ' ')
                         .replace(/\b\w/g, (c) => c.toUpperCase()),
                     versions,
+                    definitionCount: p.definitions?.length || 0,
                 } satisfies ProviderInfo;
             })
         );
@@ -197,7 +252,7 @@ async function loadProviders() {
 
         // Select all providers by default
         for (const p of providerList.value) {
-            selectedProviders.add(p.name);
+            selectedProviders.add(p.uniqueKey);
         }
     } catch {
         providerList.value = [];
@@ -212,22 +267,21 @@ async function handleSynthesize() {
 
     try {
         const sources: SourceVersionSpec[] = [];
-        for (const name of selectedProviders) {
-            const provider = providerList.value.find((p) => p.name === name);
-            const version = selectedVersions[name];
+        for (const uniqueKey of selectedProviders) {
+            const provider = providerList.value.find((p) => p.uniqueKey === uniqueKey);
+            if (!provider) continue;
+            const version = selectedVersions[uniqueKey];
             if (version && version !== 'latest') {
-                sources.push({ provider: name, version });
-            } else if (provider?.versions.length) {
-                // Use latest version
+                sources.push({ provider: provider.name, version });
+            } else if (provider.versions.length) {
                 sources.push({
-                    provider: name,
+                    provider: provider.name,
                     version: provider.versions[0].version,
                 });
             }
         }
 
         if (sources.length === 0) {
-            // No versioned providers — fall back to regular re-synth
             emit('synthesized');
             return;
         }
