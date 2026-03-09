@@ -1,16 +1,8 @@
 # Usage Notes: {{ word }}
 Definition: {{ definition }}
 
-## Note Categories
-- **grammar**: syntactic patterns
-- **confusion**: commonly confused with
-- **regional**: geographic variations
-- **register**: formal/informal contexts
-- **error**: common mistakes
+Generate 1-3 practical usage notes. Each note has a type and text (max 20 words).
 
-## Examples
-`literally`: Often misused for emphasis; properly means "in a literal sense"
-`whom`: Use when object of verb/preposition; "who" for subjects
-`colour/color`: British vs. American spelling
+Types: grammar, confusion, regional, register, error.
 
-Generate ≤3 concise notes (max 20 words each).
+Focus on what a writer needs to know — not textbook theory. Skip if nothing notable.

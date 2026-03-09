@@ -1,7 +1,5 @@
-Query: {{ query }}
+Is this a word-suggestion query? "{{ query }}"
 
-Valid: word requests (meanings/descriptions/fill-in-blanks/characteristics) **ONLY**: nothing else.
+Valid = user wants words matching a description, fill-in-the-blank, or characteristic. Invalid = anything else.
 
-Return:
-- **is_valid**: true/false
-- **reason**: brief explanation
+Return is_valid (bool) and reason (brief).

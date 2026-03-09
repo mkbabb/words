@@ -1,24 +1,39 @@
 # Antonyms: {{ word }} ({{ part_of_speech }})
-Definition: {{ definition }}
-{% if existing_antonyms %}Existing: {{ existing_antonyms | join(', ') }}{% endif %}
 
-Generate {{ count }}{% if existing_antonyms %} NEW{% endif %} varied antonyms:
-- 40% common: everyday opposites
-- 30% expressive: literary/sophisticated
-- 20% foreign: when English lacks precision
-- 10% technical: domain-specific
+**Definition**: {{ definition }}
+{% if existing_antonyms %}**Existing**: {{ existing_antonyms | join(', ') }}{% endif %}
 
-Per antonym: word | language | relevance (0-1) | efflorescence (0-1) | brief explanation
-Efflorescence: 0=plain, 1=ornate
+## Task
+
+Generate {{ count }}{% if existing_antonyms %} NEW (not in Existing list){% endif %} antonyms for the specific sense defined above.
+
+### Distribution
+- ~40% common: everyday, widely understood opposites
+- ~30% literary: sophisticated or elevated register
+- ~20% foreign: non-English terms where they capture an opposing nuance English lacks
+- ~10% technical: domain-specific vocabulary
+
+### Quality Rules
+- Every antonym must express a genuinely opposing or contrary meaning to the target definition, not merely a different concept.
+- Match the part of speech exactly.
+- Distinguish between contradictory antonyms (hot/cold), complementary antonyms (alive/dead), and relational antonyms (buy/sell). Prefer contradictory when available.
+- Foreign-language antonyms must be actual words in that language.
+
+### Output Per Antonym
+- **word**: the antonym
+- **language**: source language (e.g., English, French, German)
+- **relevance** (0.0-1.0): strength of the oppositional relationship
+- **efflorescence** (0.0-1.0): 0=plain/utilitarian, 1=ornate/literary
+- **explanation**: 5-15 words on how this antonym opposes the target
 
 ## Examples
 
 ### `beautiful` (adjective)
-ugly | English | 0.95 | 0.2 | Direct everyday opposite
-grotesque | English | 0.85 | 0.8 | Distorted, repulsive beauty
-mostruoso | Italian | 0.75 | 0.7 | Monstrous, horrifying appearance
+ugly | English | 0.95 | 0.2 | Direct everyday opposite of physical attractiveness
+grotesque | English | 0.85 | 0.8 | Distorted or unnatural in a repulsive way
+mostruoso | Italian | 0.75 | 0.7 | Monstrous, horrifying in appearance
 
 ### `increase` (verb)
-decrease | English | 0.95 | 0.3 | Standard opposite
-attenuate | English | 0.8 | 0.8 | Gradually weaken or reduce
-abate | English | 0.85 | 0.7 | Diminish in intensity or amount
+decrease | English | 0.95 | 0.3 | Standard, direct opposite
+attenuate | English | 0.8 | 0.8 | Gradually weaken, reduce, or thin out
+abate | English | 0.85 | 0.7 | Diminish in intensity, force, or amount

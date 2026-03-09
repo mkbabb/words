@@ -8,7 +8,30 @@
 
 ## Task
 
-**AGGRESSIVELY** deduplicate definitions herein. Select supreme quality **ONLY**. Never merge different parts of speech. Merge if semantic similarity >80%. Brief reasoning (max 10 words). **Output indices merged, quality score (0-1).**
+Identify and merge duplicate or near-duplicate definitions. Select the highest-quality representative from each group.
+
+### Merge Criteria (merge when ANY apply)
+- Same core meaning with different wording (semantic overlap >80%).
+- One definition is a strict subset of another (e.g., "to walk" vs. "to walk or move on foot").
+- Definitions differ only in example scope but describe the same action/state.
+
+### Keep Separate (NEVER merge when ANY apply)
+- Different parts of speech, even if semantically related.
+- Same POS but different semantic domains (e.g., "run a race" vs. "run a company").
+- Opposing connotations (e.g., "sanction" as approval vs. penalty).
+- Literal vs. figurative senses.
+- Different registers (slang vs. formal) when the distinction matters.
+
+### Selection Preference
+When choosing which definition to keep from a merged group:
+1. Prefer the more precise and complete definition.
+2. Prefer definitions that avoid circular phrasing.
+3. Prefer definitions with clear scope boundaries.
+
+### Output Format
+- Group indices that should merge. State the shared meaning in max 10 words.
+- Identify which index to keep from each group and why (max 10 words).
+- Quality score (0.0-1.0): confidence in deduplication correctness.
 
 ## Examples
 
@@ -18,8 +41,8 @@
 2: noun: Process or rules for problem-solving operations
 3: noun: Finite sequence of rigorous instructions for specific problems
 
-**Merge**: [0,3] precision; [1,2] simplicity
-**Keep**: 0 (comprehensive), 1 (accessible)
+**Merge**: [0,3] same meaning, different phrasing; [1,2] simplified variants
+**Keep**: 0 (most precise), 1 (most accessible)
 **Quality**: 0.9
 
 #### `sanction` (noun)
@@ -28,8 +51,8 @@
 2: noun: Coercive measures by states
 3: noun: Formal authorization
 
-**Merge**: [0,3] approval; [1,2] penalty
-**Keep**: 0 (clearer positive), 1 (clearer negative)
+**Merge**: [0,3] both mean approval; [1,2] both mean punishment
+**Keep**: 0 (clearer for approval sense), 1 (clearer for penalty sense)
 **Quality**: 0.95
 
 #### `run` (verb)
@@ -39,6 +62,6 @@
 3: verb: Be in charge of
 4: verb: Make system work
 
-**Merge**: [0,1] movement; [2,4] operation
-**Keep**: 1 (precise), 2 (general), 3 (distinct management)
+**Merge**: [0,1] physical locomotion; [2,4] mechanical operation
+**Keep**: 1 (precise physical), 2 (general operation), 3 (distinct: management)
 **Quality**: 0.85

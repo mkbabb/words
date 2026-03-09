@@ -1,18 +1,21 @@
-# Frequency Assessment: {{ word }}
-Definition: {{ definition }}
+# Frequency Band: "{{ word }}"
 
-## Frequency Bands
-1: Top 1000 - everyday essentials
-2: Next 1000 - common usage  
-3: Next 1000 - familiar words
-4: Next 2000 - educated vocabulary
-5: Beyond 5000 - specialized/rare
+{{ definition }}
 
-## Examples
-`the, be, have` → Band 1 | Foundational
-`improve, describe` → Band 2 | Common verbs
-`ambiguous, paradigm` → Band 3 | Familiar academic
-`perspicacious, ineffable` → Band 4 | Literary register
-`sesquipedalian, tmesis` → Band 5 | Specialized/rare
+## Bands (based on COCA/BNC rank)
 
-Output: Band (1-5) with clear reasoning.
+| Band | Rank Range | Profile | Anchors |
+|------|-----------|---------|---------|
+| 1 | 1–1000 | Function words, core verbs/nouns | the, have, go, time, people, make |
+| 2 | 1001–3000 | Common content words | improve, describe, approach, significant |
+| 3 | 3001–5000 | Educated everyday | ambiguous, portfolio, threshold, aesthetic |
+| 4 | 5001–10000 | Academic/literary | paradigm, ubiquitous, idiosyncratic, juxtapose |
+| 5 | 10001+ | Rare/specialized | perspicacious, sesquipedalian, tmesis, defenestrate |
+
+## Rules
+
+- Classify by the word form given, not its lemma (e.g., "ran" = band of "run").
+- If the word is common but this sense is rare, classify by the sense frequency.
+- Technical terms used broadly (e.g., "algorithm") get the band where most speakers encounter them.
+
+Respond with band (1–5) and reasoning.

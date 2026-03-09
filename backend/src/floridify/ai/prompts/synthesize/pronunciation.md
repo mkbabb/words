@@ -1,19 +1,28 @@
 # Pronunciation: {{ word }}
 
 {% if language and language != "en" %}
-Generate native {{ language_name }} pronunciation:
+Language: {{ language_name }}
 {% else %}
-Generate American English pronunciation:
+Language: American English
 {% endif %}
 
-**Phonetic**: Hyphenated syllables, CAPS for primary stress
+## Task
+
+Generate accurate pronunciation data for this word.
+
+### Requirements
 {% if language and language != "en" %}
-**IPA**: Standard {{ language_name }} IPA with /ˈ/ for stress
+- **Phonetic**: Hyphenated syllables using English-approximation letters. CAPS for primary stress.
+- **IPA**: Standard {{ language_name }} IPA. Mark primary stress with /ˈ/ and secondary stress with /ˌ/.
 {% else %}
-**IPA**: Standard American with /ˈ/ for stress
+- **Phonetic**: Hyphenated syllables using English letters. CAPS for primary stress.
+- **IPA**: Standard American English IPA. Mark primary stress with /ˈ/ and secondary stress with /ˌ/.
 {% endif %}
 
-Include variants with "or" if multiple are standard.
+### Rules
+- If multiple standard pronunciations exist, include variants separated by "or".
+- For loanwords in English, give the anglicized pronunciation unless the word is typically pronounced in its source language.
+- Ensure syllable breaks in the phonetic form align with the IPA syllabification.
 
 ## Examples
 
