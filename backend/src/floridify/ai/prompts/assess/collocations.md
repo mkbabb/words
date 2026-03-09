@@ -2,6 +2,8 @@
 
 {{ definition }}
 
+Return up to {{ count }} collocations total across all types.
+
 ## Collocation Types
 - **adjective**: modifying adjectives
 - **verb**: verbal companions
@@ -17,7 +19,7 @@
 
 ## Rules
 1. Only collocations a native speaker would produce unprompted. No forced or creative pairings.
-2. Max 5 per type. Omit types with no strong collocations.
+2. Omit types with no strong collocations.
 3. Strength reflects how conventionalized the pairing is, not just co-occurrence frequency.
 4. Collocations must match the given sense/definition, not other senses of the word.
 5. Prefer collocations that are distinctive to this word over generic ones (e.g., for "decision": "make" over "good").

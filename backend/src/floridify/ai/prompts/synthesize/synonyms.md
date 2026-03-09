@@ -5,15 +5,15 @@
 
 ## Task
 
-Generate {{ count }}{% if existing_synonyms %} NEW (not in Existing list){% endif %} synonyms for the specific sense defined above.
+Generate up to {{ count }}{% if existing_synonyms %} NEW (not in Existing list){% endif %} synonyms for the specific sense defined above. If fewer than {{ count }} high-quality synonyms exist, return fewer rather than padding with weak alternatives.
 
 ### Distribution
-- ~40% common: everyday, widely understood alternatives
+- ~50% common: everyday, widely understood alternatives
 - ~30% literary: sophisticated or elevated register
-- ~20% foreign: non-English terms where they capture a nuance English lacks
-- ~10% technical: domain-specific vocabulary
+- ~20% foreign/technical: non-English or domain-specific terms where they capture a nuance English lacks
 
 ### Quality Rules
+- **NEVER include "{{ word }}" itself as a synonym.** The word cannot be its own synonym.
 - Every synonym must be substitutable in at least some contexts where the target word appears.
 - Match the part of speech exactly (noun for noun, verb for verb, etc.).
 - Foreign-language synonyms must be actual words in that language, not transliterations.

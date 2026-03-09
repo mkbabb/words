@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import anthropic
-import openai
 from openai import (
     APIConnectionError,
     APITimeoutError,
@@ -71,12 +70,7 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
     def last_model_info(self) -> ModelInfo | None:
         return self._last_model_info
 
-    @cached_api_call(
-        ttl_hours=24.0,
-        key_prefix="ai_structured",
-        ignore_params=["system_prompt"],
-    )
-    async def _make_structured_request(
+    async def _make_structured_request_impl(
         self,
         prompt: str,
         response_model: type[T],
@@ -84,14 +78,18 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         system_prompt: str | None = None,
         **kwargs: Any,
     ) -> T:
-        """Make a structured AI request with model selection and validation retry.
+        """Make a structured AI request with model selection and validation retry (uncached).
+
+        This is the core implementation without caching. Use `_make_structured_request`
+        for the cached version, or call this directly when caching should be bypassed
+        (e.g., tournament candidate generation).
 
         Args:
             prompt: User prompt text
             response_model: Pydantic model for structured output
             task_name: Task name for model selection routing
             system_prompt: Optional system/developer prompt
-            **kwargs: Additional parameters (max_tokens, temperature, tier)
+            **kwargs: Additional parameters (max_tokens, temperature, tier, temperature_boost)
         """
         start_time = time.perf_counter()
 
@@ -109,8 +107,16 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         if temperature is None:
             temperature = get_temperature_for_model(model_tier, task_name) if model_tier else None
 
-        # Token parameters
-        max_tokens_value = kwargs.pop("max_tokens", None) or 1000
+        # Apply temperature boost (used by tournament for candidate diversity)
+        temperature_boost = kwargs.pop("temperature_boost", 0.0)
+        if temperature is not None and temperature_boost:
+            temperature = min(temperature + temperature_boost, 1.5)
+
+        # Token parameters: GPT-5 models use max_completion_tokens which includes
+        # reasoning tokens. The model may spend most tokens on reasoning, so we
+        # need a much higher default to ensure output fits after reasoning.
+        default_max_tokens = 16384 if model_tier and model_tier.is_gpt5 else 4096
+        max_tokens_value = kwargs.pop("max_tokens", None) or default_max_tokens
 
         # Budget check
         from ...api.middleware.rate_limiting import spending_tracker
@@ -207,6 +213,27 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         # Should not reach here, but satisfy type checker
         raise last_error or RuntimeError("Unexpected end of retry loop")
 
+    @cached_api_call(
+        ttl_hours=24.0,
+        key_prefix="ai_structured",
+        ignore_params=["system_prompt"],
+    )
+    async def _make_structured_request(
+        self,
+        prompt: str,
+        response_model: type[T],
+        task_name: str | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> T:
+        """Make a structured AI request with model selection and validation retry (cached).
+
+        Delegates to `_make_structured_request_impl` with L1/L2 caching via @cached_api_call.
+        """
+        return await self._make_structured_request_impl(
+            prompt, response_model, task_name, system_prompt, **kwargs
+        )
+
     async def _openai_call(
         self,
         prompt: str,
@@ -227,7 +254,9 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         - We use effort=none for structured outputs (fast, cheap, temperature works)
         """
         if not isinstance(self.client, AsyncOpenAI):
-            raise TypeError(f"OpenAI call requires AsyncOpenAI client, got {type(self.client).__name__}")
+            raise TypeError(
+                f"OpenAI call requires AsyncOpenAI client, got {type(self.client).__name__}"
+            )
 
         messages: list[dict[str, str]] = []
         if system_prompt:
@@ -248,9 +277,10 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         else:
             request_params["max_tokens"] = max_tokens
 
-        # Temperature: supported for GPT-5 when reasoning.effort=none (our default)
-        # NOT supported for o-series models
-        if temperature is not None and not model_tier.is_o_series:
+        # Temperature: GPT-5 models only support temperature=1 (default) when
+        # reasoning is active. GPT-4 series supports arbitrary temperature.
+        # o-series never supports temperature.
+        if temperature is not None and not model_tier.is_o_series and not model_tier.is_gpt5:
             request_params["temperature"] = temperature
 
         # Retry on transient API errors
@@ -262,14 +292,18 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
             except RateLimitError:
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt
-                    logger.warning(f"Rate limited (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s")
+                    logger.warning(
+                        f"Rate limited (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     raise
             except (APITimeoutError, APIConnectionError) as e:
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt
-                    logger.warning(f"Transient API error (attempt {attempt + 1}/{max_retries}): {e}")
+                    logger.warning(
+                        f"Transient API error (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     raise
@@ -363,7 +397,9 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
             "prompt_tokens": response.usage.input_tokens if response.usage else 0,
             "completion_tokens": response.usage.output_tokens if response.usage else 0,
             "total_tokens": (
-                (response.usage.input_tokens + response.usage.output_tokens) if response.usage else 0
+                (response.usage.input_tokens + response.usage.output_tokens)
+                if response.usage
+                else 0
             ),
         }
 
@@ -405,7 +441,9 @@ def get_ai_connector(
 
         # Determine provider and effort from config
         ai_section = getattr(config, "ai", None)
-        provider_str = ai_section.provider if ai_section and hasattr(ai_section, "provider") else "openai"
+        provider_str = (
+            ai_section.provider if ai_section and hasattr(ai_section, "provider") else "openai"
+        )
         provider = Provider(provider_str) if isinstance(provider_str, str) else provider_str
 
         effort_str = ai_section.effort if ai_section and hasattr(ai_section, "effort") else "medium"

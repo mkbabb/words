@@ -30,6 +30,6 @@
 1. Return only patterns that apply to this specific word in this specific sense.
 2. Most verbs are [T]; only mark [I] if the intransitive use is notable.
 3. Most nouns are [C]; only mark [U] if uncountability is notable.
-4. Include the most common 1–3 patterns, not an exhaustive list.
+4. Include the most common {{ count }} patterns, not an exhaustive list.
 
 Return patterns with brief descriptions.

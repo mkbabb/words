@@ -23,6 +23,7 @@ from ..utils.language_precedence import (
     to_language_codes,
 )
 from ..utils.logging import get_logger
+from .adaptive_counts import compute_counts
 from .connector import AIConnector, get_ai_connector
 from .constants import SynthesisComponent
 from .synthesis import (
@@ -174,6 +175,13 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_SYNTHESIS)
 
+        # Compute adaptive facts count
+        adaptive = compute_counts(
+            language=primary_language,
+            definition_count=len(unique_definitions),
+        )
+        facts_count = adaptive.facts
+
         # Parallel synthesis with return_exceptions=True: definitions are required,
         # but pronunciation/etymology/facts are optional enhancements
         results = await asyncio.gather(
@@ -186,7 +194,7 @@ class DefinitionSynthesizer:
                 language=primary_language,
             ),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
-            generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
+            generate_facts(word_obj, unique_definitions, self.ai, facts_count, state_tracker),
             return_exceptions=True,
         )
 
@@ -259,20 +267,24 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> list[Definition]:
         """Synthesize definitions by cluster using modular functions."""
-        # Group by cluster
+        # Group by cluster slug
         clusters: dict[str, list[Definition]] = {}
         for definition in clustered_definitions:
             if definition.meaning_cluster:
-                cluster_id = definition.meaning_cluster.id
-                if cluster_id not in clusters:
-                    clusters[cluster_id] = []
-                clusters[cluster_id].append(definition)
+                cluster_slug = definition.meaning_cluster.slug
+                if cluster_slug not in clusters:
+                    clusters[cluster_slug] = []
+                clusters[cluster_slug].append(definition)
 
         # Create tasks for parallel synthesis
         synthesis_tasks = []
 
-        async def synthesize_cluster(cluster_id: str, cluster_defs: list[Definition]) -> Definition:
-            logger.info(f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions")
+        async def synthesize_cluster(
+            cluster_slug: str, cluster_defs: list[Definition]
+        ) -> Definition:
+            logger.info(
+                f"Synthesizing cluster '{cluster_slug}' with {len(cluster_defs)} definitions"
+            )
 
             # Convert definitions to dict format, retaining provider info
             def_dicts = []
@@ -333,8 +345,8 @@ class DefinitionSynthesizer:
             return definition
 
         # Create tasks for all clusters
-        for cluster_id, cluster_defs in clusters.items():
-            task = synthesize_cluster(cluster_id, cluster_defs)
+        for cluster_slug, cluster_defs in clusters.items():
+            task = synthesize_cluster(cluster_slug, cluster_defs)
             synthesis_tasks.append(task)
 
         # Parallel cluster synthesis: log failures explicitly, filter to successful results
@@ -343,9 +355,9 @@ class DefinitionSynthesizer:
         synthesized_definitions = []
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
-                cluster_id = list(clusters.keys())[i]
+                cluster_slug = list(clusters.keys())[i]
                 logger.error(
-                    f"Cluster '{cluster_id}' synthesis failed: {result}",
+                    f"Cluster '{cluster_slug}' synthesis failed: {result}",
                     exc_info=result,
                 )
             else:
@@ -366,6 +378,61 @@ class DefinitionSynthesizer:
 
         """
         await save_entry_versioned(entry, word)
+
+    async def resynthesize_from_provenance(
+        self,
+        word: str,
+        languages: list[Language] | None = None,
+        state_tracker: StateTracker | None = None,
+    ) -> DictionaryEntry | None:
+        """Re-synthesize a word from its existing provider data.
+
+        Finds all non-synthesis DictionaryEntry records for the word and runs
+        the full synthesis pipeline (dedup → cluster → synthesize → enhance),
+        creating a new versioned synthesized entry with provenance tracking.
+
+        Args:
+            word: Word text to re-synthesize
+            languages: Override languages (defaults to word's existing languages)
+            state_tracker: Optional progress tracking
+
+        Returns:
+            New synthesized DictionaryEntry, or None if no provider data exists
+
+        """
+        storage = await get_storage()
+        word_obj = await storage.get_word(word)
+        if not word_obj:
+            logger.warning(f"Word '{word}' not found in database")
+            return None
+
+        # Find all non-synthesis provider entries for this word
+        provider_entries: list[DictionaryEntry] = await DictionaryEntry.find(
+            DictionaryEntry.word_id == word_obj.id,
+            DictionaryEntry.provider != DictionaryProvider.SYNTHESIS,
+        ).to_list()
+
+        if not provider_entries:
+            logger.warning(f"No provider data found for '{word}' — nothing to re-synthesize")
+            return None
+
+        resolved_languages = languages or list(word_obj.languages)
+        if not resolved_languages:
+            resolved_languages = [Language.ENGLISH]
+
+        logger.info(
+            f"Re-synthesizing '{word}' from {len(provider_entries)} provider entries: "
+            f"{[_provider_str(e.provider) for e in provider_entries]}",
+        )
+
+        # Run full synthesis pipeline with force_refresh to create a new version
+        return await self.synthesize_entry(
+            word=word,
+            providers_data=provider_entries,
+            languages=resolved_languages,
+            force_refresh=True,
+            state_tracker=state_tracker,
+        )
 
     async def regenerate_entry_components(
         self,

@@ -1,7 +1,7 @@
 # Usage Notes: {{ word }}
 Definition: {{ definition }}
 
-Generate 1-3 practical usage notes. Each note has a type and text (max 20 words).
+Generate {{ count }} or fewer practical usage notes. Each note has a type and text (max 20 words).
 
 Types: grammar, confusion, regional, register, error.
 

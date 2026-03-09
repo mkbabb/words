@@ -56,6 +56,27 @@ class SuggestionsMixin:
             count=count,
         )
 
+        # Use tournament for higher quality suggestions
+        from ..tournament import TournamentConfig, run_tournament
+        from .config import AIConfig
+
+        config = AIConfig()
+        if config.enable_tournament:
+            tournament_config = TournamentConfig(n=config.tournament_n)
+            result = await run_tournament(
+                ai=self,
+                prompt=prompt,
+                response_model=WordSuggestionResponse,
+                task_name="suggest_words",
+                config=tournament_config,
+                rank_prompt_builder=lambda candidates: self.prompt_manager.render(
+                    "misc/rank_candidates",
+                    candidates=candidates,
+                    task="word_suggestions",
+                ),
+            )
+            return result.response
+
         result = await self._make_structured_request(
             prompt,
             WordSuggestionResponse,

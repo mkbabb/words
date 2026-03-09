@@ -5,7 +5,7 @@
 
 ## Task
 
-Generate {{ count }}{% if existing_antonyms %} NEW (not in Existing list){% endif %} antonyms for the specific sense defined above.
+Generate up to {{ count }}{% if existing_antonyms %} NEW (not in Existing list){% endif %} antonyms for the specific sense defined above. Not all words have antonyms. If no genuine antonym exists, return an empty list. Return fewer rather than padding with weak alternatives.
 
 ### Distribution
 - ~40% common: everyday, widely understood opposites
@@ -14,6 +14,7 @@ Generate {{ count }}{% if existing_antonyms %} NEW (not in Existing list){% endi
 - ~10% technical: domain-specific vocabulary
 
 ### Quality Rules
+- **NEVER include "{{ word }}" itself as an antonym.** A word cannot be its own antonym.
 - Every antonym must express a genuinely opposing or contrary meaning to the target definition, not merely a different concept.
 - Match the part of speech exactly.
 - Distinguish between contradictory antonyms (hot/cold), complementary antonyms (alive/dead), and relational antonyms (buy/sell). Prefer contradictory when available.

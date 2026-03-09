@@ -42,12 +42,33 @@ class SynthesisMixin:
             meaning_cluster=meaning_cluster,
         )
 
+        # Use tournament for higher quality synthesis
+        from ..tournament import TournamentConfig, run_tournament
+        from .config import AIConfig
+
+        config = AIConfig()
+        if config.enable_tournament:
+            tournament_config = TournamentConfig(n=config.tournament_n)
+            result = await run_tournament(
+                ai=self,
+                prompt=prompt,
+                response_model=SynthesisResponse,
+                task_name="synthesize_definitions",
+                config=tournament_config,
+                rank_prompt_builder=lambda candidates: self.prompt_manager.render(
+                    "misc/rank_candidates",
+                    word=word,
+                    candidates=candidates,
+                    task="definition_synthesis",
+                ),
+            )
+            return result.response
+
         result = await self._make_structured_request(
             prompt,
             SynthesisResponse,
             task_name="synthesize_definitions",
         )
-        # Success logging handled by synthesizer context
         return result
 
     async def extract_etymology(
@@ -267,7 +288,7 @@ class SynthesisMixin:
         # Log each cluster for debugging
         for cluster in result.cluster_mappings:
             logger.debug(
-                f"  • Cluster '{cluster.cluster_id}': {cluster.cluster_description} "
+                f"  • Cluster '{cluster.cluster_slug}': {cluster.cluster_description} "
                 f"({len(cluster.definition_indices)} definitions)",
             )
 

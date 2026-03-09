@@ -63,10 +63,11 @@ async def synthesize_synonyms(
             count=needed_count,
         )
 
-        # Union existing and new synonyms, removing duplicates
+        # Union existing and new synonyms, removing duplicates and self-references
+        word_lower = word.lower()
         all_synonyms = existing_synonyms.copy()
         for candidate in response.synonyms:
-            if candidate.word not in all_synonyms:
+            if candidate.word.lower() != word_lower and candidate.word not in all_synonyms:
                 all_synonyms.append(candidate.word)
 
         logger.info(f"Synthesized {len(all_synonyms)} total synonyms for '{word}'")
@@ -115,10 +116,11 @@ async def synthesize_antonyms(
             count=needed_count,
         )
 
-        # Union existing and new antonyms, removing duplicates
+        # Union existing and new antonyms, removing duplicates and self-references
+        word_lower = word.lower()
         all_antonyms = existing_antonyms.copy()
         for candidate in response.antonyms:
-            if candidate.word not in all_antonyms:
+            if candidate.word.lower() != word_lower and candidate.word not in all_antonyms:
                 all_antonyms.append(candidate.word)
 
         return all_antonyms[:count]
@@ -244,6 +246,7 @@ async def assess_definition_domain(
 async def assess_grammar_patterns(
     definition: Definition,
     ai: AIConnector,
+    count: int = 3,
     state_tracker: StateTracker | None = None,
 ) -> list[GrammarPattern]:
     """Extract grammar patterns for a definition."""
@@ -256,6 +259,7 @@ async def assess_grammar_patterns(
         response = await ai.assess_grammar_patterns(
             definition.text,
             definition.part_of_speech,
+            count=count,
         )
         return [
             GrammarPattern(
@@ -273,6 +277,7 @@ async def assess_collocations(
     definition: Definition,
     word: str,
     ai: AIConnector,
+    count: int = 5,
     state_tracker: StateTracker | None = None,
 ) -> list[Collocation]:
     """Identify collocations for a definition."""
@@ -286,6 +291,7 @@ async def assess_collocations(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
+            count=count,
         )
         return [
             Collocation(
@@ -304,6 +310,7 @@ async def usage_note_generation(
     definition: Definition,
     word: str,
     ai: AIConnector,
+    count: int = 3,
     state_tracker: StateTracker | None = None,
 ) -> list[UsageNote]:
     """Generate usage notes for a definition."""
@@ -313,7 +320,7 @@ async def usage_note_generation(
                 stage=Stages.AI_SYNTHESIS,
                 message=f"Generating usage notes for {word}",
             )
-        response = await ai.usage_note_generation(word, definition.text)
+        response = await ai.usage_note_generation(word, definition.text, count=count)
         return [
             UsageNote(
                 type=note.type,  # type: ignore

@@ -73,6 +73,10 @@ class AIConfig(BaseModel):
 
     max_concurrent_requests: int = Field(default=10, ge=1)
     effort: ParsedEffort = OpenAIEffort.MEDIUM
+    enable_tournament: bool = Field(
+        default=True, description="Enable tournament/ranker for high-complexity tasks"
+    )
+    tournament_n: int = Field(default=3, ge=2, le=8, description="Number of tournament candidates")
 
 
 class AIProviderConfig(BaseModel):

@@ -126,12 +126,14 @@ class AssessmentMixin:
         self,
         definition: str,
         part_of_speech: str,
+        count: int = 3,
     ) -> GrammarPatternResponse:
         """Extract grammar patterns from a definition.
 
         Args:
             definition: The definition text
             part_of_speech: Part of speech
+            count: Maximum number of patterns to return
 
         Returns:
             GrammarPatternResponse with patterns
@@ -141,6 +143,7 @@ class AssessmentMixin:
             "assess/grammar_patterns",
             definition=definition,
             part_of_speech=part_of_speech,
+            count=count,
         )
 
         result = await self._make_structured_request(
@@ -156,6 +159,7 @@ class AssessmentMixin:
         word: str,
         definition: str,
         part_of_speech: str,
+        count: int = 5,
     ) -> CollocationResponse:
         """Identify common collocations for a word.
 
@@ -163,6 +167,7 @@ class AssessmentMixin:
             word: The word
             definition: The definition for context
             part_of_speech: Part of speech
+            count: Maximum number of collocations to return
 
         Returns:
             CollocationResponse with collocations
@@ -173,6 +178,7 @@ class AssessmentMixin:
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            count=count,
         )
 
         result = await self._make_structured_request(
@@ -187,12 +193,14 @@ class AssessmentMixin:
         self,
         word: str,
         definition: str,
+        count: int = 3,
     ) -> UsageNoteResponse:
         """Generate usage notes for a definition.
 
         Args:
             word: The word
             definition: The definition text
+            count: Maximum number of usage notes to return
 
         Returns:
             UsageNoteResponse with usage guidance
@@ -202,6 +210,7 @@ class AssessmentMixin:
             "misc/usage_note_generation",
             word=word,
             definition=definition,
+            count=count,
         )
 
         result = await self._make_structured_request(

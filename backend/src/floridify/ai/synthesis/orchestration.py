@@ -28,6 +28,7 @@ from ...models.relationships import (
 )
 from ...storage.dictionary import save_definitions_batch_versioned, save_entry_versioned
 from ...utils.logging import get_logger
+from ..adaptive_counts import compute_counts
 from ..batch_processor import batch_synthesis
 from ..connector import AIConnector
 from ..constants import SynthesisComponent
@@ -118,16 +119,16 @@ async def cluster_definitions(
 
         # Apply cluster assignments
         for cluster_mapping in cluster_response.cluster_mappings:
-            # Extract short name from cluster_id (e.g., "bank_finance" -> "finance")
+            # Extract short name from cluster_slug (e.g., "bank_noun_finance" -> "finance")
             cluster_name = (
-                cluster_mapping.cluster_id.split("_")[-1].title()
-                if "_" in cluster_mapping.cluster_id
-                else cluster_mapping.cluster_id
+                cluster_mapping.cluster_slug.split("_")[-1].title()
+                if "_" in cluster_mapping.cluster_slug
+                else cluster_mapping.cluster_slug
             )
 
             cluster = MeaningCluster(
-                id=cluster_mapping.cluster_id,
-                name=cluster_name,  # Short name extracted from ID
+                slug=cluster_mapping.cluster_slug,
+                name=cluster_name,  # Short name extracted from slug
                 description=cluster_mapping.cluster_description,
                 order=int(cluster_mapping.relevancy),
                 relevance=cluster_mapping.relevancy,
@@ -160,6 +161,38 @@ async def cluster_definitions(
         return definitions
 
 
+def _dedup_across_definitions(definitions: list[Definition]) -> None:
+    """Remove synonym/antonym overlap across definitions. Higher-relevance definitions keep the word."""
+    # Sort by meaning_cluster.relevance descending — high-relevance defs get priority
+    sorted_defs = sorted(
+        definitions,
+        key=lambda d: d.meaning_cluster.relevance if d.meaning_cluster else 0,
+        reverse=True,
+    )
+
+    seen_syns: set[str] = set()
+    for defn in sorted_defs:
+        if defn.synonyms:
+            deduped = []
+            for s in defn.synonyms:
+                key = s.lower()
+                if key not in seen_syns:
+                    seen_syns.add(key)
+                    deduped.append(s)
+            defn.synonyms = deduped
+
+    seen_ants: set[str] = set()
+    for defn in sorted_defs:
+        if defn.antonyms:
+            deduped = []
+            for a in defn.antonyms:
+                key = a.lower()
+                if key not in seen_ants:
+                    seen_ants.add(key)
+                    deduped.append(a)
+            defn.antonyms = deduped
+
+
 async def enhance_definitions_parallel(
     definitions: list[Definition],
     word: Word,
@@ -185,11 +218,21 @@ async def enhance_definitions_parallel(
     if components is None:
         components = SynthesisComponent.default_components()
 
+    # Compute adaptive counts based on word characteristics
+    primary_language = word.languages[0] if word.languages else "en"
+
     # Build tasks for each definition and component
     tasks: list[Coroutine[Any, Any, Any]] = []
     task_info: list[tuple[Definition, SynthesisComponent, int]] = []
 
     for definition in definitions:
+        # Compute per-definition adaptive counts
+        counts = compute_counts(
+            language=primary_language,
+            definition_count=len(definitions),
+            part_of_speech=definition.part_of_speech,
+        )
+
         # Synonyms
         if SynthesisComponent.SYNONYMS in components and (not definition.synonyms or force_refresh):
             tasks.append(
@@ -197,6 +240,7 @@ async def enhance_definitions_parallel(
                     word.text,
                     definition,
                     ai,
+                    count=counts.synonyms,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
                 ),
@@ -207,7 +251,11 @@ async def enhance_definitions_parallel(
         if SynthesisComponent.EXAMPLES in components and (
             not definition.example_ids or force_refresh
         ):
-            tasks.append(generate_examples(word.text, definition, ai, state_tracker=state_tracker))
+            tasks.append(
+                generate_examples(
+                    word.text, definition, ai, count=counts.examples, state_tracker=state_tracker
+                )
+            )
             task_info.append((definition, SynthesisComponent.EXAMPLES, len(tasks) - 1))
 
         # Antonyms
@@ -217,6 +265,7 @@ async def enhance_definitions_parallel(
                     word.text,
                     definition,
                     ai,
+                    count=counts.antonyms,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
                 ),
@@ -261,21 +310,37 @@ async def enhance_definitions_parallel(
         if SynthesisComponent.GRAMMAR_PATTERNS in components and (
             not definition.grammar_patterns or force_refresh
         ):
-            tasks.append(assess_grammar_patterns(definition, ai, state_tracker))
+            tasks.append(
+                assess_grammar_patterns(
+                    definition, ai, count=counts.grammar_patterns, state_tracker=state_tracker
+                )
+            )
             task_info.append((definition, SynthesisComponent.GRAMMAR_PATTERNS, len(tasks) - 1))
 
         # Collocations
         if SynthesisComponent.COLLOCATIONS in components and (
             not definition.collocations or force_refresh
         ):
-            tasks.append(assess_collocations(definition, word.text, ai, state_tracker))
+            tasks.append(
+                assess_collocations(
+                    definition,
+                    word.text,
+                    ai,
+                    count=counts.collocations,
+                    state_tracker=state_tracker,
+                )
+            )
             task_info.append((definition, SynthesisComponent.COLLOCATIONS, len(tasks) - 1))
 
         # Usage Notes
         if SynthesisComponent.USAGE_NOTES in components and (
             not definition.usage_notes or force_refresh
         ):
-            tasks.append(usage_note_generation(definition, word.text, ai, state_tracker))
+            tasks.append(
+                usage_note_generation(
+                    definition, word.text, ai, count=counts.usage_notes, state_tracker=state_tracker
+                )
+            )
             task_info.append((definition, SynthesisComponent.USAGE_NOTES, len(tasks) - 1))
 
         # Regional Variants
@@ -364,6 +429,9 @@ async def enhance_definitions_parallel(
                 definition.region = result
 
         successes += 1
+
+    # Cross-definition dedup: remove synonym/antonym overlap across definitions
+    _dedup_across_definitions(definitions)
 
     # Save all enhanced definitions with version history
     await save_definitions_batch_versioned(definitions, word.text)

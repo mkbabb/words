@@ -7,7 +7,7 @@
 
 ## Task
 Group definitions into meaning clusters. Output fields per cluster:
-- **cluster_id**: `{word}_{pos}_{sense}` (e.g. `bludgeon_noun_weapon`, `bludgeon_verb_strike`)
+- **cluster_slug**: `{word}_{pos}_{sense}` (e.g. `bludgeon_noun_weapon`, `bludgeon_verb_strike`)
 - **cluster_description**: 3-6 word summary
 - **definition_indices**: [list of indices]
 - **relevancy**: 0.0-1.0 (common usage frequency)
@@ -16,7 +16,7 @@ Group definitions into meaning clusters. Output fields per cluster:
 
 ### Part of Speech
 - NEVER merge different parts of speech into one cluster.
-- If providers disagree on POS for the same sense (e.g. one says "adjective", another says "noun" for the same meaning), create separate clusters per POS and note via cluster_id.
+- If providers disagree on POS for the same sense (e.g. one says "adjective", another says "noun" for the same meaning), create separate clusters per POS and note via cluster_slug.
 
 ### When to MERGE
 - Definitions with >70% semantic overlap, even if worded differently across providers.
@@ -30,6 +30,8 @@ Group definitions into meaning clusters. Output fields per cluster:
 - Domain-specific senses distinct from general usage (e.g. "bug" in computing vs. entomology vs. espionage).
 
 ### Cluster Count
+- For phrases or idioms with a single fixed meaning, return exactly 1 cluster.
+- For monosemous words, return 1 cluster.
 - Target 3-5 clusters for 10+ definitions. Fewer definitions = fewer clusters.
 - Every definition index must appear in exactly one cluster.
 
@@ -41,7 +43,7 @@ Group definitions into meaning clusters. Output fields per cluster:
 2: Wiktionary (noun) - large touring motorcar with folding top
 3: Webster (noun) - early automobile
 
-→ cluster_id: phaeton_noun_carriage, indices: [0,1,2,3], relevancy: 1.0
+→ cluster_slug: phaeton_noun_carriage, indices: [0,1,2,3], relevancy: 1.0
 
 ### Preserving antonymy — "sanction":
 0: Oxford (noun) - official permission

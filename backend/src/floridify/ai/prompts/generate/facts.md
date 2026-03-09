@@ -1,4 +1,4 @@
-Generate {{ count }} facts about "{{ word }}" ({{ definition }}).
+Generate {{ count }} or fewer facts about "{{ word }}" ({{ definition }}). Quality over quantity — omit a fact rather than include a banal one.
 
 Each fact should teach something a well-read person might not know. 1-2 sentences each.
 
