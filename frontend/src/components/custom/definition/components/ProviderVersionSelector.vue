@@ -65,7 +65,7 @@
                     <Select
                         v-if="selectedProviders.has(provider.uniqueKey) && provider.versions.length > 0"
                         :model-value="selectedVersions[provider.uniqueKey] || 'latest'"
-                        @update:model-value="selectVersion(provider.uniqueKey, $event)"
+                        @update:model-value="selectVersion(provider.uniqueKey, String($event))"
                     >
                         <SelectTrigger class="h-7 w-auto min-w-[7rem] gap-1 px-2 text-xs">
                             <SelectValue placeholder="Latest" />
@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { X, Check, Loader2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
