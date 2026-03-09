@@ -27,10 +27,13 @@
                 cardVariant !== 'default' ? 'themed-shadow-sm' : ''
             )"
             :data-theme="cardVariant || 'default'"
+            side="right"
+            align="start"
         >
             <PartOfSpeechPreview
                 :clusterId="clusterId"
                 :partOfSpeech="partOfSpeech"
+                :clusterDescription="clusterDescription"
             />
         </HoverCardContent>
     </HoverCard>
@@ -46,6 +49,7 @@ interface Props {
     partOfSpeech: { type: string; count: number };
     isActive: boolean;
     cardVariant?: string;
+    clusterDescription?: string;
 }
 
 defineProps<Props>();

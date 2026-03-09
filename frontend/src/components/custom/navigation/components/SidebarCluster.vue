@@ -16,7 +16,7 @@
                     <div class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2">
                         <ShimmerText
                             v-if="isActive"
-                            :text="formatClusterLabel(cluster.clusterId).toUpperCase()"
+                            :text="cluster.clusterName.toUpperCase()"
                             text-class="themed-cluster-title text-left text-xs font-bold uppercase tracking-wider"
                             :duration="400"
                             :interval="15000"
@@ -25,7 +25,7 @@
                             v-else
                             class="themed-cluster-title text-left text-xs font-bold uppercase tracking-wider"
                         >
-                            {{ formatClusterLabel(cluster.clusterId).toUpperCase() }}
+                            {{ cluster.clusterName.toUpperCase() }}
                         </span>
                     </div>
                     <div
@@ -51,6 +51,7 @@
                 :partOfSpeech="partOfSpeech"
                 :isActive="activePartOfSpeech === `${cluster.clusterId}-${partOfSpeech.type}`"
                 :cardVariant="cardVariant"
+                :clusterDescription="cluster.clusterDescription"
                 @click="$emit('part-of-speech-click', partOfSpeech.type)"
             />
         </div>
@@ -60,7 +61,6 @@
 <script setup lang="ts">
 import { HoverCard, HoverCardTrigger } from '@/components/ui';
 import { ShimmerText } from '@/components/custom/animation';
-import { formatClusterLabel } from '@/components/custom/definition/utils';
 import SidebarHoverCard from './SidebarHoverCard.vue';
 import SidebarPartOfSpeech from './SidebarPartOfSpeech.vue';
 import type { SidebarCluster } from '../types';

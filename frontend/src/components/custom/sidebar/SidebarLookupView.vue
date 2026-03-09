@@ -212,48 +212,6 @@ const extractWordCount = (query: string): number => {
 
 // Initialize vocabulary suggestions on component mount
 onMounted(async () => {
-    // If no lookup history exists, add some test data for vocabulary suggestions
-    if (history.recentLookups.length === 0) {
-        // Add some sample lookup history to test vocabulary suggestions
-        const sampleWords = ['eloquent', 'serendipity', 'ephemeral', 'ubiquitous', 'perspicacious'];
-
-        for (const word of sampleWords) {
-            // Create a minimal entry for testing
-            const mockEntry = {
-                id: `test-${word}`,
-                word,
-                word_id: `test-${word}`,
-                definitions: [{
-                    id: `def-${word}`,
-                    text: `Sample definition for ${word}`,
-                    part_of_speech: 'adjective' as const,
-                    word_id: `test-${word}`,
-                    word_forms: [],
-                    example_ids: [],
-                    image_ids: [],
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    cefr_level: null,
-                    frequency_band: null,
-                    meaning_cluster: null,
-                    language_register: null,
-                    grammar_patterns: [],
-                    collocations: [],
-                    usage_notes: [],
-                    regional_variants: [],
-                    examples: [],
-                    images: [],
-                    providers_data: []
-                }],
-                last_updated: new Date().toISOString(),
-                lookup_count: 1
-            } as unknown as SynthesizedDictionaryEntry;
-
-            history.addToLookupHistory(word, mockEntry);
-        }
-    }
-
-    // Check if we need to initialize vocabulary suggestions
     if (history.vocabularySuggestions.length === 0 && history.recentLookups.length > 0) {
         try {
             await history.refreshVocabularySuggestions();

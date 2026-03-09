@@ -37,7 +37,7 @@ export function useSidebarNavigation(options: NavigationOptions = {}) {
         
         return entry.definitions
             .filter((def) => {
-                const defCluster = def.meaning_cluster?.id || 'default';
+                const defCluster = def.meaning_cluster?.slug || def.meaning_cluster?.id || 'default';
                 return defCluster === clusterId && def.part_of_speech === partOfSpeech;
             })
             .sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0));

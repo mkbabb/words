@@ -1,7 +1,7 @@
 <template>
   <div
-    class="yoshi-avatar from-primary/20 to-primary/10 border-primary/20 flex items-center justify-center rounded-full border bg-gradient-to-br cursor-pointer select-none transition-transform duration-300 ease-apple-spring hover:scale-125"
-    :class="{ 'animate-yoshi-bounce': bouncing }"
+    class="yoshi-avatar from-primary/20 to-primary/10 border-primary/20 flex aspect-square items-center justify-center rounded-full border bg-gradient-to-br cursor-pointer select-none transition-transform duration-300 ease-apple-spring hover:scale-125"
+    :class="{ 'animate-yoshi-bounce': bouncing, 'admin-shimmer': props.isAdmin }"
     :style="{ width: size, height: size }"
     @click="handleClick"
   >
@@ -28,10 +28,12 @@ import yellowYoshi from '@/assets/yoshi/standing/yoshi_yellow_standing.png';
 interface YoshiAvatarProps {
   size?: string;
   color?: string;
+  isAdmin?: boolean;
 }
 
 const props = withDefaults(defineProps<YoshiAvatarProps>(), {
   size: '2.5rem',
+  isAdmin: false,
 });
 
 const sprites: Record<string, string> = {
@@ -84,5 +86,16 @@ const handleClick = () => {
 
 .animate-yoshi-bounce {
   animation: yoshi-bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes golden-shimmer {
+  0% { box-shadow: 0 0 4px rgba(234, 179, 8, 0.3); border-color: rgba(234, 179, 8, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(234, 179, 8, 0.6); border-color: rgba(234, 179, 8, 0.8); }
+  100% { box-shadow: 0 0 4px rgba(234, 179, 8, 0.3); border-color: rgba(234, 179, 8, 0.4); }
+}
+
+.admin-shimmer {
+  border-width: 2px;
+  animation: golden-shimmer 3s ease-in-out infinite;
 }
 </style>

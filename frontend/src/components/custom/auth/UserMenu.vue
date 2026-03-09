@@ -26,7 +26,7 @@
             collapsed && 'justify-center'
           )"
         >
-          <YoshiAvatar size="2rem" @click.stop />
+          <YoshiAvatar size="2rem" :is-admin="auth.isAdmin" @click.stop />
 
           <div v-if="!collapsed" class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">

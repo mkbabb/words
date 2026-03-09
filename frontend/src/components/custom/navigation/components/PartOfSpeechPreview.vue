@@ -1,33 +1,65 @@
 <template>
     <div class="space-y-3">
-        <div class="flex items-center justify-between">
-            <h4 class="themed-cluster-title text-sm font-semibold uppercase">
-                {{ partOfSpeech.type }}
-            </h4>
-            <span class="text-xs opacity-70">{{ partOfSpeech.count }} definitions</span>
+        <!-- Header -->
+        <div>
+            <div class="flex items-center justify-between">
+                <h4 class="themed-cluster-title text-sm font-semibold uppercase">
+                    {{ partOfSpeech.type }}
+                </h4>
+                <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {{ partOfSpeech.count }} def{{ partOfSpeech.count !== 1 ? 's' : '' }}
+                </span>
+            </div>
+            <p v-if="clusterDescription" class="mt-0.5 text-xs text-muted-foreground">
+                {{ clusterDescription }}
+            </p>
         </div>
-        <div class="space-y-2">
+
+        <!-- Definition Previews -->
+        <div v-if="previewDefinitions.length > 0" class="space-y-2">
             <div
                 v-for="(definition, idx) in previewDefinitions"
                 :key="idx"
-                class="space-y-1"
+                class="rounded-md border border-border/30 bg-muted/20 px-2.5 py-2"
             >
-                <p class="themed-definition-text text-sm leading-relaxed">
+                <p class="text-xs leading-relaxed text-foreground/80 line-clamp-2">
                     {{ definition.text }}
                 </p>
+                <!-- Example -->
                 <div
                     v-if="definition.examples?.[0]"
-                    class="themed-example-text text-xs italic opacity-75"
+                    class="mt-1 text-[10px] italic text-muted-foreground line-clamp-1"
                 >
                     "{{ definition.examples[0].text }}"
                 </div>
+                <!-- Synonyms -->
+                <div
+                    v-if="definition.synonyms?.length > 0"
+                    class="mt-1.5 flex flex-wrap gap-1"
+                >
+                    <span
+                        v-for="syn in definition.synonyms.slice(0, 4)"
+                        :key="syn"
+                        class="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                        {{ syn }}
+                    </span>
+                    <span
+                        v-if="definition.synonyms.length > 4"
+                        class="text-[10px] text-muted-foreground/50"
+                    >
+                        +{{ definition.synonyms.length - 4 }}
+                    </span>
+                </div>
             </div>
-            <div
-                v-if="definitions.length > 2"
-                class="text-xs opacity-60"
-            >
-                +{{ definitions.length - 2 }} more definitions
-            </div>
+        </div>
+
+        <!-- More indicator -->
+        <div
+            v-if="definitions.length > 2"
+            class="text-[10px] text-muted-foreground/60"
+        >
+            +{{ definitions.length - 2 }} more definition{{ definitions.length - 2 !== 1 ? 's' : '' }}
         </div>
     </div>
 </template>
@@ -39,6 +71,7 @@ import { useSidebarNavigation } from '../composables/useSidebarNavigation';
 interface Props {
     clusterId: string;
     partOfSpeech: { type: string; count: number };
+    clusterDescription?: string;
 }
 
 const props = defineProps<Props>();

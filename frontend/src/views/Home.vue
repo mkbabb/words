@@ -32,7 +32,7 @@
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
                     <div
-                        class="hidden xl:block transition-all duration-300 ease-out"
+                        class="hidden lg:block transition-all duration-300 ease-out"
                         :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0'"
                     >
                         <div
@@ -137,7 +137,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useScroll } from '@vueuse/core';
@@ -153,6 +153,7 @@ import { ProgressiveSidebar } from '@/components/custom/navigation';
 
 const { searchBar, content, ui, loading } = useStores();
 const route = useRoute();
+const router = useRouter();
 
 const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery)
@@ -233,7 +234,31 @@ watch(() => route.fullPath, async () => {
         searchBar.hideControls();
         searchBar.hideDropdown();
 
-        // Always fetch when the word changes
+        // Ensure we have the definition entry first (thesaurus needs it for the card shell)
+        if (!content.currentEntry || content.currentEntry.word !== word) {
+            try {
+                const definition = await orchestrator.getDefinition(word, {
+                    onProgress: (stage, progress) => {
+                        loading.setLoadingStage(stage);
+                        loading.setLoadingProgress(progress);
+                    }
+                });
+                if (definition) {
+                    content.setCurrentEntry(definition);
+                }
+            } catch (error: any) {
+                const message = error?.message || '';
+                if (message.includes('aborted') || error?.name === 'AbortError') {
+                    return;
+                }
+                // If definition fetch fails, fall back to dictionary mode
+                searchBar.setSubMode('lookup', 'dictionary');
+                router.replace({ name: 'Definition', params: { word } });
+                return;
+            }
+        }
+
+        // Now fetch thesaurus data
         const hasThesaurus = content.currentThesaurus &&
             content.currentThesaurus.word === word;
         if (!hasThesaurus) {
@@ -241,7 +266,6 @@ watch(() => route.fullPath, async () => {
                 const data = await orchestrator.getThesaurusData(word);
                 if (data) {
                     content.setCurrentThesaurus(data);
-                    // Close dropdowns after lookup completes
                     searchBar.hideControls();
                     searchBar.hideDropdown();
                 }

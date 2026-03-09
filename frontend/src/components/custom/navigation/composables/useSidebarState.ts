@@ -38,11 +38,20 @@ export function useSidebarState() {
                     return aOrder - bOrder;
                 });
             
+            // Build definition previews for hovercard
+            const definitions = group.definitions.slice(0, 3).map(def => ({
+                partOfSpeech: def.part_of_speech || '',
+                text: def.text || def.definition || '',
+                synonyms: (def.synonyms || []).slice(0, 4),
+            }));
+
             return {
                 clusterId: group.clusterId,
+                clusterName: group.clusterName,
                 clusterDescription: group.clusterDescription,
                 partsOfSpeech: sortedPOS,
-                maxRelevancy: group.maxRelevancy
+                maxRelevancy: group.maxRelevancy,
+                definitions,
             };
         });
         
@@ -51,9 +60,11 @@ export function useSidebarState() {
         if (normalizedEtymology?.text) {
             sections.push({
                 clusterId: 'etymology',
+                clusterName: 'Etymology',
                 clusterDescription: 'Word origin and history',
                 partsOfSpeech: [{ type: 'etymology', count: 1 }],
-                maxRelevancy: 0.8
+                maxRelevancy: 0.8,
+                definitions: [],
             });
         }
         

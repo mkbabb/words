@@ -16,8 +16,8 @@
             </span>
         </AccordionTrigger>
         <AccordionContent class="pb-2 pt-0">
-            <div 
-                v-if="items.length > 0" 
+            <div
+                v-if="items.length > 0"
                 :class="[
                     'space-y-1 rounded-lg p-2',
                     'bg-yellow-50/50 dark:bg-yellow-900/10',
@@ -25,7 +25,9 @@
                     items.length > 15 ? 'max-h-[60vh] overflow-y-auto scrollbar-thin pr-2' : ''
                 ]"
             >
-                <slot :items="items" />
+                <div v-for="(item, index) in items" :key="(item as any).id ?? (item as any).word ?? index">
+                    <slot name="item" :item="item" />
+                </div>
             </div>
             <div v-else class="py-3 text-center text-sm text-muted-foreground">
                 {{ emptyMessage }}
