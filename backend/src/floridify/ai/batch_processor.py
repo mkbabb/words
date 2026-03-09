@@ -19,7 +19,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from ..utils.logging import get_logger
-from .connector import OpenAIConnector
+from .connector import AIConnector
 
 logger = get_logger(__name__)
 
@@ -225,7 +225,7 @@ class BatchExecutor:
 class BatchContext:
     """Context manager for batch processing OpenAI requests."""
 
-    def __init__(self, connector: OpenAIConnector) -> None:
+    def __init__(self, connector: AIConnector) -> None:
         self.connector = connector
         self.collector = BatchCollector()
         self.executor = BatchExecutor(connector.client)
@@ -348,7 +348,7 @@ class BatchContext:
 
 
 @asynccontextmanager
-async def batch_synthesis(connector: OpenAIConnector) -> AsyncIterator[BatchContext]:
+async def batch_synthesis(connector: AIConnector) -> AsyncIterator[BatchContext]:
     """Context manager for batch synthesis operations.
 
     Usage:

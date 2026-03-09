@@ -8,7 +8,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from ....ai import get_openai_connector
+from ....ai import get_ai_connector
 from ....ai.constants import SynthesisComponent
 from ....ai.synthesis import (
     assess_collocations,
@@ -351,7 +351,7 @@ async def regenerate_components(
     assert definition is not None
 
     # Get AI connector
-    ai = get_openai_connector()
+    ai = get_ai_connector()
 
     # Map component names to functions
     component_functions: dict[str, Callable[..., Any]] = {
@@ -498,7 +498,7 @@ async def batch_regenerate_components(
         raise HTTPException(404, "Some definitions not found")
 
     # Get AI connector
-    ai = get_openai_connector()
+    ai = get_ai_connector()
 
     # Group definitions by word
 

@@ -6,7 +6,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from ....ai import get_openai_connector
+from ....ai import get_ai_connector
 from ....ai.synthesis import generate_examples
 from ....models import Definition, Example, Word
 from ....storage.dictionary import save_definition_versioned
@@ -220,7 +220,7 @@ async def generate_examples_for_definition(
         raise HTTPException(404, "Word not found")
 
     # Get AI connector
-    ai = get_openai_connector()
+    ai = get_ai_connector()
 
     # Generate examples
     example_texts = await generate_examples(

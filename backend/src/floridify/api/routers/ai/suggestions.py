@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ....ai.connector import get_openai_connector
+from ....ai.connector import get_ai_connector
 from ....caching.decorators import cached_api_call
 from ....utils.logging import get_logger
 
@@ -58,7 +58,7 @@ async def _cached_suggestions(params: SuggestionsParams) -> SuggestionsAPIRespon
 
     try:
         # Get OpenAI connector singleton
-        connector = get_openai_connector()
+        connector = get_ai_connector()
 
         # Generate suggestions using AI
         ai_response = await connector.suggestions(

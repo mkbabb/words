@@ -27,6 +27,7 @@ from ..providers.factory import create_connector
 from ..storage.dictionary import save_entry_versioned
 from ..storage.mongodb import get_storage, get_synthesized_entry
 from ..utils.language_precedence import (
+    merge_language_precedence,
     to_language_codes,
 )
 from ..utils.logging import (
@@ -295,6 +296,19 @@ async def _get_provider_definition(
                 languages=requested_language_codes,
             )
             await word_obj.save()
+        else:
+            # Word exists: merge requested languages into existing (requested take precedence)
+            merged = merge_language_precedence(
+                requested_languages=requested_language_codes,
+                existing_languages=list(word_obj.languages),
+            )
+            if merged != list(word_obj.languages):
+                old_languages = list(word_obj.languages)
+                word_obj.languages = merged
+                await word_obj.save()
+                logger.debug(
+                    f"Updated languages for '{word}': {old_languages} → {merged}",
+                )
         if connector:
             fetch_start = time.perf_counter()
 

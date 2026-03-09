@@ -17,7 +17,7 @@ from ...models.relationships import (
     UsageNote,
 )
 from ...utils.logging import get_logger
-from ..connector import OpenAIConnector
+from ..connector import AIConnector
 from ..constants import (
     DEFAULT_ANTONYM_COUNT,
     DEFAULT_EXAMPLE_COUNT,
@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 async def synthesize_synonyms(
     word: str,
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int = 10,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
@@ -82,7 +82,7 @@ async def synthesize_synonyms(
 async def synthesize_antonyms(
     word: str,
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int = 5,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
@@ -131,7 +131,7 @@ async def synthesize_antonyms(
 async def generate_examples(
     word: str,
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int = 3,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
@@ -166,7 +166,7 @@ async def generate_examples(
 async def assess_definition_cefr(
     definition: Definition,
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Assess CEFR level for a definition."""
@@ -186,7 +186,7 @@ async def assess_definition_cefr(
 async def assess_definition_frequency(
     definition: Definition,
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> int | None:
     """Assess frequency band for a definition."""
@@ -205,7 +205,7 @@ async def assess_definition_frequency(
 
 async def classify_definition_register(
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Classify register for a definition."""
@@ -224,7 +224,7 @@ async def classify_definition_register(
 
 async def assess_definition_domain(
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Identify domain for a definition."""
@@ -243,7 +243,7 @@ async def assess_definition_domain(
 
 async def assess_grammar_patterns(
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[GrammarPattern]:
     """Extract grammar patterns for a definition."""
@@ -272,7 +272,7 @@ async def assess_grammar_patterns(
 async def assess_collocations(
     definition: Definition,
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[Collocation]:
     """Identify collocations for a definition."""
@@ -303,7 +303,7 @@ async def assess_collocations(
 async def usage_note_generation(
     definition: Definition,
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[UsageNote]:
     """Generate usage notes for a definition."""
@@ -328,7 +328,7 @@ async def usage_note_generation(
 
 async def assess_regional_variants(
     definition: Definition,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
     """Detect regional variants for a definition."""
@@ -348,7 +348,7 @@ async def assess_regional_variants(
 async def synthesize_definition_text(
     clustered_definitions: list[dict[str, Any]],
     word: Word,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> dict[str, Any]:
     """Synthesize definition text from clustered meanings."""

@@ -6,7 +6,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ....ai.connector import OpenAIConnector, get_openai_connector
+from ....ai.connector import AIConnector, get_ai_connector
 from ....wordlist.word_of_the_day.models import (
     NotificationFrequency,
     WordOfTheDayBatch,
@@ -21,15 +21,15 @@ from ...core import (
 router = APIRouter()
 
 
-async def get_ai_connector() -> OpenAIConnector:
-    """Get OpenAI connector dependency."""
-    return get_openai_connector()
+async def get_connector_dep() -> AIConnector:
+    """Get AI connector dependency."""
+    return get_ai_connector()
 
 
 @router.get("/current", response_model=ResourceResponse)
 async def get_current_word_of_the_day(
     generate_if_empty: bool = Query(True, description="Generate new batch if empty"),
-    ai: OpenAIConnector = Depends(get_ai_connector),
+    ai: AIConnector = Depends(get_connector_dep),
 ) -> ResourceResponse:
     """Get the current Word of the Day.
 
@@ -90,7 +90,7 @@ async def get_current_word_of_the_day(
 
 @router.post("/send", response_model=ResourceResponse)
 async def send_current_word(
-    ai: OpenAIConnector = Depends(get_ai_connector),
+    ai: AIConnector = Depends(get_connector_dep),
 ) -> ResourceResponse:
     """Mark the current word as sent and advance to next.
 
@@ -284,7 +284,7 @@ async def update_batch_config(
 async def generate_new_batch_words(
     batch_id: PydanticObjectId,
     count: int = Query(20, ge=5, le=50, description="Number of words to generate"),
-    ai: OpenAIConnector = Depends(get_ai_connector),
+    ai: AIConnector = Depends(get_connector_dep),
 ) -> ResourceResponse:
     """Generate new words for a batch.
 
@@ -450,7 +450,7 @@ async def update_word_of_the_day_config(
 # Helper function for batch generation
 async def _generate_new_batch(
     batch: WordOfTheDayBatch,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int | None = None,
 ) -> None:
     """Generate new words for a batch."""

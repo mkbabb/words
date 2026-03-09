@@ -537,10 +537,10 @@ async def mock_openai_client():
         )
     )
 
-    # Patch both the class and get_openai_connector function
+    # Patch both the class and get_ai_connector function
     with (
-        patch("floridify.ai.connector.OpenAIConnector", return_value=mock_connector),
-        patch("floridify.ai.connector.get_openai_connector", return_value=mock_connector),
+        patch("floridify.ai.connector.AIConnector", return_value=mock_connector),
+        patch("floridify.ai.connector.get_ai_connector", return_value=mock_connector),
     ):
         yield mock_connector
 

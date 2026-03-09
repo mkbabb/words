@@ -19,7 +19,7 @@ from ...utils.language_precedence import (
     language_code,
 )
 from ...utils.logging import get_logger
-from ..connector import OpenAIConnector
+from ..connector import AIConnector
 
 logger = get_logger(__name__)
 
@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 async def synthesize_pronunciation(
     word: str,
     providers_data: list[dict[str, Any]] | list[DictionaryEntry],
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
     language: str = "en",
 ) -> Pronunciation | None:
@@ -64,7 +64,7 @@ async def _find_existing_pronunciation(
 async def _clone_and_enhance_pronunciation(
     source: Pronunciation,
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None,
     language: str = "en",
 ) -> Pronunciation:
@@ -103,7 +103,7 @@ async def _clone_and_enhance_pronunciation(
 
 async def _create_pronunciation(
     word: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None,
     language: str = "en",
 ) -> Pronunciation | None:
@@ -176,7 +176,7 @@ async def _generate_audio_files(
 async def synthesize_etymology(
     word: Word,
     providers_data: list[dict[str, Any]] | list[DictionaryEntry],
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> Etymology | None:
     """Extract and synthesize etymology from provider data."""
@@ -227,7 +227,7 @@ async def synthesize_etymology(
 async def synthesize_word_forms(
     word: Word,
     part_of_speech: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[WordForm]:
     """Generate word forms for a word."""
@@ -254,7 +254,7 @@ async def synthesize_word_forms(
 async def generate_facts(
     word: Word,
     definitions: list[Definition],
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int = 3,
     state_tracker: StateTracker | None = None,
 ) -> list[Fact]:

@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 
 
 class SuggestionsMixin:
-    """Mixin providing suggestion methods for OpenAIConnector."""
+    """Mixin providing suggestion methods for AIConnector."""
 
     async def validate_query(
         self,

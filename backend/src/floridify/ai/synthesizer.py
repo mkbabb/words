@@ -23,7 +23,7 @@ from ..utils.language_precedence import (
     to_language_codes,
 )
 from ..utils.logging import get_logger
-from .connector import OpenAIConnector, get_openai_connector
+from .connector import AIConnector, get_ai_connector
 from .constants import SynthesisComponent
 from .synthesis import (
     cluster_definitions,
@@ -42,7 +42,7 @@ class DefinitionSynthesizer:
 
     def __init__(
         self,
-        openai_connector: OpenAIConnector,
+        openai_connector: AIConnector,
         examples_count: int = 2,
         facts_count: int = 3,
     ) -> None:
@@ -464,7 +464,7 @@ def get_definition_synthesizer(
 
     if _definition_synthesizer is None or force_recreate:
         logger.info("Initializing definition synthesizer singleton")
-        connector = get_openai_connector(config_path, force_recreate)
+        connector = get_ai_connector(config_path, force_recreate)
         _definition_synthesizer = DefinitionSynthesizer(connector, examples_count=examples_count)
         logger.success("Definition synthesizer singleton initialized")
 

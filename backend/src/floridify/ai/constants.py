@@ -90,7 +90,7 @@ DEFAULT_USAGE_NOTE_COUNT = 3
 # Functions should follow this parameter order:
 # 1. word: str (the word being processed)
 # 2. definition: Definition (when working with a specific definition)
-# 3. ai: OpenAIConnector (AI connector instance)
+# 3. ai: AIConnector (AI connector instance)
 # 4. count: int = DEFAULT_X_COUNT (for generation functions)
 # 5. state_tracker: StateTracker | None = None (optional state tracking)
 

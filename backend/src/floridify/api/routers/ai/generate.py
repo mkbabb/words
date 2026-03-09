@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-from ....ai.connector import get_openai_connector
+from ....ai.connector import get_ai_connector
 from ...middleware.rate_limiting import ai_limiter, get_client_key
 from .base import (
     AntonymRequest,
@@ -44,7 +44,7 @@ async def generate_pronunciation(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.pronunciation(request.word)
 
     return {"word": request.word, "pronunciation": result.model_dump()}
@@ -75,7 +75,7 @@ async def generate_word_forms(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.identify_word_forms(request.word, request.part_of_speech)
 
     return {"word": request.word, "word_forms": result.model_dump()}
@@ -109,7 +109,7 @@ async def generate_synonyms(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.synthesize_synonyms(
         request.word,
         request.definition,
@@ -153,7 +153,7 @@ async def generate_antonyms(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.synthesize_antonyms(
         request.word,
         request.definition,
@@ -196,7 +196,7 @@ async def generate_examples(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.generate_examples(
         request.word,
         request.part_of_speech,
@@ -238,7 +238,7 @@ async def generate_facts(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.generate_facts(
         request.word,
         request.definition,
@@ -268,7 +268,7 @@ async def generate_usage_notes(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.usage_note_generation(
         request.word,
         request.definition,

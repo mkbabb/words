@@ -1,4 +1,8 @@
-"""OpenAI connector base: class definition, structured request, singleton."""
+"""Multi-provider AI connector with structured outputs, validation retry, and caching.
+
+Ported from dns-analysis AI connector system. Supports OpenAI and Anthropic
+with task-based model selection, semaphore rate limiting, and budget tracking.
+"""
 
 from __future__ import annotations
 
@@ -7,13 +11,15 @@ import time
 from pathlib import Path
 from typing import Any, TypeVar
 
+import anthropic
+import openai
 from openai import (
     APIConnectionError,
     APITimeoutError,
     AsyncOpenAI,
     RateLimitError,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ...caching.decorators import cached_api_call
 from ...models.base import ModelInfo
@@ -21,6 +27,7 @@ from ...utils.logging import get_logger, log_metrics
 from ..model_selection import ModelTier, get_model_for_task, get_temperature_for_model
 from ..prompt_manager import PromptManager
 from .assessment import AssessmentMixin
+from .config import Effort, OpenAIEffort, Provider
 from .generation import GenerationMixin
 from .suggestions import SuggestionsMixin
 from .synthesis import SynthesisMixin
@@ -29,117 +36,88 @@ T = TypeVar("T", bound=BaseModel)
 
 logger = get_logger(__name__)
 
+DEFAULT_TIMEOUT = 600.0
+MAX_VALIDATION_RETRIES = 2
 
-class OpenAIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsMixin):
-    """Modern OpenAI connector with structured outputs and caching."""
+
+class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsMixin):
+    """Multi-provider AI connector with structured outputs and validation retry.
+
+    Supports OpenAI and Anthropic via a unified interface. Uses task-based model
+    selection, semaphore rate limiting, validation retry on parse failures,
+    and L1/L2 caching via @cached_api_call.
+    """
 
     def __init__(
         self,
-        api_key: str,
-        model_name: str = "gpt-5-nano",
-        embedding_model: str = "text-embedding-3-small",
-        temperature: float | None = None,
-        max_tokens: int = 1000,
+        provider: Provider,
+        client: AsyncOpenAI | anthropic.AsyncAnthropic,
+        model: str,
+        semaphore: asyncio.Semaphore,
+        prompt_manager: PromptManager | None = None,
+        effort: Effort = OpenAIEffort.MEDIUM,
+        **kwargs: Any,
     ) -> None:
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.api_key = api_key
-        self.default_model = model_name  # Keep default from config
-        self.model_name = model_name  # Current active model
-        self.embedding_model = embedding_model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.prompt_manager = PromptManager()
-        self._last_model_info: ModelInfo | None = None  # Track last model info
+        self.provider = provider
+        self.client = client
+        self.model = model
+        self.semaphore = semaphore
+        self.effort = effort
+        self.kwargs = kwargs
+        self.prompt_manager = prompt_manager or PromptManager()
+        self._last_model_info: ModelInfo | None = None
 
     @property
     def last_model_info(self) -> ModelInfo | None:
-        """Get the last model info that was actually used for a request."""
         return self._last_model_info
 
+    def _is_reasoning_model(self, model: str | None = None) -> bool:
+        """Check if model is a reasoning model (o-series, GPT-5 variants)."""
+        m = (model or self.model).lower()
+        return self.provider == Provider.OPENAI and m.startswith(("o1", "o3", "gpt-5"))
+
     @cached_api_call(
-        ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
-        key_prefix="openai_structured",
+        ttl_hours=24.0,
+        key_prefix="ai_structured",
+        ignore_params=["system_prompt"],
     )
     async def _make_structured_request(
         self,
         prompt: str,
         response_model: type[T],
         task_name: str | None = None,
+        system_prompt: str | None = None,
         **kwargs: Any,
     ) -> T:
-        """Make a structured request to OpenAI with caching and model selection.
+        """Make a structured AI request with model selection and validation retry.
 
         Args:
-            prompt: The prompt to send
-            response_model: The Pydantic model for response parsing
-            task_name: Optional task name for model selection
-            **kwargs: Additional parameters for the API call
-
-        Raises:
-            APIConnectionError: Network connection failed
-            APITimeoutError: Request timed out
-            RateLimitError: Rate limit exceeded
-            APIStatusError: HTTP status error from API
-            AuthenticationError: Authentication failed
-            ValueError: No content in API response
-            IndexError: Missing choices in response
-
+            prompt: User prompt text
+            response_model: Pydantic model for structured output
+            task_name: Task name for model selection routing
+            system_prompt: Optional system/developer prompt
+            **kwargs: Additional parameters (max_tokens, temperature, tier)
         """
         start_time = time.perf_counter()
 
-        # Determine which model to use based on task
+        # Model selection based on task
+        tier_override = kwargs.pop("tier", None)
         if task_name:
-            model_tier = get_model_for_task(task_name)
+            model_tier = get_model_for_task(task_name, override=tier_override)
             active_model = model_tier.value
         else:
-            active_model = self.model_name
+            active_model = self.model
             model_tier = ModelTier(active_model)
 
-        # Get appropriate temperature
-        temperature = (
-            get_temperature_for_model(model_tier, task_name) if model_tier else self.temperature
-        )
+        # Temperature selection
+        temperature = kwargs.pop("temperature", None)
+        if temperature is None:
+            temperature = get_temperature_for_model(model_tier, task_name) if model_tier else None
 
-        # Handle max_tokens parameter from kwargs before adding to request_params
-        max_tokens_value = kwargs.pop("max_tokens", None) or self.max_tokens
+        # Token parameters
+        max_tokens_value = kwargs.pop("max_tokens", None) or 1000
 
-        # Prepare request parameters
-        request_params: dict[str, Any] = {
-            "model": active_model,
-            "messages": [{"role": "user", "content": prompt}],
-            **kwargs,
-        }
-
-        # Use correct token parameter based on model capabilities
-        if model_tier.uses_completion_tokens:
-            if model_tier.is_reasoning_model:
-                # Reasoning models need token allocation for internal thinking
-                # Cap multiplier to prevent runaway token usage
-                reasoning_multiplier = 30 if max_tokens_value <= 50 else 15
-                request_params["max_completion_tokens"] = min(
-                    16000,
-                    max(4000, max_tokens_value * reasoning_multiplier),
-                )
-            else:
-                # Non-reasoning models with completion tokens use standard allocation
-                request_params["max_completion_tokens"] = max_tokens_value
-        else:
-            # Legacy models use max_tokens
-            request_params["max_tokens"] = max_tokens_value
-
-        # Add temperature if model supports it (reasoning/thinking models don't)
-        if temperature is not None and not model_tier.is_reasoning_model:
-            request_params["temperature"] = temperature
-
-        # Log API call details
-        logger.debug(
-            f"🤖 OpenAI API call: model={active_model}, "
-            f"task={task_name or 'default'}, "
-            f"response_type={response_model.__name__}, "
-            f"prompt_length={len(prompt)}",
-        )
-
-        # Check AI spending budget before making API call
+        # Budget check
         from ...api.middleware.rate_limiting import spending_tracker
 
         budget_ok, budget_reason = await spending_tracker.check_budget()
@@ -150,138 +128,310 @@ class OpenAIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, Suggesti
                 body=None,
             )
 
-        # Make the API call with structured output (retry on transient errors)
-        max_retries = 3
-        api_start = time.perf_counter()
+        logger.debug(
+            f"AI request: provider={self.provider}, model={active_model}, "
+            f"task={task_name or 'default'}, response={response_model.__name__}",
+        )
 
+        # Validation retry loop (retries on ValidationError, not on API errors)
+        last_error: Exception | None = None
+        for attempt in range(MAX_VALIDATION_RETRIES + 1):
+            try:
+                async with self.semaphore:
+                    if self.provider == Provider.OPENAI:
+                        result, usage = await self._openai_call(
+                            prompt=prompt,
+                            response_model=response_model,
+                            system_prompt=system_prompt,
+                            temperature=temperature,
+                            model=active_model,
+                            model_tier=model_tier,
+                            max_tokens=max_tokens_value,
+                        )
+                    else:
+                        result, usage = await self._anthropic_call(
+                            prompt=prompt,
+                            response_model=response_model,
+                            system_prompt=system_prompt,
+                            temperature=temperature,
+                        )
+
+                # Record spending
+                total_tokens = usage.get("total_tokens", 0)
+                await spending_tracker.record_spend(active_model, total_tokens)
+
+                # Track model info
+                api_duration = time.perf_counter() - start_time
+                self._last_model_info = ModelInfo(
+                    name=active_model,
+                    confidence=0.9,
+                    temperature=temperature or 0.7,
+                    max_tokens=max_tokens_value,
+                    prompt_tokens=usage.get("prompt_tokens"),
+                    completion_tokens=usage.get("completion_tokens"),
+                    total_tokens=total_tokens,
+                    response_time_ms=int(api_duration * 1000),
+                )
+
+                log_metrics(
+                    api_call=str(self.provider),
+                    model=active_model,
+                    task=task_name or "default",
+                    response_type=response_model.__name__,
+                    duration=api_duration,
+                    retry_count=attempt,
+                    **usage,
+                )
+
+                logger.info(
+                    f"AI success: {response_model.__name__} in {api_duration:.2f}s "
+                    f"(tokens: {total_tokens})",
+                )
+                return result
+
+            except ValidationError as e:
+                last_error = e
+                if attempt < MAX_VALIDATION_RETRIES:
+                    logger.warning(
+                        f"Validation failed (attempt {attempt + 1}/{MAX_VALIDATION_RETRIES + 1}), retrying..."
+                    )
+                    for error in e.errors():
+                        field_path = ".".join(str(loc) for loc in error["loc"])
+                        logger.warning(f"  Field '{field_path}': {error['type']}")
+                    continue
+
+                logger.error(
+                    f"Validation error for {response_model.__name__} after "
+                    f"{MAX_VALIDATION_RETRIES + 1} attempts"
+                )
+                for error in e.errors():
+                    field_path = ".".join(str(loc) for loc in error["loc"])
+                    logger.error(f"  Field '{field_path}': {error['type']} - {error['msg']}")
+                raise
+
+        # Should not reach here, but satisfy type checker
+        raise last_error or RuntimeError("Unexpected end of retry loop")
+
+    async def _openai_call(
+        self,
+        prompt: str,
+        response_model: type[T],
+        system_prompt: str | None,
+        temperature: float | None,
+        model: str,
+        model_tier: ModelTier,
+        max_tokens: int,
+    ) -> tuple[T, dict[str, int]]:
+        """OpenAI structured outputs via beta.chat.completions.parse."""
+        if not isinstance(self.client, AsyncOpenAI):
+            raise TypeError(f"OpenAI call requires AsyncOpenAI client, got {type(self.client).__name__}")
+
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            role = "developer" if self._is_reasoning_model(model) else "system"
+            messages.append({"role": role, "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        request_params: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "response_format": response_model,
+        }
+
+        # Token parameter selection based on model capabilities
+        if model_tier.uses_completion_tokens:
+            if model_tier.is_reasoning_model:
+                reasoning_multiplier = 30 if max_tokens <= 50 else 15
+                request_params["max_completion_tokens"] = min(
+                    16000, max(4000, max_tokens * reasoning_multiplier)
+                )
+            else:
+                request_params["max_completion_tokens"] = max_tokens
+        else:
+            request_params["max_tokens"] = max_tokens
+
+        # Temperature (reasoning models don't use it)
+        if temperature is not None and not model_tier.is_reasoning_model:
+            request_params["temperature"] = temperature
+
+        # Retry on transient API errors
+        max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = await self.client.beta.chat.completions.parse(
-                    response_format=response_model,
-                    **request_params,
-                )
+                response = await self.client.beta.chat.completions.parse(**request_params)
                 break
             except RateLimitError:
                 if attempt < max_retries - 1:
-                    # Exponential backoff: 1s, 2s, 4s
                     wait_time = 2**attempt
-                    logger.warning(
-                        f"Rate limited (attempt {attempt + 1}/{max_retries}), "
-                        f"retrying in {wait_time}s"
-                    )
+                    logger.warning(f"Rate limited (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s")
                     await asyncio.sleep(wait_time)
                 else:
                     raise
             except (APITimeoutError, APIConnectionError) as e:
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt
-                    logger.warning(
-                        f"Transient API error (attempt {attempt + 1}/{max_retries}): {e}, "
-                        f"retrying in {wait_time}s"
-                    )
+                    logger.warning(f"Transient API error (attempt {attempt + 1}/{max_retries}): {e}")
                     await asyncio.sleep(wait_time)
                 else:
                     raise
 
-        api_duration = time.perf_counter() - api_start
+        # Check for refusal
+        if response.choices[0].message.refusal:
+            logger.error(f"OpenAI refusal: {response.choices[0].message.refusal}")
+            raise ValueError(f"OpenAI refused: {response.choices[0].message.refusal}")
 
-        # Extract token usage from response
-        prompt_tokens = response.usage.prompt_tokens
-        completion_tokens = response.usage.completion_tokens
-        total_tokens = response.usage.total_tokens
-        token_usage = {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
-        }
-
-        # Record actual AI spending
-        await spending_tracker.record_spend(active_model, total_tokens)
-
-        # Log successful API call
-        log_metrics(
-            api_call="openai",
-            model=active_model,
-            task=task_name or "default",
-            response_type=response_model.__name__,
-            duration=api_duration,
-            retry_count=0,
-            **token_usage,
-        )
-
-        # Parse JSON response
+        # Parse response
         content = response.choices[0].message.content
         if not content:
-            raise ValueError("No content in response")
+            raise ValueError("No content in OpenAI response")
 
         result = response_model.model_validate_json(content)
 
-        # Track the last model info
-        self._last_model_info = ModelInfo(
-            name=active_model,
-            confidence=0.9,  # Default high confidence for successful responses
-            temperature=temperature or 0.7,
-            max_tokens=max_tokens_value,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            response_time_ms=int(api_duration * 1000),
-        )
+        usage = {
+            "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+            "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+            "total_tokens": response.usage.total_tokens if response.usage else 0,
+        }
 
-        total_duration = time.perf_counter() - start_time
-        logger.info(
-            f"✅ OpenAI API success: {response_model.__name__} "
-            f"in {total_duration:.2f}s (tokens: {total_tokens})",
-        )
+        return result, usage
 
-        return result
+    async def _anthropic_call(
+        self,
+        prompt: str,
+        response_model: type[T],
+        system_prompt: str | None,
+        temperature: float | None,
+    ) -> tuple[T, dict[str, int]]:
+        """Anthropic structured outputs via beta.messages.parse."""
+        if not isinstance(self.client, anthropic.AsyncAnthropic):
+            raise TypeError(
+                f"Anthropic call requires AsyncAnthropic client, got {type(self.client).__name__}"
+            )
+
+        effort = self.effort
+        if effort == OpenAIEffort.MINIMAL:
+            raise ValueError("Anthropic does not support 'minimal' effort level")
+
+        params: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.kwargs.get("max_tokens", 8192),
+            "system": system_prompt or "",
+            "messages": [{"role": "user", "content": prompt}],
+            "betas": ["structured-outputs-2025-11-13", "effort-2025-11-24"],
+            "output_format": response_model,
+            "output_config": {"effort": effort.value},
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
+
+        response = await self.client.beta.messages.parse(**params)  # type: ignore[arg-type]
+
+        if response.stop_reason == "refusal":
+            raise ValueError("Anthropic refusal: content may not comply with guidelines")
+
+        if response.stop_reason == "max_tokens":
+            logger.warning("Anthropic response truncated (max_tokens reached)")
+
+        result = response.parsed_output
+        if result is None:
+            raise ValueError("Anthropic returned None for parsed_output")
+
+        assert isinstance(result, response_model), "Response type mismatch"
+
+        usage = {
+            "prompt_tokens": response.usage.input_tokens if response.usage else 0,
+            "completion_tokens": response.usage.output_tokens if response.usage else 0,
+            "total_tokens": (
+                (response.usage.input_tokens + response.usage.output_tokens) if response.usage else 0
+            ),
+        }
+
+        return result, usage
+
+    async def close(self) -> None:
+        """Close the underlying async client."""
+        try:
+            if isinstance(self.client, AsyncOpenAI):
+                await self.client.close()
+            elif isinstance(self.client, anthropic.AsyncAnthropic):
+                await self.client.close()
+        except Exception as e:
+            logger.warning(f"Error closing AI client: {e}")
 
 
 # ---------------------------------------------------------------------------
-# Global singleton
+# Singleton factory
 # ---------------------------------------------------------------------------
-_openai_connector: OpenAIConnector | None = None
+_ai_connector: AIConnector | None = None
 
 
-def get_openai_connector(
+def get_ai_connector(
     config_path: str | Path | None = None,
     force_recreate: bool = False,
-) -> OpenAIConnector:
-    """Get or create the global OpenAI connector singleton.
+) -> AIConnector:
+    """Get or create the global AI connector singleton.
 
-    Args:
-        config_path: Path to configuration file (defaults to auth/config.toml)
-        force_recreate: Force recreation of the connector
-
-    Returns:
-        Initialized OpenAI connector instance
-
+    Reads provider config from auth/config.toml. Supports [openai] and [anthropic]
+    sections. Provider selection via [ai].provider or defaults to OpenAI.
     """
-    global _openai_connector
+    global _ai_connector
 
-    if _openai_connector is None or force_recreate:
+    if _ai_connector is None or force_recreate:
         from ...utils.config import Config
 
-        logger.info("Initializing OpenAI connector singleton")
+        logger.info("Initializing AI connector singleton")
         config = Config.from_file(config_path)
 
-        api_key = config.openai.api_key
-        model_name = config.openai.model
+        # Determine provider and effort from config
+        ai_section = getattr(config, "ai", None)
+        provider_str = ai_section.provider if ai_section and hasattr(ai_section, "provider") else "openai"
+        provider = Provider(provider_str) if isinstance(provider_str, str) else provider_str
 
-        # Log configuration status (without exposing the key)
-        logger.info(f"OpenAI model: {model_name}")
-        logger.info(f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}")
+        effort_str = ai_section.effort if ai_section and hasattr(ai_section, "effort") else "medium"
+        effort = OpenAIEffort(effort_str) if isinstance(effort_str, str) else effort_str
 
-        # Only set temperature for non-reasoning models
-        temperature = None
-        if not model_name.startswith(("o1", "o3")):
-            temperature = 0.7  # Default temperature for non-reasoning models
-
-        _openai_connector = OpenAIConnector(
-            api_key=api_key,
-            model_name=model_name,
-            temperature=temperature,
+        max_concurrent = (
+            ai_section.max_concurrent_requests
+            if ai_section and hasattr(ai_section, "max_concurrent_requests")
+            else 10
         )
-        logger.success("OpenAI connector singleton initialized")
+        semaphore = asyncio.Semaphore(max_concurrent)
 
-    return _openai_connector
+        if provider == Provider.ANTHROPIC and hasattr(config, "anthropic") and config.anthropic:
+            anthropic_config = config.anthropic
+            logger.info(f"Anthropic model: {anthropic_config.model}")
+
+            client = anthropic.AsyncAnthropic(
+                api_key=anthropic_config.api_key,
+                timeout=DEFAULT_TIMEOUT,
+            )
+            _ai_connector = AIConnector(
+                provider=Provider.ANTHROPIC,
+                client=client,
+                model=anthropic_config.model,
+                semaphore=semaphore,
+                effort=effort,
+                max_tokens=anthropic_config.max_tokens,
+            )
+        else:
+            # Default to OpenAI
+            api_key = config.openai.api_key
+            model_name = config.openai.model
+            logger.info(f"OpenAI model: {model_name}")
+            logger.info(f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}")
+
+            client = AsyncOpenAI(
+                api_key=api_key,
+                timeout=DEFAULT_TIMEOUT,
+            )
+            _ai_connector = AIConnector(
+                provider=Provider.OPENAI,
+                client=client,
+                model=model_name,
+                semaphore=semaphore,
+                effort=effort,
+            )
+
+        logger.success(f"AI connector initialized: {provider}")
+
+    return _ai_connector

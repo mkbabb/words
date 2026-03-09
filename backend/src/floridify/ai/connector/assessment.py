@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 
 class AssessmentMixin:
-    """Mixin providing assessment methods for OpenAIConnector."""
+    """Mixin providing assessment methods for AIConnector."""
 
     async def assess_frequency_band(
         self,

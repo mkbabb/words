@@ -29,7 +29,7 @@ from ...models.relationships import (
 from ...storage.dictionary import save_definitions_batch_versioned, save_entry_versioned
 from ...utils.logging import get_logger
 from ..batch_processor import batch_synthesis
-from ..connector import OpenAIConnector
+from ..connector import AIConnector
 from ..constants import SynthesisComponent
 from ..models import QueryValidationResponse, WordSuggestionResponse
 from .definition_level import (
@@ -62,7 +62,7 @@ SynthesisFunc = Callable[..., Any]
 async def cluster_definitions(
     word: Word,
     definitions: list[Definition],
-    ai: OpenAIConnector,
+    ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[Definition]:
     """Cluster definitions by meaning using AI.
@@ -163,7 +163,7 @@ async def cluster_definitions(
 async def enhance_definitions_parallel(
     definitions: list[Definition],
     word: Word,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     components: set[SynthesisComponent] | None = None,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
@@ -382,7 +382,7 @@ async def enhance_definitions_parallel(
 
 async def enhance_synthesized_entry(
     entry_id: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     components: set[SynthesisComponent] | None = None,
     force: bool = False,
     state_tracker: StateTracker | None = None,
@@ -510,7 +510,7 @@ async def enhance_synthesized_entry(
 
 async def validate_query(
     query: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
 ) -> QueryValidationResponse:
     """Validate if a query is seeking word suggestions."""
     return await ai.validate_query(query)
@@ -518,7 +518,7 @@ async def validate_query(
 
 async def suggest_words(
     query: str,
-    ai: OpenAIConnector,
+    ai: AIConnector,
     count: int = 10,
 ) -> WordSuggestionResponse:
     """Generate word suggestions based on descriptive query."""

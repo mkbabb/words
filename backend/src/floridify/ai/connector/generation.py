@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 
 class GenerationMixin:
-    """Mixin providing generation methods for OpenAIConnector."""
+    """Mixin providing generation methods for AIConnector."""
 
     async def generate_examples(
         self,

@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-from ....ai.connector import get_openai_connector
+from ....ai.connector import get_ai_connector
 from ...middleware.rate_limiting import ai_limiter, get_client_key
 from .base import (
     CEFRAssessmentRequest,
@@ -45,7 +45,7 @@ async def assess_frequency(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_frequency_band(request.word, request.definition)
 
     return result.model_dump()
@@ -76,7 +76,7 @@ async def assess_cefr(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_cefr_level(request.word, request.definition)
 
     return result.model_dump()
@@ -106,7 +106,7 @@ async def classify_register(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.classify_register(request.definition)
 
     return result.model_dump()
@@ -126,7 +126,7 @@ async def identify_domain(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_domain(request.definition)
 
     return result.model_dump()
@@ -146,7 +146,7 @@ async def identify_collocations(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_collocations(
         request.word,
         request.definition,
@@ -170,7 +170,7 @@ async def extract_grammar_patterns(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_grammar_patterns(
         request.definition,
         request.part_of_speech,
@@ -193,7 +193,7 @@ async def detect_regional_variants(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.assess_regional_variants(request.definition)
 
     return result.model_dump()

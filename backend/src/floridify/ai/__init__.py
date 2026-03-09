@@ -1,6 +1,7 @@
 """AI integration module for Floridify dictionary synthesis and generation."""
 
-from .connector import OpenAIConnector, get_openai_connector
+from .connector import AIConnector, get_ai_connector
+from .connector.config import Provider
 from .models import (
     AIGeneratedProviderData,
     SynthesisResponse,
@@ -8,10 +9,11 @@ from .models import (
 from .synthesizer import DefinitionSynthesizer, get_definition_synthesizer
 
 __all__ = [
+    "AIConnector",
     "AIGeneratedProviderData",
     "DefinitionSynthesizer",
-    "OpenAIConnector",
+    "Provider",
     "SynthesisResponse",
+    "get_ai_connector",
     "get_definition_synthesizer",
-    "get_openai_connector",
 ]

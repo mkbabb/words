@@ -50,7 +50,7 @@ from pathlib import Path
 
 import torch
 
-from ...ai import get_openai_connector
+from ...ai import get_ai_connector
 from ...literature import LiteratureSourceManager
 from ...utils.logging import get_logger
 from ...utils.paths import get_cache_directory
@@ -639,7 +639,7 @@ class WOTDTrainer:
         """
         from ..core import Complexity, Era, Style
 
-        ai_connector = get_openai_connector()
+        ai_connector = get_ai_connector()
         augmented_corpora = {}
 
         # Sample words for AI context
@@ -747,7 +747,7 @@ class WOTDTrainer:
             Dictionary mapping corpus IDs to semantic ID tuples
 
         """
-        ai_connector = get_openai_connector()
+        ai_connector = get_ai_connector()
         semantic_ids = {}
 
         for corpus_id, corpus in corpora_dict.items():

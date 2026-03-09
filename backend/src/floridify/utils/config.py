@@ -13,6 +13,15 @@ from .paths import get_project_root
 
 
 @dataclass
+class AIGlobalConfig:
+    """Global AI configuration."""
+
+    provider: str = "openai"
+    effort: str = "medium"
+    max_concurrent_requests: int = 10
+
+
+@dataclass
 class OpenAIConfig:
     """OpenAI API configuration."""
 
@@ -20,6 +29,17 @@ class OpenAIConfig:
     model: str = "gpt-4o"
     reasoning_effort: str = "high"
     embedding_model: str = "text-embedding-3-large"
+
+
+@dataclass
+class AnthropicConfig:
+    """Anthropic API configuration."""
+
+    api_key: str
+    model: str = "claude-sonnet-4-5-20250929"
+    max_tokens: int = 64000
+    extended_thinking: bool = False
+    thinking_budget_tokens: int = 32000
 
 
 @dataclass
@@ -202,6 +222,8 @@ class Config:
     database: DatabaseConfig
     rate_limits: RateLimits
     processing: ProcessingConfig
+    ai: AIGlobalConfig | None = None
+    anthropic: AnthropicConfig | None = None
     merriam_webster: MerriamWebsterConfig | None = None
     google_cloud: GoogleCloudConfig | None = None
     semantic_search: SemanticSearchConfig | None = None
@@ -353,6 +375,29 @@ class Config:
             verbose=processing_data.get("verbose", False),
         )
 
+        # Load AI global config (optional)
+        ai_config = None
+        if "ai" in data:
+            ai_data = data["ai"]
+            ai_config = AIGlobalConfig(
+                provider=ai_data.get("provider", "openai"),
+                effort=ai_data.get("effort", "medium"),
+                max_concurrent_requests=ai_data.get("max_concurrent_requests", 10),
+            )
+
+        # Load Anthropic config (optional)
+        anthropic_config = None
+        if "anthropic" in data:
+            anth_data = data["anthropic"]
+            if "api_key" in anth_data and anth_data["api_key"]:
+                anthropic_config = AnthropicConfig(
+                    api_key=anth_data["api_key"],
+                    model=anth_data.get("model", "claude-sonnet-4-5-20250929"),
+                    max_tokens=anth_data.get("max_tokens", 64000),
+                    extended_thinking=anth_data.get("extended_thinking", False),
+                    thinking_budget_tokens=anth_data.get("thinking_budget_tokens", 32000),
+                )
+
         # Load Google Cloud config (optional)
         google_cloud = None
         if "google_cloud" in data:
@@ -382,10 +427,12 @@ class Config:
         return cls(
             openai=openai_config,
             oxford=oxford_config,
-            merriam_webster=merriam_webster_config,
             database=database_config,
             rate_limits=rate_limits,
             processing=processing,
+            ai=ai_config,
+            anthropic=anthropic_config,
+            merriam_webster=merriam_webster_config,
             google_cloud=google_cloud,
             semantic_search=semantic_search,
         )

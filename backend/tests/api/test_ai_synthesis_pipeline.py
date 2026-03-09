@@ -398,7 +398,7 @@ class TestAISynthesisPipelineAPI:
         )
 
         # Patch the getter function used by the router
-        mocker.patch("floridify.ai.connector.get_openai_connector", return_value=failing_mock)
+        mocker.patch("floridify.ai.connector.get_ai_connector", return_value=failing_mock)
 
         response = await async_client.post(
             "/api/v1/ai/synthesize/pronunciation",

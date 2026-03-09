@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from ....ai.connector import get_openai_connector
+from ....ai.connector import get_ai_connector
 from ....ai.constants import SynthesisComponent
 from ....ai.synthesizer import get_definition_synthesizer
 from ....caching import cached_api_call_with_dedup
@@ -41,7 +41,7 @@ router.include_router(generate_router)
 )
 async def _cached_suggestions(input_words: list[str], count: int) -> dict[str, Any]:
     """Cached suggestion generation."""
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.suggestions(input_words, count)
     return result.model_dump()
 
@@ -90,7 +90,7 @@ async def validate_query(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     result = await connector.validate_query(request.query)
 
     return result.model_dump()
@@ -110,7 +110,7 @@ async def suggest_words(
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
     # First validate the query
-    connector = get_openai_connector()
+    connector = get_ai_connector()
     validation = await connector.validate_query(request.query)
 
     if not validation.is_valid:
@@ -169,7 +169,7 @@ async def suggest_words_stream(
             await state_tracker.update_stage("QUERY_VALIDATION")
             await state_tracker.update(stage="QUERY_VALIDATION", message="Validating query...")
 
-            connector = get_openai_connector()
+            connector = get_ai_connector()
             validation = await connector.validate_query(query)
 
             if not validation.is_valid:

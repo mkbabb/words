@@ -1,8 +1,15 @@
-"""OpenAI connector sub-package."""
+"""AI connector sub-package."""
 
-from .base import OpenAIConnector, get_openai_connector
+from .base import AIConnector, get_ai_connector
+from .config import AIConfig, AIProviderConfig, AnthropicEffort, Effort, OpenAIEffort, Provider
 
 __all__ = [
-    "OpenAIConnector",
-    "get_openai_connector",
+    "AIConfig",
+    "AIConnector",
+    "AIProviderConfig",
+    "AnthropicEffort",
+    "Effort",
+    "OpenAIEffort",
+    "Provider",
+    "get_ai_connector",
 ]

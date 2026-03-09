@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..ai import get_definition_synthesizer, get_openai_connector
+from ..ai import get_ai_connector, get_definition_synthesizer
 from ..audio import get_audio_synthesizer
 from ..caching.core import get_global_cache, shutdown_global_cache
 from ..core.search_pipeline import get_search_engine_manager
@@ -63,8 +63,8 @@ async def lifespan(app: FastAPI) -> Any:
         print("✅ MongoDB storage initialized successfully")
 
         # Initialize AI components (singletons)
-        get_openai_connector()
-        print("✅ OpenAI connector initialized successfully")
+        get_ai_connector()
+        print("✅ AI connector initialized successfully")
 
         get_definition_synthesizer()
         print("✅ Definition synthesizer initialized successfully")
@@ -74,10 +74,10 @@ async def lifespan(app: FastAPI) -> Any:
         cache.start_ttl_cleanup_task(interval_seconds=60.0)
         print("✅ Background TTL cleanup task started (interval=60s)")
 
-        # Initialize TTS backends (downloads models on first run, cached after)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, lambda: get_audio_synthesizer().initialize())
-        print("✅ TTS backends initialized (KittenTTS + Kokoro-ONNX)")
+        # TTS backends use lazy initialization — models load on first request.
+        # No eager init needed; AudioSynthesizer._get_kitten()/_get_kokoro()
+        # handle thread-safe initialization with caching.
+        print("✅ TTS backends registered (lazy init on first audio request)")
 
         # Start search engine initialization in background (non-blocking)
         manager = get_search_engine_manager()

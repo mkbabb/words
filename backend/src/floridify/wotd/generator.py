@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from ..ai.connector import get_openai_connector
+from ..ai.connector import get_ai_connector
 from ..utils.logging import get_logger
 from .core import (
     Author,
@@ -23,7 +23,7 @@ class SyntheticGenerator:
     """Generate synthetic WOTD training corpora using OpenAI."""
 
     def __init__(self) -> None:
-        self._ai_connector = get_openai_connector()
+        self._ai_connector = get_ai_connector()
         self._storage = None
 
     async def _get_storage(self):

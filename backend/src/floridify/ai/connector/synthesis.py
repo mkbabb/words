@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 class SynthesisMixin:
-    """Mixin providing synthesis methods for OpenAIConnector."""
+    """Mixin providing synthesis methods for AIConnector."""
 
     async def synthesize_definitions(
         self,

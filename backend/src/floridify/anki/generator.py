@@ -11,7 +11,7 @@ from typing import Any
 
 import genanki  # type: ignore[import-untyped]
 
-from ..ai.connector import OpenAIConnector
+from ..ai.connector import AIConnector
 from ..ai.prompt_manager import PromptManager
 from ..models.dictionary import Definition, DictionaryEntry
 from ..utils.logging import get_logger
@@ -150,7 +150,7 @@ class AnkiCardGenerator:
 
     def __init__(
         self,
-        openai_connector: OpenAIConnector,
+        openai_connector: AIConnector,
         prompt_manager: PromptManager | None = None,
     ) -> None:
         """Initialize Anki card generator.
