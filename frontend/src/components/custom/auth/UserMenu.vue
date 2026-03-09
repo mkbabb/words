@@ -26,25 +26,15 @@
             collapsed && 'justify-center'
           )"
         >
-          <div
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-primary/20 bg-gradient-to-br from-primary/20 to-primary/10"
-          >
-            <img
-              v-if="auth.user?.avatar"
-              :src="auth.user.avatar"
-              :alt="auth.user.name"
-              class="h-full w-full rounded-full object-cover"
-            />
-            <User v-else :size="14" class="text-primary" />
-          </div>
+          <YoshiAvatar size="2rem" @click.stop />
 
           <div v-if="!collapsed" class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
-              <span class="truncate text-sm font-medium">{{ auth.user?.name || 'User' }}</span>
+              <span class="truncate text-sm font-medium">{{ displayName }}</span>
               <RoleBadge :role="auth.role" />
             </div>
-            <div class="text-muted-foreground truncate text-xs">
-              {{ auth.user?.email }}
+            <div v-if="auth.user?.email" class="text-muted-foreground truncate text-xs">
+              {{ auth.user.email }}
             </div>
           </div>
         </button>
@@ -53,10 +43,10 @@
       <DropdownMenuContent align="end" class="w-56">
         <DropdownMenuLabel>
           <div class="flex items-center gap-2">
-            <span>{{ auth.user?.name || 'User' }}</span>
+            <span>{{ displayName }}</span>
             <RoleBadge :role="auth.role" />
           </div>
-          <div class="text-muted-foreground text-xs font-normal">{{ auth.user?.email }}</div>
+          <div v-if="auth.user?.email" class="text-muted-foreground text-xs font-normal">{{ auth.user.email }}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem v-if="auth.isAdmin" @click="$router.push('/admin')">
@@ -73,7 +63,9 @@
 </template>
 
 <script setup lang="ts">
-import { User, LogIn, LogOut, Shield } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { LogIn, LogOut, Shield } from 'lucide-vue-next';
+import { YoshiAvatar } from '@/components/custom/sidebar';
 import { useClerk } from '@clerk/vue';
 import { useAuthStore } from '@/stores/auth';
 import { cn } from '@/utils';
@@ -95,6 +87,9 @@ const { collapsed = false } = defineProps<Props>();
 
 const auth = useAuthStore();
 const clerk = useClerk();
+
+const isDevAdmin = import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN === 'true';
+const displayName = computed(() => auth.user?.name || (isDevAdmin ? 'Yoshi' : 'User'));
 
 function signOut() {
   auth.clearProfile();
