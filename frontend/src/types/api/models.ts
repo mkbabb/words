@@ -64,7 +64,8 @@ export interface WordForm {
 }
 
 export interface MeaningCluster {
-    id: string;
+    id: string; // UUID primary key
+    slug: string; // Human-readable: "bank_noun_financial"
     name: string;
     description: string;
     order: number;

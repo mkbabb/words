@@ -72,7 +72,9 @@ export const lookupApi = {
     async reSynthesize(word: string): Promise<SynthesizedDictionaryEntry> {
         try {
             const response = await api.post<DictionaryEntryResponse>(
-                `/lookup/${encodeURIComponent(word)}/re-synthesize`
+                `/lookup/${encodeURIComponent(word)}/re-synthesize`,
+                null,
+                { timeout: 180_000 } // 3 minutes — AI synthesis is slow
             );
             return {
                 ...response.data,

@@ -20,10 +20,12 @@ export const versionsApi = {
     // Get a specific version's full content
     async getVersion(
         word: string,
-        version: string
+        version: string,
+        hydrate = false,
     ): Promise<VersionDetailResponse> {
         const response = await api.get(
-            `/words/${encodeURIComponent(word)}/versions/${encodeURIComponent(version)}`
+            `/words/${encodeURIComponent(word)}/versions/${encodeURIComponent(version)}`,
+            { params: hydrate ? { hydrate: true } : undefined },
         );
         return response.data;
     },
@@ -32,12 +34,13 @@ export const versionsApi = {
     async diff(
         word: string,
         fromVersion: string,
-        toVersion: string
+        toVersion: string,
+        hydrate = false,
     ): Promise<VersionDiffResponse> {
         const response = await api.get(
             `/words/${encodeURIComponent(word)}/diff`,
             {
-                params: { from: fromVersion, to: toVersion },
+                params: { from: fromVersion, to: toVersion, ...(hydrate ? { hydrate: true } : {}) },
             }
         );
         return response.data;
@@ -98,7 +101,8 @@ export const versionsApi = {
     ): Promise<DictionaryEntryResponse> {
         const response = await api.post<DictionaryEntryResponse>(
             `/lookup/${encodeURIComponent(word)}/synthesize-from`,
-            { sources, auto_increment: autoIncrement }
+            { sources, auto_increment: autoIncrement },
+            { timeout: 180_000 } // 3 minutes — AI synthesis is slow
         );
         return response.data;
     },

@@ -31,5 +31,5 @@ export function isExample(obj: any): obj is Example {
 }
 
 export function isMeaningCluster(obj: any): obj is MeaningCluster {
-    return obj && typeof obj.id === 'string' && typeof obj.name === 'string';
+    return obj && typeof obj.id === 'string' && typeof obj.slug === 'string' && typeof obj.name === 'string';
 }
