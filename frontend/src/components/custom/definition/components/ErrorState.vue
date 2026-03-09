@@ -3,13 +3,13 @@
         class="flex min-h-[400px] flex-col items-center justify-center px-6 text-center"
     >
         <div class="mb-6">
-            <div
-                class="relative mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10"
-            >
-                <component
-                    :is="errorIcon"
-                    :size="32"
-                    class="text-destructive"
+            <div class="relative mb-4 inline-flex items-center justify-center">
+                <img
+                    :src="errorImage"
+                    :alt="errorAlt"
+                    class="h-20 w-20 object-contain"
+                    :class="errorImageClass"
+                    draggable="false"
                 />
             </div>
         </div>
@@ -55,14 +55,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
-import {
-    AlertTriangle,
-    Wifi,
-    Search,
-    ServerCrash,
-    RotateCcw,
-    HelpCircle,
-} from 'lucide-vue-next';
+import { RotateCcw, HelpCircle } from 'lucide-vue-next';
+import swirlIcon from '@/assets/yoshi/ui/swirl_icon.png';
+import sunIcon from '@/assets/yoshi/ui/sun_icon.png';
+import heartBubble3 from '@/assets/yoshi/ui/heart_speech_bubble_3.png';
 
 interface ErrorStateProps {
     title?: string;
@@ -91,19 +87,48 @@ defineEmits<{
     help: [];
 }>();
 
-const errorIcon = computed(() => {
+const errorImage = computed(() => {
     switch (props.errorType) {
         case 'network':
-            return Wifi;
+        case 'server':
+            return swirlIcon;
         case 'not-found':
         case 'empty':
-            return Search;
-        case 'server':
-            return ServerCrash;
+            return sunIcon;
         case 'ai-failed':
-            return AlertTriangle;
         default:
-            return AlertTriangle;
+            return heartBubble3;
+    }
+});
+
+const errorAlt = computed(() => {
+    switch (props.errorType) {
+        case 'network':
+        case 'server':
+            return 'Connection error';
+        case 'not-found':
+        case 'empty':
+            return 'Not found';
+        case 'ai-failed':
+        default:
+            return 'Something went wrong';
+    }
+});
+
+const errorImageClass = computed(() => {
+    switch (props.errorType) {
+        case 'network':
+        case 'server':
+            // Swirl: gentle spin animation for "confused/disconnected" feel
+            return 'opacity-70 animate-[spin_8s_linear_infinite]';
+        case 'not-found':
+        case 'empty':
+            // Sun: subtle pulse for "wilting" feel
+            return 'opacity-50 animate-pulse';
+        case 'ai-failed':
+        default:
+            // Heart: static but slightly transparent
+            return 'opacity-60';
     }
 });
 </script>

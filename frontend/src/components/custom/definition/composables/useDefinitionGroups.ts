@@ -4,6 +4,7 @@ import type {
     SynthesizedDictionaryEntry,
 } from '@/types';
 import type { GroupedDefinition } from '../types';
+import { formatClusterLabel } from '../utils/clustering';
 
 export function useDefinitionGroups(
     entry: ComputedRef<SynthesizedDictionaryEntry | null>
@@ -14,7 +15,7 @@ export function useDefinitionGroups(
         const groups = new Map<string, TransformedDefinition[]>();
 
         entry.value.definitions.forEach((def: TransformedDefinition) => {
-            const clusterId = def.meaning_cluster?.id || 'default';
+            const clusterId = def.meaning_cluster?.slug || def.meaning_cluster?.id || 'default';
             if (!groups.has(clusterId)) {
                 groups.set(clusterId, []);
             }
@@ -30,9 +31,11 @@ export function useDefinitionGroups(
 
             return {
                 clusterId,
+                clusterName:
+                    definitions[0]?.meaning_cluster?.name || formatClusterLabel(clusterId),
                 definitions,
                 clusterDescription:
-                    definitions[0]?.meaning_cluster?.name || 'General meaning',
+                    definitions[0]?.meaning_cluster?.description || 'General meaning',
                 maxRelevancy,
             };
         });

@@ -32,6 +32,12 @@
         class="space-y-6 px-3 sm:px-6"
     >
         <div
+            v-if="activeSource && activeSource !== 'synthesis'"
+            class="text-xs text-muted-foreground/70"
+        >
+            Synonyms from {{ formatProviderName(activeSource) }}
+        </div>
+        <div
             class="grid grid-cols-3 gap-1.5 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
         >
             <HoverCard
@@ -180,9 +186,22 @@ import type { ThesaurusEntry, CardVariant } from '@/types';
 interface ThesaurusViewProps {
     thesaurusData: ThesaurusEntry | null;
     cardVariant: CardVariant;
+    activeSource?: string;
 }
 
 defineProps<ThesaurusViewProps>();
+
+const formatProviderName = (provider: string) => {
+    const names: Record<string, string> = {
+        wiktionary: 'Wiktionary',
+        oxford: 'Oxford',
+        apple_dictionary: 'Apple Dictionary',
+        merriam_webster: 'Merriam-Webster',
+        free_dictionary: 'Free Dictionary',
+        wordhippo: 'WordHippo',
+    };
+    return names[provider] || provider.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
 
 defineEmits<{
     'word-click': [word: string];

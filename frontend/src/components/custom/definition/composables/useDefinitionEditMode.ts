@@ -242,7 +242,8 @@ export function useDefinitionEditMode(
                 fields.meaning_cluster_name.value !== null
             ) {
                 updateData.meaning_cluster = {
-                    id: definition.value.meaning_cluster?.id || '', // Provide default id
+                    id: definition.value.meaning_cluster?.id || '',
+                    slug: definition.value.meaning_cluster?.slug || '',
                     name: fields.meaning_cluster_name.value,
                     description:
                         definition.value.meaning_cluster?.description || '',

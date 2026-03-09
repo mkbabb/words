@@ -88,6 +88,7 @@
                 :showDropdown="actions.showThemeDropdown.value"
                 :editModeEnabled="editModeEnabled"
                 :word="entry?.word"
+                :currentVersion="entry?.version"
                 @toggle-dropdown="
                     actions.showThemeDropdown.value =
                         !actions.showThemeDropdown.value
@@ -138,7 +139,7 @@
 
             <!-- Gradient Separator -->
             <hr
-                class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
+                class="mt-1 mb-1 h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
             />
 
             <!-- Provider source tabs (AI Synthesis + raw provider data) -->
@@ -227,6 +228,7 @@
                             <ThesaurusView
                                 :thesaurusData="thesaurusData"
                                 :cardVariant="selectedCardVariant"
+                                :activeSource="activeSourceTab"
                                 @word-click="actions.handleWordSearch"
                                 @retry-thesaurus="actions.handleRetryThesaurus"
                                 @switch-to-dictionary="searchBar.setSubMode('lookup', 'dictionary')"
@@ -281,18 +283,33 @@
             </ProviderViewTabs>
         </ThemedCard>
 
-        <!-- Version History Panel (admin only) -->
-        <div
-            v-if="actions.showVersionHistory.value && entry?.word"
-            class="mt-4 rounded-lg border border-border bg-background p-4"
-        >
-            <VersionHistory
-                :word="entry.word"
-                :currentVersion="entry.version"
-                @close="actions.handleToggleVersionHistory"
-                @rollback="handleVersionRollback"
-            />
-        </div>
+        <!-- Time Machine Version History Overlay -->
+        <TimeMachineOverlay
+            :is-open="timeMachine.isOpen.value"
+            :word="entry?.word"
+            :current-version="entry?.version"
+            :versions="timeMachine.versions.value"
+            :selected-index="timeMachine.selectedIndex.value"
+            :selected-version="timeMachine.selectedVersion.value"
+            :version-detail="timeMachine.versionDetail.value"
+            :version-diff="timeMachine.versionDiff.value"
+            :diff-fields="timeMachine.diffFields.value"
+            :text-changes="timeMachine.textChanges.value"
+            :hydrated-entry="timeMachine.hydratedEntry.value"
+            :navigation-direction="timeMachine.navigationDirection.value"
+            :loading="timeMachine.loading.value"
+            :detail-loading="timeMachine.detailLoading.value"
+            :rolling-back="timeMachine.rollingBack.value"
+            :is-newest="timeMachine.isNewest.value"
+            :is-oldest="timeMachine.isOldest.value"
+            :expanded-view="timeMachine.expandedView.value"
+            @close="handleTimeMachineClose"
+            @select-version="timeMachine.selectVersion"
+            @navigate-next="timeMachine.navigateNext"
+            @navigate-prev="timeMachine.navigatePrev"
+            @rollback="handleTimeMachineRollback"
+            @toggle-expanded="timeMachine.toggleExpanded"
+        />
 
         <!-- Add to Wordlist Modal -->
         <AddToWordlistModal
@@ -326,12 +343,13 @@ import DefinitionStreamingSkeleton from './skeletons/DefinitionStreamingSkeleton
 import { ThemedCard } from '@/components/custom/card';
 import AddToWordlistModal from './components/AddToWordlistModal.vue';
 import ProviderViewTabs from './components/ProviderViewTabs.vue';
-import VersionHistory from './components/VersionHistory.vue';
+import TimeMachineOverlay from './components/TimeMachineOverlay.vue';
 import {
     useDefinitionGroups,
     useProviders,
     useImageManagement,
     useDefinitionActions,
+    useTimeMachine,
 } from './composables';
 import {
     getErrorTitle,
@@ -442,7 +460,23 @@ const selectedCardVariant = computed({
 });
 
 // Convert readonly thesaurus to mutable type for component compatibility
+// When a specific provider is selected (non-synthesis), show that provider's raw synonyms
 const thesaurusData = computed(() => {
+    const currentSource = activeSourceTab.value;
+
+    // If a non-synthesis provider is selected, extract synonyms from that provider's data
+    if (currentSource && currentSource !== 'synthesis' && entry.value) {
+        const providerSynonyms = extractProviderSynonyms(entry.value, currentSource);
+        if (providerSynonyms.length > 0) {
+            return {
+                word: entry.value.word,
+                synonyms: providerSynonyms,
+                confidence: 0.7,
+            };
+        }
+    }
+
+    // Default: use AI-synthesized thesaurus data
     const data = contentStore.currentThesaurus;
     if (data) {
         return {
@@ -452,7 +486,7 @@ const thesaurusData = computed(() => {
         };
     }
 
-    // Fallback: extract synonyms from provider definitions (useful in no_ai mode)
+    // Fallback: extract synonyms from all provider definitions (useful in no_ai mode)
     if (entry.value?.definitions) {
         const synonyms = (entry.value.definitions as any[])
             .flatMap((d: any) => d.synonyms || [])
@@ -465,6 +499,37 @@ const thesaurusData = computed(() => {
 
     return null;
 });
+
+// Extract synonyms from a specific provider's raw data
+function extractProviderSynonyms(entryData: any, provider: string) {
+    const synonymSet = new Set<string>();
+
+    // Check providers_data on each definition
+    if (entryData.definitions) {
+        for (const def of entryData.definitions) {
+            if (!def.providers_data) continue;
+            const providerEntries = Array.isArray(def.providers_data)
+                ? def.providers_data
+                : [def.providers_data];
+
+            for (const pd of providerEntries) {
+                if (pd.provider !== provider) continue;
+                // Extract synonyms from provider's definitions
+                if (pd.definitions) {
+                    for (const pDef of pd.definitions) {
+                        if (pDef.synonyms) {
+                            for (const s of pDef.synonyms) {
+                                synonymSet.add(s);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return Array.from(synonymSet).map((word) => ({ word, score: 1.0 }));
+}
 
 // Smart skeleton logic
 const expectedDefinitionCount = computed(() => {
@@ -498,6 +563,15 @@ const { usedProviders } = useProviders(entry);
 const { allImages, handleImageClick, handleImageError } =
     useImageManagement(entry);
 const actions = useDefinitionActions({ entry, editModeEnabled });
+const timeMachine = useTimeMachine(computed(() => entry.value?.word));
+
+// Wire up the toggle: open Time Machine instead of old panel
+watch(() => actions.showVersionHistory.value, (show) => {
+    if (show) {
+        timeMachine.open();
+        actions.showVersionHistory.value = false;
+    }
+});
 
 const hasAISynthesis = computed(() => !!entry.value?.model_info);
 const selectableSources = computed(() => {
@@ -544,10 +618,15 @@ watch(
     { immediate: true },
 );
 
-// Version rollback handler: re-fetch the word after rollback
-const handleVersionRollback = async (_version: string) => {
+// Time Machine handlers
+const handleTimeMachineClose = () => {
+    timeMachine.close();
+};
+
+const handleTimeMachineRollback = async () => {
+    await timeMachine.handleRollback();
+    // Re-fetch the word to get the rolled-back version
     if (entry.value?.word) {
-        // Re-fetch the word to get the rolled-back version
         const orchestrator2 = useSearchOrchestrator({
             query: computed(() => entry.value?.word || ''),
         });
@@ -556,7 +635,6 @@ const handleVersionRollback = async (_version: string) => {
         } catch {
             // Silently fail — user can manually refresh
         }
-        actions.showVersionHistory.value = false;
     }
 };
 

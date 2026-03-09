@@ -3,6 +3,7 @@ import type { Component } from 'vue';
 
 export interface GroupedDefinition {
     clusterId: string;
+    clusterName: string;
     clusterDescription: string;
     definitions: TransformedDefinition[];
     maxRelevancy: number;

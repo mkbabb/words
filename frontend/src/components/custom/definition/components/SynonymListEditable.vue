@@ -22,14 +22,14 @@
                     class="pointer-events-auto rounded-full border border-border bg-background p-0.5 shadow-sm transition-colors hover:bg-muted"
                     title="Edit synonym"
                 >
-                    <Edit2 class="h-2.5 w-2.5 text-muted-foreground" />
+                    <Edit2 class="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
                 <button
                     @click.stop="deleteSynonym(index)"
                     class="pointer-events-auto rounded-full border border-border bg-background p-0.5 shadow-sm transition-colors hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
                     title="Delete synonym"
                 >
-                    <X class="h-2.5 w-2.5 text-muted-foreground" />
+                    <X class="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
             </span>
         </span>

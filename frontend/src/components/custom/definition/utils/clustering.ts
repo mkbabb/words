@@ -14,13 +14,14 @@ export function groupDefinitionsByCluster(
     const clusters = new Map<string, GroupedDefinition>();
 
     definitions.forEach((definition) => {
-        const clusterId = definition.meaning_cluster?.id || 'default';
+        const clusterId = definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default';
         const clusterDescription =
             definition.meaning_cluster?.description || 'General';
 
         if (!clusters.has(clusterId)) {
             clusters.set(clusterId, {
                 clusterId,
+                clusterName: definition.meaning_cluster?.name || formatClusterLabel(clusterId),
                 clusterDescription,
                 definitions: [],
                 maxRelevancy: definition.relevancy || 1.0,

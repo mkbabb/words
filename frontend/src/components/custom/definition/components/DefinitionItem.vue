@@ -181,8 +181,8 @@
                 @synonym-click="emit('searchWord', $event)"
             />
 
-            <!-- Domain, Region, Frequency (edit mode only) -->
-            <div v-if="editModeEnabled" class="mt-3 flex flex-wrap gap-3">
+            <!-- Domain & Region (edit mode only) -->
+            <div v-if="editModeEnabled" class="mt-3 flex flex-wrap items-center gap-3">
                 <EditableField
                     v-if="definition.domain || editModeEnabled"
                     v-model="fields.domain.value"
@@ -225,24 +225,25 @@
                         </span>
                     </template>
                 </EditableField>
+            </div>
 
-                <div v-if="definition.frequency_band || editModeEnabled" class="flex items-center gap-1">
-                    <span class="text-xs text-muted-foreground">Freq:</span>
-                    <div class="flex gap-0.5">
-                        <button
-                            v-for="star in 5"
-                            :key="star"
-                            @click="
-                                fields.frequency_band.value = star;
-                                fields.frequency_band.isDirty = true;
-                                save();
-                            "
-                            class="text-xs transition-colors"
-                            :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
-                        >
-                            &#9733;
-                        </button>
-                    </div>
+            <!-- Frequency (edit mode only, standalone row for alignment) -->
+            <div v-if="editModeEnabled && (definition.frequency_band || editModeEnabled)" class="mt-2 flex items-center gap-1">
+                <span class="text-xs text-muted-foreground">Freq:</span>
+                <div class="flex gap-0.5">
+                    <button
+                        v-for="star in 5"
+                        :key="star"
+                        @click="
+                            fields.frequency_band.value = star;
+                            fields.frequency_band.isDirty = true;
+                            save();
+                        "
+                        class="text-xs transition-colors"
+                        :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
+                    >
+                        &#9733;
+                    </button>
                 </div>
             </div>
 

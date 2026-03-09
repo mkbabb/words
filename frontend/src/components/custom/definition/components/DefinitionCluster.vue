@@ -10,7 +10,7 @@
             <HoverCard :open-delay="600" :close-delay="100">
                 <HoverCardTrigger as-child>
                     <EditableField
-                        :model-value="formatClusterLabel(cluster.clusterId)"
+                        :model-value="cluster.clusterName"
                         field-name="cluster name"
                         :edit-mode="props.editModeEnabled"
                         @update:model-value="
@@ -26,7 +26,7 @@
                             <h4
                                 class="inline-block cursor-help rounded-md border border-border/50 bg-muted/30 px-3 py-1.5 text-sm font-semibold tracking-wide uppercase transition-all duration-200 hover:border-border hover:bg-muted/50"
                             >
-                                {{ formatClusterLabel(cluster.clusterId) }}
+                                {{ cluster.clusterName }}
                             </h4>
                         </template>
                     </EditableField>
@@ -45,7 +45,7 @@
                     <div class="space-y-4">
                         <div>
                             <h4 class="mb-2 text-base font-semibold">
-                                {{ formatClusterLabel(cluster.clusterId) }}
+                                {{ cluster.clusterName }}
                             </h4>
                             <p class="mb-4 text-sm text-muted-foreground">
                                 {{ cluster.clusterDescription }}
@@ -125,7 +125,6 @@ import {
     HoverCardTrigger,
 } from '@/components/ui/hover-card';
 import { cn } from '@/utils';
-import { formatClusterLabel } from '../utils/clustering';
 import type { GroupedDefinition } from '../types';
 import type { CardVariant } from '@/types';
 import EditableField from './EditableField.vue';

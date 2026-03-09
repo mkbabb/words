@@ -25,7 +25,7 @@
                 class="pointer-events-auto rounded-full border border-border bg-background p-1 shadow-sm transition-colors hover:bg-muted"
                 :title="`Edit ${fieldName}`"
             >
-                <Edit2 class="h-3 w-3 text-muted-foreground" />
+                <Edit2 class="h-4 w-4 text-muted-foreground" />
             </button>
             <button
                 v-if="canRegenerate"
@@ -36,7 +36,7 @@
             >
                 <RefreshCw
                     :class="[
-                        'h-3 w-3 text-muted-foreground',
+                        'h-4 w-4 text-muted-foreground',
                         isRegenerating && 'animate-spin',
                     ]"
                 />

@@ -6,17 +6,17 @@
         <!-- Edit Mode Toggle Button -->
         <button
             @click="$emit('toggle-edit-mode')"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             :title="editModeEnabled ? 'Exit edit mode' : 'Enter edit mode'"
         >
             <Edit2
                 v-if="!editModeEnabled"
-                :size="14"
+                :size="18"
                 class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
             />
             <Check
                 v-else
-                :size="14"
+                :size="18"
                 class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
             />
         </button>
@@ -25,11 +25,11 @@
         <button
             v-if="editModeEnabled"
             @click="$emit('toggle-version-history')"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             title="Version History"
         >
             <History
-                :size="14"
+                :size="18"
                 class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
             />
         </button>
@@ -38,11 +38,11 @@
         <button
             v-if="editModeEnabled"
             @click="showVersionSelector = !showVersionSelector"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             title="Re-synthesize with AI"
         >
             <RefreshCw
-                :size="14"
+                :size="18"
                 class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
             />
         </button>
@@ -51,11 +51,12 @@
         <Transition name="theme-dropdown">
             <div
                 v-if="showVersionSelector && word"
-                class="absolute top-full right-0 z-60 mt-2 w-80 rounded-lg border border-border bg-popover p-4 shadow-lg"
+                class="absolute top-full right-0 z-60 mt-2 w-96 rounded-lg border border-border bg-popover p-4 shadow-lg"
                 @click.stop
             >
                 <ProviderVersionSelector
                     :word="word"
+                    :currentVersion="currentVersion"
                     @close="showVersionSelector = false"
                     @synthesized="handleSynthesized"
                 />
@@ -66,10 +67,10 @@
         <div class="relative">
             <button
                 @click="toggleDropdown"
-                class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+                class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             >
                 <ChevronLeft
-                    :size="14"
+                    :size="18"
                     :class="[
                         'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
                         showDropdown && 'rotate-90',
@@ -134,6 +135,7 @@ interface ThemeSelectorProps {
     showDropdown: boolean;
     editModeEnabled?: boolean;
     word?: string;
+    currentVersion?: string;
 }
 
 defineProps<ThemeSelectorProps>();
