@@ -33,6 +33,32 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
         window.removeEventListener('resize', updateViewportWidth);
     });
 
+    // Hysteresis: debounce the interactive state to prevent rapid bouncing
+    // at the scroll threshold boundary when focus/blur triggers layout shifts.
+    const isInteractive = ref(false);
+    let interactiveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    watch(
+        () =>
+            searchBar.isFocused ||
+            uiState.isContainerHovered ||
+            searchBar.showSearchControls ||
+            searchBar.showDropdown,
+        (active) => {
+            if (interactiveTimer) clearTimeout(interactiveTimer);
+            if (active) {
+                // Expand immediately
+                isInteractive.value = true;
+            } else {
+                // Shrink with a short delay to prevent bounce
+                interactiveTimer = setTimeout(() => {
+                    isInteractive.value = false;
+                }, 150);
+            }
+        },
+        { immediate: true }
+    );
+
     // Container style with smooth transitions
     const containerStyle = computed(() => {
         // Use the scroll progress directly as it's already normalized (0-1)
@@ -49,13 +75,8 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
         // State machine for search bar sizing
         // Priority order: focused/hovered/dropdowns > unfocused > scroll-based
 
-        // State 1: Interactive states - always full size
-        if (
-            searchBar.isFocused ||
-            uiState.isContainerHovered ||
-            searchBar.showSearchControls ||
-            searchBar.showDropdown
-        ) {
+        // State 1: Interactive states - always full size (uses debounced flag)
+        if (isInteractive.value) {
             return {
                 maxWidth: responsiveMaxWidth,
                 transform: 'scale(1)',

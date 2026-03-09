@@ -255,14 +255,14 @@ defineExpose({
  */
 .results-dropdown-enter-active {
     transition:
-        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 120ms cubic-bezier(0, 0, 0.2, 1),
+        transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .results-dropdown-leave-active {
     transition:
-        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1) 30ms,
-        transform 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045);
+        opacity 100ms cubic-bezier(0.4, 0, 1, 1) 20ms,
+        transform 150ms cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 .results-dropdown-enter-from {

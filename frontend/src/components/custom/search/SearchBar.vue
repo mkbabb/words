@@ -181,10 +181,9 @@
 
             <!-- Dropdowns Container -->
             <div class="absolute top-full right-0 left-0 z-40 pt-2">
-                <!-- Controls Dropdown — height transition wrapper -->
+                <!-- Controls Dropdown — grid-based height transition wrapper -->
                 <div
                     :class="[
-                        'overflow-hidden',
                         'controls-dropdown-wrapper',
                         searchBar.showSearchControls
                             ? 'controls-dropdown-open'
@@ -192,6 +191,7 @@
                     ]"
                 >
                     <SearchControls
+                        class="min-h-0 overflow-hidden"
                         :show="true"
                         v-model:selected-sources="selectedSources"
                         v-model:selected-languages="selectedLanguages"
@@ -700,32 +700,32 @@ onUnmounted(() => {
 
 <style scoped>
 /*
- * Controls dropdown: split opacity and transform onto separate easings.
- * Opacity uses a fast ease-out (no overshoot) so content is fully opaque
- * early in the animation. Height/margin use the spring easing for bounce.
+ * Controls dropdown: grid-based height animation.
+ * Uses grid-template-rows 0fr/1fr for smooth collapse without max-height.
  */
 .controls-dropdown-wrapper {
-    will-change: max-height, opacity, margin-bottom;
+    display: grid;
+    will-change: grid-template-rows, opacity;
 }
 
 .controls-dropdown-open {
-    max-height: 500px;
+    grid-template-rows: 1fr;
     opacity: 1;
     margin-bottom: 0.5rem;
     transition:
-        max-height 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
-        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        margin-bottom 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 150ms cubic-bezier(0, 0, 0.2, 1),
+        margin-bottom 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .controls-dropdown-closed {
-    max-height: 0px;
+    grid-template-rows: 0fr;
     opacity: 0;
-    margin-bottom: 0px;
+    margin-bottom: 0;
     transition:
-        max-height 250ms cubic-bezier(0.4, 0.0, 1, 1),
-        opacity 180ms cubic-bezier(0.4, 0.0, 1, 1) 40ms,
-        margin-bottom 250ms cubic-bezier(0.4, 0.0, 1, 1);
+        grid-template-rows 180ms cubic-bezier(0.4, 0, 1, 1),
+        opacity 120ms cubic-bezier(0.4, 0, 1, 1) 30ms,
+        margin-bottom 180ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Disable animations for reduced motion */
