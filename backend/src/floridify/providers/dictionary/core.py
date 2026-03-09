@@ -151,14 +151,21 @@ class DictionaryConnector(BaseConnector):
 
         # Save definitions with examples
         for def_data in provider_entry.definitions:
+            # Filter self-referential synonyms/antonyms from provider data
+            word_lower = word.text.lower()
+            raw_synonyms = def_data.get("synonyms", [])
+            raw_antonyms = def_data.get("antonyms", [])
+            filtered_synonyms = [s for s in raw_synonyms if s.lower() != word_lower]
+            filtered_antonyms = [a for a in raw_antonyms if a.lower() != word_lower]
+
             # Create Definition document
             definition = Definition(
                 word_id=word.id,
                 part_of_speech=def_data.get("part_of_speech", "unknown"),
                 text=def_data.get("text", ""),
                 sense_number=def_data.get("sense_number"),
-                synonyms=def_data.get("synonyms", []),
-                antonyms=def_data.get("antonyms", []),
+                synonyms=filtered_synonyms,
+                antonyms=filtered_antonyms,
                 providers=[self.provider],
                 collocations=[
                     Collocation(**c) if isinstance(c, dict) else c

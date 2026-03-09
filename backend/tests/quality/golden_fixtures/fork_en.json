@@ -1,0 +1,485 @@
+{
+  "word": "fork",
+  "language": "en",
+  "definitions": [
+    {
+      "created_at": "2026-03-09T06:23:13.632000",
+      "updated_at": "2026-03-09T06:23:13.632000",
+      "version": 1,
+      "id": "69ae6751e40679950d45225e",
+      "word_id": "69a260214575a5762ef029bd",
+      "part_of_speech": "noun",
+      "text": "A hand-held implement with two or more slender projecting tines used for spearing, lifting, or separating food and materials; includes eating forks and similar pronged tools.",
+      "meaning_cluster": {
+        "id": "fork_noun_tool_and_forked_objects",
+        "name": "Objects",
+        "description": "eating tool and forked parts",
+        "order": 1,
+        "relevance": 1.0
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae67a9e40679950d452263",
+        "69ae67a9e40679950d452264",
+        "69ae67a9e40679950d452265"
+      ],
+      "synonyms": [
+        "fourchette",
+        "tenedor",
+        "utensil",
+        "tine",
+        "cutlery",
+        "silverware",
+        "prong",
+        "trident",
+        "bident",
+        "furca"
+      ],
+      "antonyms": [
+        "spoon",
+        "cuchara",
+        "ladle",
+        "chalice",
+        "trowel"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 2259,
+        "completion_tokens": 4048,
+        "total_tokens": 6307,
+        "response_time_ms": 27027,
+        "last_generated": "2026-03-09T06:23:13.631000"
+      },
+      "examples": [
+        {
+          "text": "Pass me a fork—these potato wedges are falling apart and I don't want to use my fingers.",
+          "type": "generated"
+        },
+        {
+          "text": "The catering team labeled forks and knives separately to streamline service during the conference's plated dinner courses.",
+          "type": "generated"
+        },
+        {
+          "text": "He used a fork to coax the last roasted pepper from the flame, its tines blackening and scenting the air smoky-sweet.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:23:07.981000",
+      "updated_at": "2026-03-09T06:23:07.981000",
+      "version": 1,
+      "id": "69ae674be40679950d452256",
+      "word_id": "69a260214575a5762ef029bd",
+      "part_of_speech": "noun",
+      "text": "A projecting tine or prong on a multi-tined implement, or any similar pointed projection used to pierce, hold, or separate materials; also a barbed or pointed tip.",
+      "meaning_cluster": {
+        "id": "fork_noun_bifurcation",
+        "name": "Bifurcation",
+        "description": "branching split or prong",
+        "order": 0,
+        "relevance": 0.86
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae67a9e40679950d452266",
+        "69ae67a9e40679950d452267",
+        "69ae67a9e40679950d452268"
+      ],
+      "synonyms": [
+        "tine",
+        "prong",
+        "spike",
+        "barb",
+        "spina",
+        "spine",
+        "dent",
+        "spicule",
+        "pricket",
+        "quillon"
+      ],
+      "antonyms": [
+        "pad",
+        "cavity",
+        "sheath",
+        "hueco",
+        "platen"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1257,
+        "completion_tokens": 3466,
+        "total_tokens": 4723,
+        "response_time_ms": 31502,
+        "last_generated": "2026-03-09T06:23:07.981000"
+      },
+      "examples": [
+        {
+          "text": "Pass me a fork before the barbecue starts — the skewers are useless for these thick, charred vegetables.",
+          "type": "generated"
+        },
+        {
+          "text": "The new cafeteria doubled capacity, but staff favored forks over sporks for durability and ease with dense, grain-forward salads.",
+          "type": "generated"
+        },
+        {
+          "text": "He noticed a rusted fork stuck like a tiny anchor in the riverbank, catching driftwood and old love letters.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:23:11.829000",
+      "updated_at": "2026-03-09T06:23:11.829000",
+      "version": 1,
+      "id": "69ae674fe40679950d45225a",
+      "word_id": "69a260214575a5762ef029bd",
+      "part_of_speech": "noun",
+      "text": "A departure from a single source of truth that creates an independent copy of a project or dataset, enabling separate development or divergent versions in software, content, or data management.",
+      "meaning_cluster": {
+        "id": "fork_noun_specialized",
+        "name": "Specialized",
+        "description": "specialized technical noun senses",
+        "order": 0,
+        "relevance": 0.58
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae67a9e40679950d452269",
+        "69ae67a9e40679950d45226a",
+        "69ae67a9e40679950d45226b"
+      ],
+      "synonyms": [
+        "copy",
+        "clone",
+        "offshoot",
+        "spin-off",
+        "schism",
+        "splinter",
+        "bifurcation",
+        "Abspaltung",
+        "embranchement",
+        "repository clone"
+      ],
+      "antonyms": [
+        "authoritative source",
+        "trunk",
+        "consolidation",
+        "confluence",
+        "centralisation"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1483,
+        "completion_tokens": 3941,
+        "total_tokens": 5424,
+        "response_time_ms": 25142,
+        "last_generated": "2026-03-09T06:23:11.828000"
+      },
+      "examples": [
+        {
+          "text": "When the maintainers ignored security patches, our team decided to create a fork and keep the project alive on our own timeline.",
+          "type": "generated"
+        },
+        {
+          "text": "The audit recommended documenting every fork of the dataset to prevent provenance confusion and ensure reproducible analyses across departments.",
+          "type": "generated"
+        },
+        {
+          "text": "When the open-source tools fragmented into multiple forks, each with its own roadmap, users faced hard choices about compatibility and trust.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:23:10.520000",
+      "updated_at": "2026-03-09T06:23:10.520000",
+      "version": 1,
+      "id": "69ae674ee40679950d452258",
+      "word_id": "69a260214575a5762ef029bd",
+      "part_of_speech": "verb",
+      "text": "To split into two or more branches or offshoots, producing separate lines, paths, or copies that diverge from a single origin; used for roads, streams, or code repositories.",
+      "meaning_cluster": {
+        "id": "fork_verb_divide",
+        "name": "Divide",
+        "description": "split into branches or copies",
+        "order": 0,
+        "relevance": 0.83
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae67a9e40679950d45226c",
+        "69ae67a9e40679950d45226d",
+        "69ae67a9e40679950d45226e"
+      ],
+      "synonyms": [
+        "ramify",
+        "bifurcate",
+        "ramificarse",
+        "sunder",
+        "bifurquer",
+        "diverge",
+        "split",
+        "branch off",
+        "divide",
+        "spawn"
+      ],
+      "antonyms": [
+        "join",
+        "merge",
+        "unite",
+        "coalesce",
+        "unir"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1007,
+        "completion_tokens": 3242,
+        "total_tokens": 4249,
+        "response_time_ms": 22019,
+        "last_generated": "2026-03-09T06:23:10.520000"
+      },
+      "examples": [
+        {
+          "text": "We forked our route when the main road flooded, splitting into two smaller streets to reach the hotel.",
+          "type": "generated"
+        },
+        {
+          "text": "After acquiring the startup, the product team forked the open-source repo to develop a proprietary feature set without disrupting upstream releases.",
+          "type": "generated"
+        },
+        {
+          "text": "At the crossroads of grief and duty, he forked his allegiance, tending the old orchard while sending his son to seek fortune abroad.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:23:37.387000",
+      "updated_at": "2026-03-09T06:23:37.387000",
+      "version": 1,
+      "id": "69ae6769e40679950d452260",
+      "word_id": "69a260214575a5762ef029bd",
+      "part_of_speech": "verb",
+      "text": "To lift, turn, or move hay, fodder, food, or similar material using a fork or pitchfork, typically for feeding or stacking; agricultural or culinary use.",
+      "meaning_cluster": {
+        "id": "fork_verb_other_actions",
+        "name": "Actions",
+        "description": "use fork or specialized actions",
+        "order": 0,
+        "relevance": 0.49
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae67a9e40679950d45226f",
+        "69ae67a9e40679950d452270",
+        "69ae67a9e40679950d452271"
+      ],
+      "synonyms": [
+        "pitch",
+        "toss",
+        "lift",
+        "gather",
+        "prong",
+        "upturn",
+        "heave",
+        "voltear",
+        "ratisser",
+        "ted"
+      ],
+      "antonyms": [
+        "flatten",
+        "compress",
+        "scatter",
+        "étaler",
+        "prostrate"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1706,
+        "completion_tokens": 5059,
+        "total_tokens": 6765,
+        "response_time_ms": 32065,
+        "last_generated": "2026-03-09T06:23:37.387000"
+      },
+      "examples": [
+        {
+          "text": "After the storm the ranch hands had to fork the wet hay into the barn before it spoiled, laughing and swearing.",
+          "type": "generated"
+        },
+        {
+          "text": "To prevent mold and maintain feed quality, crew schedules ensure workers fork fresh-cut alfalfa twice daily during summer heat.",
+          "type": "generated"
+        },
+        {
+          "text": "By dawn, elderly farmers still fork the damp morning hay into perfect rows, a tactile ritual that anchors the town's fading rhythms.",
+          "type": "generated"
+        }
+      ]
+    }
+  ],
+  "pronunciation": {
+    "created_at": "2026-03-09T06:22:10.021000",
+    "updated_at": "2026-03-09T06:22:10.021000",
+    "version": 1,
+    "id": "69ae6751e40679950d45225c",
+    "word_id": "69a260214575a5762ef029bd",
+    "phonetic": "FAWRK",
+    "ipa": "/ˈfɔɹk/",
+    "audio_file_ids": [
+      "69ae6751e40679950d45225d"
+    ],
+    "syllables": [],
+    "stress_pattern": null,
+    "model_info": null
+  },
+  "etymology": {
+    "text": "Via Latin furca (fork, pitchfork), the word appears in Old English as *furkō/force for a forked instrument (attested c. 9th–11th century) and then Middle English forke; later forms were reinforced by Latin-derived forms such as furcate/forque. The ultimate origin is uncertain: some scholars derive it from Proto‑Indo‑European *ǵʰerk(ʷ)- ‘fork’ (though the development of the -c- is problematic), while others connect it to a stem *furkaz (from *perg-) ‘stake, pole’, which would relate it to words for bolts, bars, and staffs.",
+    "origin_language": "Proto-Indo-European",
+    "root_words": [
+      "furca",
+      "*furkō",
+      "forke",
+      "forque",
+      "*ǵʰerk(ʷ)-",
+      "*furkaz",
+      "*perg-"
+    ],
+    "first_known_use": "Old English, c. 9th–11th century",
+    "model_info": {
+      "name": "gpt-5-mini",
+      "confidence": 0.9,
+      "temperature": 0.7,
+      "max_tokens": 16384,
+      "top_p": 1.0,
+      "frequency_penalty": 0.0,
+      "presence_penalty": 0.0,
+      "generation_count": 1,
+      "prompt_tokens": 985,
+      "completion_tokens": 996,
+      "total_tokens": 1981,
+      "response_time_ms": 40157,
+      "last_generated": "2026-03-09T06:22:50.178000"
+    }
+  },
+  "facts": [
+    "English \"fork\" comes from Old English forca, borrowed from Latin furca; that Latin root also produced the insult furcifer (originally \"one who carries a fork\") and the technical adjective furcate/\"forked.\"",
+    "The dining fork was introduced into Western Europe from Byzantine/Italian practice but provoked moral and social resistance—Renaissance and Puritan commentators often ridiculed it as an effeminate, continental affectation, so possession and use of forks long signaled elite taste and confessional identity.",
+    "English shows an unusual split: the name of the whole implement is a borrowing (fork), while the native Germanic word survives for its prongs (tine), so a borrowed term labels the object while the inherited word labels a component."
+  ]
+}

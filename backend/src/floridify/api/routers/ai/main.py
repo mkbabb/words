@@ -17,6 +17,7 @@ from ...middleware.rate_limiting import ai_limiter, get_client_key
 from .assess import router as assess_router
 from .base import (
     QueryValidationRequest,
+    ResynthesizeRequest,
     SuggestionsRequest,
     SynthesizeRequest,
     WordSuggestionRequest,
@@ -271,5 +272,67 @@ async def synthesize_entry_components(
         links={
             "self": "/ai/synthesize",
             "entry": f"/lookup/{entry.word_id}",
+        },
+    )
+
+
+# Re-synthesize Endpoint
+
+
+@router.post("/resynthesize")
+@handle_ai_errors
+async def resynthesize_from_provenance(
+    request: ResynthesizeRequest,
+    api_request: Request,
+) -> ResourceResponse:
+    """Re-synthesize a word from its existing provider data.
+
+    Creates a new versioned synthesized entry by running the full synthesis
+    pipeline (dedup → cluster → synthesize → enhance) against the raw
+    provider DictionaryEntry records already in the database.
+
+    Provenance is tracked via SourceReference linking back to the specific
+    provider entry versions used.
+    """
+    client_key = get_client_key(api_request)
+    allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=5000)
+
+    if not allowed:
+        raise HTTPException(429, "AI rate limit exceeded", headers=headers)
+
+    # Resolve languages if provided
+    from ....models.base import Language
+
+    resolved_languages: list[Language] | None = None
+    if request.languages:
+        try:
+            resolved_languages = [Language(lang) for lang in request.languages]
+        except ValueError as e:
+            raise HTTPException(400, f"Invalid language: {e}")
+
+    synthesizer = get_definition_synthesizer()
+    entry = await synthesizer.resynthesize_from_provenance(
+        word=request.word,
+        languages=resolved_languages,
+    )
+
+    if not entry:
+        raise HTTPException(
+            404,
+            f"No provider data found for '{request.word}'. "
+            "The word must have been looked up at least once before re-synthesis.",
+        )
+
+    return ResourceResponse(
+        data=entry.model_dump(mode="json"),
+        metadata={
+            "word": request.word,
+            "version": entry.version,
+            "source_entries": len(entry.source_entries),
+            "definition_count": len(entry.definition_ids),
+        },
+        links={
+            "self": "/ai/resynthesize",
+            "entry": f"/lookup/{request.word}",
         },
     )

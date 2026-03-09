@@ -175,6 +175,16 @@ class SynthesizeRequest(BaseModel):
     components: list[str] | None = Field(None, description="Components to regenerate")
 
 
+class ResynthesizeRequest(BaseModel):
+    """Request for re-synthesizing a word from its existing provider data."""
+
+    word: str = Field(..., min_length=1, max_length=200, description="Word to re-synthesize")
+    languages: list[str] | None = Field(
+        None,
+        description="Override languages (defaults to word's existing languages)",
+    )
+
+
 class QueryValidationRequest(BaseModel):
     """Request for query validation."""
 

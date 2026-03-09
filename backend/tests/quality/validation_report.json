@@ -1,0 +1,181 @@
+[
+  {
+    "word": "bank",
+    "language": "en",
+    "success": true,
+    "score": 8.9,
+    "error": null,
+    "duration_seconds": 243.67,
+    "provider_count": 1,
+    "provider_names": [
+      "wiktionary"
+    ],
+    "raw_definition_count": 40,
+    "definition_count": 5,
+    "has_pronunciation": true,
+    "has_etymology": true,
+    "has_facts": true,
+    "fact_count": 3,
+    "cluster_count": 5,
+    "source_entry_count": 1,
+    "version": 1,
+    "pos_coverage_ok": true,
+    "actual_pos": [
+      "noun",
+      "verb"
+    ],
+    "issues": [],
+    "definitions": [
+      {
+        "index": 0,
+        "pos": "noun",
+        "text": "A financial institution that accepts deposits, makes loans, and provides payment, investment, and ot",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Financial",
+        "issues": []
+      },
+      {
+        "index": 1,
+        "pos": "verb",
+        "text": "To place money into an account at a financial institution for safekeeping, payment, or record-keepin",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Financial",
+        "issues": []
+      },
+      {
+        "index": 2,
+        "pos": "noun",
+        "text": "Edge or slope of land bordering a river, lake, or other watercourse, forming the natural margin wher",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Mass",
+        "issues": []
+      },
+      {
+        "index": 3,
+        "pos": "noun",
+        "text": "The lateral tilt of an aircraft from the horizontal, produced by lowering one wing and raising the o",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Tilt",
+        "issues": []
+      },
+      {
+        "index": 4,
+        "pos": "verb",
+        "text": "To raise a mound or dike around an area to enclose, defend, or fortify it, creating a raised earthwo",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Enclose",
+        "issues": []
+      }
+    ]
+  },
+  {
+    "word": "fork",
+    "language": "en",
+    "success": true,
+    "score": 8.9,
+    "error": null,
+    "duration_seconds": 219.37,
+    "provider_count": 2,
+    "provider_names": [
+      "wiktionary",
+      "wiktionary"
+    ],
+    "raw_definition_count": 44,
+    "definition_count": 5,
+    "has_pronunciation": true,
+    "has_etymology": true,
+    "has_facts": true,
+    "fact_count": 3,
+    "cluster_count": 5,
+    "source_entry_count": 2,
+    "version": 1,
+    "pos_coverage_ok": true,
+    "actual_pos": [
+      "noun",
+      "verb"
+    ],
+    "issues": [],
+    "definitions": [
+      {
+        "index": 0,
+        "pos": "noun",
+        "text": "A hand-held implement with two or more slender projecting tines used for spearing, lifting, or separ",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Objects",
+        "issues": []
+      },
+      {
+        "index": 1,
+        "pos": "noun",
+        "text": "A projecting tine or prong on a multi-tined implement, or any similar pointed projection used to pie",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Bifurcation",
+        "issues": []
+      },
+      {
+        "index": 2,
+        "pos": "noun",
+        "text": "A departure from a single source of truth that creates an independent copy of a project or dataset, ",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Specialized",
+        "issues": []
+      },
+      {
+        "index": 3,
+        "pos": "verb",
+        "text": "To split into two or more branches or offshoots, producing separate lines, paths, or copies that div",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Divide",
+        "issues": []
+      },
+      {
+        "index": 4,
+        "pos": "verb",
+        "text": "To lift, turn, or move hay, fodder, food, or similar material using a fork or pitchfork, typically f",
+        "synonym_count": 10,
+        "antonym_count": 5,
+        "example_count": 3,
+        "cefr_level": null,
+        "frequency_band": null,
+        "cluster_name": "Actions",
+        "issues": []
+      }
+    ]
+  }
+]

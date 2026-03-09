@@ -19,8 +19,100 @@ from ....models.responses import (
 from ....utils.logging import get_logger
 from ...middleware.auth import require_admin
 
+from ...services.loaders import DefinitionLoader, PronunciationLoader
+
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+async def _hydrate_version_content(content: dict[str, Any], word: str) -> dict[str, Any]:
+    """Hydrate a raw version snapshot into the same shape as a lookup response.
+
+    Resolves definition_ids → full Definition objects with examples/images,
+    pronunciation_id → Pronunciation with audio files, and image_ids → ImageMedia.
+    """
+    from ....models.base import ImageMedia
+    from ....models.dictionary import Definition, DictionaryEntry, DictionaryProvider, Word
+
+    hydrated = dict(content)
+
+    # Resolve word text from the Word document
+    word_id = content.get("word_id")
+    if word_id:
+        word_obj = await Word.get(word_id)
+        if word_obj:
+            hydrated["word"] = word_obj.text
+    if "word" not in hydrated:
+        hydrated["word"] = word
+
+    # Resolve definitions
+    definition_ids = content.get("definition_ids", [])
+    if definition_ids:
+        # Load provider entries for provider_data linkage
+        if word_id:
+            provider_entries = await DictionaryEntry.find(
+                DictionaryEntry.word_id == word_id,
+                DictionaryEntry.provider != DictionaryProvider.SYNTHESIS,
+            ).to_list()
+            provider_entry_ids = [str(pe.id) for pe in provider_entries] if provider_entries else None
+        else:
+            provider_entry_ids = None
+
+        definitions = []
+        for def_id in definition_ids:
+            definition = await Definition.get(def_id)
+            if definition:
+                def_dict = await DefinitionLoader.load_with_relations(
+                    definition=definition,
+                    include_examples=True,
+                    include_images=True,
+                    include_provider_data=True,
+                    provider_data_ids=provider_entry_ids,
+                )
+                definitions.append(def_dict)
+        hydrated["definitions"] = definitions
+
+    # Resolve pronunciation
+    pronunciation_id = content.get("pronunciation_id")
+    if pronunciation_id:
+        pronunciation = await PronunciationLoader.load_with_audio(str(pronunciation_id))
+        if pronunciation:
+            hydrated["pronunciation"] = pronunciation
+
+    # Resolve entry-level images
+    image_ids = content.get("image_ids", [])
+    if image_ids:
+        images = []
+        for image_id in image_ids:
+            image = await ImageMedia.get(image_id)
+            if image:
+                images.append(image.model_dump(mode="json", exclude={"data"}))
+        hydrated["images"] = images
+
+    return hydrated
+
+
+_NOISY_KEYS = frozenset({
+    "id", "word_id", "definition_ids", "pronunciation_id", "image_ids",
+    "created_at", "updated_at", "definition_id", "entry_id",
+    "model_info", "last_generated",
+    "audio_file_ids", "audio_files", "fact_ids",
+})
+
+
+def _strip_noisy_fields(obj: Any, depth: int = 0) -> None:
+    """Recursively remove timestamp / ID fields that clutter text-level diffs."""
+    if depth > 10:
+        return
+    if isinstance(obj, dict):
+        for key in list(obj.keys()):
+            if key in _NOISY_KEYS:
+                del obj[key]
+            else:
+                _strip_noisy_fields(obj[key], depth + 1)
+    elif isinstance(obj, list):
+        for item in obj:
+            _strip_noisy_fields(item, depth + 1)
 
 
 def _make_resource_id(word: str) -> str:
@@ -67,12 +159,17 @@ async def list_word_versions(word: str) -> VersionHistoryResponse:
 
 
 @router.get("/{word}/versions/{version}")
-async def get_word_version(word: str, version: str) -> dict[str, Any]:
+async def get_word_version(
+    word: str,
+    version: str,
+    hydrate: bool = Query(False, description="Hydrate definition_ids, pronunciation, images into full objects"),
+) -> dict[str, Any]:
     """Get a specific historical version of a word's synthesized entry.
 
     Args:
         word: The word to retrieve
         version: Semantic version string (e.g. "1.0.2")
+        hydrate: If True, resolve IDs to full objects (definitions, pronunciation, images)
 
     Returns:
         Full content of the specified version
@@ -89,6 +186,11 @@ async def get_word_version(word: str, version: str) -> dict[str, Any]:
             detail=f"Version {version} not found for word: {word}",
         )
 
+    content = result.content_inline
+
+    if hydrate and content:
+        content = await _hydrate_version_content(content, word)
+
     return {
         "resource_id": resource_id,
         "version": result.version_info.version,
@@ -96,7 +198,7 @@ async def get_word_version(word: str, version: str) -> dict[str, Any]:
         "data_hash": result.version_info.data_hash,
         "storage_mode": result.version_info.storage_mode,
         "is_latest": result.version_info.is_latest,
-        "content": result.content_inline,
+        "content": content,
     }
 
 
@@ -105,6 +207,10 @@ async def diff_word_versions(
     word: str,
     from_version: str = Query(..., alias="from", description="Source version (e.g. 1.0.0)"),
     to_version: str = Query(..., alias="to", description="Target version (e.g. 1.0.2)"),
+    hydrate: bool = Query(
+        False,
+        description="Hydrate IDs to full objects before diffing (gives text-level diffs instead of ID-level)",
+    ),
 ) -> VersionDiffResponse:
     """Compute diff between two versions of a word's synthesized entry.
 
@@ -112,6 +218,9 @@ async def diff_word_versions(
         word: The word to diff
         from_version: Source version
         to_version: Target version
+        hydrate: If True, resolve definition_ids/pronunciation/images into full
+                 objects before computing the diff, yielding text-level changes
+                 rather than raw ObjectId changes.
 
     Returns:
         Categorized changes between the two versions
@@ -139,6 +248,18 @@ async def diff_word_versions(
 
     from_content = from_result.content_inline or {}
     to_content = to_result.content_inline or {}
+
+    if hydrate:
+        import json
+
+        from_content = await _hydrate_version_content(from_content, word)
+        to_content = await _hydrate_version_content(to_content, word)
+        # Round-trip through JSON to normalize types (Beanie models → plain dicts)
+        from_content = json.loads(json.dumps(from_content, default=str))
+        to_content = json.loads(json.dumps(to_content, default=str))
+        # Strip noisy fields that aren't meaningful for user-facing diffs
+        _strip_noisy_fields(from_content)
+        _strip_noisy_fields(to_content)
 
     changes = compute_diff_between(from_content, to_content)
 

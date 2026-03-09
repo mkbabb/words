@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
+from uuid import uuid4
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .base import BaseMetadata
+
+# UUID4 pattern for detecting old slug-as-id vs new UUID id
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 class WordForm(BaseModel):
@@ -50,11 +55,31 @@ class UsageNote(BaseModel):
 class MeaningCluster(BaseModel):
     """Semantic grouping metadata."""
 
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid4()))  # UUID primary key
+    slug: str = ""  # Human-readable: "bank_noun_financial"
     name: str  # Human-readable cluster name
     description: str  # Brief description of this meaning
     order: int = Field(ge=0)  # Display order
     relevance: float = Field(ge=0.0, le=1.0)  # Usage frequency
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_old_id_to_slug(cls, data: dict) -> dict:
+        """Migrate old documents where id was a slug string (not a UUID)."""
+        if not isinstance(data, dict):
+            return data
+        id_val = data.get("id", "")
+        slug_val = data.get("slug", "")
+        # Old schema: id was a slug like "bank_noun_financial" (not a UUID)
+        if id_val and not _UUID_RE.match(id_val):
+            # Migrate: move old slug-id → slug, generate new UUID id
+            if not slug_val:
+                data["slug"] = id_val
+            data["id"] = str(uuid4())
+        # If slug is still empty, derive from id (shouldn't happen for new data)
+        if not data.get("slug"):
+            data["slug"] = data.get("name", "unknown")
+        return data
 
 
 class WordRelationship(Document, BaseMetadata):

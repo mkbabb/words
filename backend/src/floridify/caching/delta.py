@@ -100,10 +100,14 @@ def compute_diff_between(
     Returns:
         Dict with categorized changes (values_changed, items_added, items_removed, etc.)
     """
+    import json
+
     diff = DeepDiff(a, b, verbose_level=2)
     if not diff:
         return {}
-    return diff.to_dict()
+    # Round-trip through JSON to ensure all values are JSON-serializable
+    # (DeepDiff's type_changes includes Python type objects like <class 'str'>)
+    return json.loads(json.dumps(diff.to_dict(), default=str))
 
 
 def should_keep_as_snapshot(version_num: int, interval: int = 10) -> bool:

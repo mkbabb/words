@@ -158,4 +158,87 @@ async def _lookup_async(
         console.print(format_error(f"Lookup failed: {e}"))
 
 
+@click.command()
+@click.argument("word")
+@click.option(
+    "--language",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
+    default=None,
+    help="Override languages (defaults to word's existing languages)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def resynthesize(
+    word: str,
+    language: tuple[str, ...] | None,
+    output_json: bool,
+) -> None:
+    """Re-synthesize a word from its existing provider data.
+
+    WORD: The word to re-synthesize
+
+    Runs the full AI synthesis pipeline (dedup → cluster → synthesize → enhance)
+    against the raw provider data already in the database, creating a new
+    versioned synthesized entry.
+    """
+    asyncio.run(_resynthesize_async(word, language, output_json))
+
+
+async def _resynthesize_async(
+    word: str,
+    language: tuple[str, ...] | None,
+    output_json: bool,
+) -> None:
+    """Async implementation of re-synthesis."""
+    from ...ai.synthesizer import get_definition_synthesizer
+    from ...storage.mongodb import get_storage
+
+    try:
+        await get_storage()
+        synthesizer = get_definition_synthesizer()
+
+        languages: list[Language] | None = None
+        if language:
+            languages = [Language(lang) for lang in language]
+
+        console.print(f"[bold blue]Re-synthesizing '{word}' from provider data...[/bold blue]")
+
+        entry = await synthesizer.resynthesize_from_provenance(
+            word=word,
+            languages=languages,
+        )
+
+        if entry:
+            if output_json:
+                from ...api.services.loaders import DictionaryEntryLoader
+                from ...models.responses import LookupResponse
+
+                response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=entry)
+                response = LookupResponse(**response_dict)
+                print_json(response)
+            else:
+                console.print(
+                    f"[green]✓ Re-synthesized '{word}': "
+                    f"{len(entry.definition_ids)} definitions, "
+                    f"{len(entry.source_entries)} source entries, "
+                    f"version {entry.version}[/green]"
+                )
+        else:
+            console.print(
+                format_warning(
+                    f"No provider data found for '{word}'. "
+                    "Look up the word first to fetch provider data."
+                )
+            )
+
+    except Exception as e:
+        logger.error(f"Re-synthesis failed: {e}")
+        console.print(format_error(f"Re-synthesis failed: {e}"))
+
+
 lookup_group = lookup

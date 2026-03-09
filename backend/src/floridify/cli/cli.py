@@ -12,7 +12,7 @@ from rich.console import Console
 # PATHOLOGICAL REMOVAL: Move ALL nested imports to module level - NO nested imports allowed
 from .commands.config import config_group
 from .commands.database import database_group
-from .commands.lookup import _lookup_async
+from .commands.lookup import _lookup_async, resynthesize
 from .commands.scrape import (
     cleanup_sessions,
     delete_session,
@@ -501,6 +501,8 @@ def completion(shell: str) -> None:
 
 # Add aliases
 cli.add_command(lookup, name="define")
+
+cli.add_command(resynthesize, name="resynthesize")
 
 
 if __name__ == "__main__":

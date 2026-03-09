@@ -1,0 +1,485 @@
+{
+  "word": "bank",
+  "language": "en",
+  "definitions": [
+    {
+      "created_at": "2026-03-09T06:19:50.030000",
+      "updated_at": "2026-03-09T06:19:50.030000",
+      "version": 1,
+      "id": "69ae6686e40679950d45223a",
+      "word_id": "69ae5675b43926b64e476405",
+      "part_of_speech": "noun",
+      "text": "A financial institution that accepts deposits, makes loans, and provides payment, investment, and other monetary services; also used for one of its local branch offices.",
+      "meaning_cluster": {
+        "id": "bank_noun_financial",
+        "name": "Financial",
+        "description": "financial institution and funds",
+        "order": 1,
+        "relevance": 1.0
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae66cde40679950d45223f",
+        "69ae66cde40679950d452240",
+        "69ae66cde40679950d452241"
+      ],
+      "synonyms": [
+        "financial institution",
+        "banque",
+        "depository institution",
+        "savings bank",
+        "credit union",
+        "banking house",
+        "trust company",
+        "financial house",
+        "lender",
+        "caja"
+      ],
+      "antonyms": [
+        "borrower",
+        "debtor",
+        "almshouse",
+        "charité",
+        "nonbank"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 2113,
+        "completion_tokens": 3107,
+        "total_tokens": 5220,
+        "response_time_ms": 20713,
+        "last_generated": "2026-03-09T06:19:50.030000"
+      },
+      "examples": [
+        {
+          "text": "I deposited my paycheck at the bank around the corner and grabbed coffee before heading back to the office.",
+          "type": "generated"
+        },
+        {
+          "text": "The bank announced layoffs across the region today, citing automation and declining branch traffic in a sharply worded press release.",
+          "type": "generated"
+        },
+        {
+          "text": "In the novel, the bank's shuttered windows signaled more than recession — they marked the end of a neighborhood's slow unravelling.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:19:43.355000",
+      "updated_at": "2026-03-09T06:19:43.355000",
+      "version": 1,
+      "id": "69ae667fe40679950d452231",
+      "word_id": "69ae5675b43926b64e476405",
+      "part_of_speech": "verb",
+      "text": "To place money into an account at a financial institution for safekeeping, payment, or record-keeping, thereby establishing or increasing funds available for transactions.",
+      "meaning_cluster": {
+        "id": "bank_verb_financial",
+        "name": "Financial",
+        "description": "use or place in bank",
+        "order": 0,
+        "relevance": 0.8
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae66cde40679950d452242",
+        "69ae66cde40679950d452243",
+        "69ae66cde40679950d452244"
+      ],
+      "synonyms": [
+        "consign",
+        "ensconce",
+        "entrust",
+        "déposer",
+        "deposit",
+        "ingresar",
+        "credit",
+        "lodge",
+        "place",
+        "remit"
+      ],
+      "antonyms": [
+        "withdraw",
+        "retirar",
+        "spend",
+        "debit",
+        "divest"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1228,
+        "completion_tokens": 2895,
+        "total_tokens": 4123,
+        "response_time_ms": 33133,
+        "last_generated": "2026-03-09T06:19:43.354000"
+      },
+      "examples": [
+        {
+          "text": "I need to bank my pay from gig work before the weekend so I don't blow it on takeout.",
+          "type": "generated"
+        },
+        {
+          "text": "The nonprofit announced it would bank all online donations separately to ensure transparency and faster disbursement to disaster relief.",
+          "type": "generated"
+        },
+        {
+          "text": "He banked the final paycheck with a small, stubborn satisfaction, watching his savings grow like a quiet, necessary rebellion.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:19:45.227000",
+      "updated_at": "2026-03-09T06:19:45.227000",
+      "version": 1,
+      "id": "69ae6681e40679950d452236",
+      "word_id": "69ae5675b43926b64e476405",
+      "part_of_speech": "noun",
+      "text": "Edge or slope of land bordering a river, lake, or other watercourse, forming the natural margin where water meets land and often shaping local terrain.",
+      "meaning_cluster": {
+        "id": "bank_noun_slope_mass",
+        "name": "Mass",
+        "description": "raised edge, mass, or ridge",
+        "order": 0,
+        "relevance": 0.88
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae66cde40679950d452245",
+        "69ae66cde40679950d452246",
+        "69ae66cde40679950d452247"
+      ],
+      "synonyms": [
+        "shore",
+        "shoreline",
+        "riverside",
+        "rive",
+        "waterfront",
+        "orilla",
+        "strand",
+        "foreshore",
+        "verge",
+        "brink"
+      ],
+      "antonyms": [
+        "midstream",
+        "open water",
+        "the deep",
+        "arrière-pays",
+        "thalweg"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 3112,
+        "completion_tokens": 3113,
+        "total_tokens": 6225,
+        "response_time_ms": 22473,
+        "last_generated": "2026-03-09T06:19:45.226000"
+      },
+      "examples": [
+        {
+          "text": "We picnicked on the river bank until sunset, watching kids skip stones and fishermen pack up their gear.",
+          "type": "generated"
+        },
+        {
+          "text": "Engineers recommended reinforcing the river bank with native shrubs and porous rock to prevent erosion during seasonal floods.",
+          "type": "generated"
+        },
+        {
+          "text": "After the storm, the town's old bank had collapsed in places, exposing utility lines and widening the channel overnight.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:19:45.844000",
+      "updated_at": "2026-03-09T06:19:45.844000",
+      "version": 1,
+      "id": "69ae6681e40679950d452238",
+      "word_id": "69ae5675b43926b64e476405",
+      "part_of_speech": "noun",
+      "text": "The lateral tilt of an aircraft from the horizontal, produced by lowering one wing and raising the other to change direction; measured as the angle between aircraft and horizon. Aviation.",
+      "meaning_cluster": {
+        "id": "bank_noun_verb_tilt",
+        "name": "Tilt",
+        "description": "aircraft tilt or turning motion",
+        "order": 0,
+        "relevance": 0.45
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae66cde40679950d452248",
+        "69ae66cde40679950d452249",
+        "69ae66cde40679950d45224a"
+      ],
+      "synonyms": [
+        "tilt",
+        "roll angle",
+        "roll",
+        "alabeo",
+        "roulis",
+        "list",
+        "heel",
+        "obliquity",
+        "cant",
+        "askewness"
+      ],
+      "antonyms": [
+        "level",
+        "horizontality",
+        "zero roll",
+        "horizontalité",
+        "equipoise"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 984,
+        "completion_tokens": 2861,
+        "total_tokens": 3845,
+        "response_time_ms": 19350,
+        "last_generated": "2026-03-09T06:19:45.844000"
+      },
+      "examples": [
+        {
+          "text": "That pilot's sudden bank scared me — the plane tilted sharply, one wing dipping while the other climbed over the coastline.",
+          "type": "generated"
+        },
+        {
+          "text": "During asymmetric thrust, apply coordinated rudder and aileron to arrest an increasing bank; exceeding safe bank angles risks structural stress.",
+          "type": "generated"
+        },
+        {
+          "text": "Investigators measured the jet's final bank before impact, a steep roll that suggested deliberate maneuver rather than mechanical failure.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-09T06:19:59.507000",
+      "updated_at": "2026-03-09T06:19:59.507000",
+      "version": 1,
+      "id": "69ae668fe40679950d45223c",
+      "word_id": "69ae5675b43926b64e476405",
+      "part_of_speech": "verb",
+      "text": "To raise a mound or dike around an area to enclose, defend, or fortify it, creating a raised earthwork that contains or diverts water or soil.",
+      "meaning_cluster": {
+        "id": "bank_verb_arrange_enclose",
+        "name": "Enclose",
+        "description": "embank, gather, or arrange",
+        "order": 0,
+        "relevance": 0.56
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69ae66cde40679950d45224b",
+        "69ae66cde40679950d45224c",
+        "69ae66cde40679950d45224d"
+      ],
+      "synonyms": [
+        "embank",
+        "dike",
+        "endiguer",
+        "dijken",
+        "revet",
+        "mound",
+        "bulwark",
+        "entrench",
+        "pile",
+        "heap"
+      ],
+      "antonyms": [
+        "breach",
+        "dismantle",
+        "afgraven",
+        "scour",
+        "unmake"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "wiktionary"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5-nano",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 1975,
+        "completion_tokens": 2214,
+        "total_tokens": 4189,
+        "response_time_ms": 16789,
+        "last_generated": "2026-03-09T06:19:59.506000"
+      },
+      "examples": [
+        {
+          "text": "After last year's floods, the farmers banked the low fields with compacted soil to keep the river water out.",
+          "type": "generated"
+        },
+        {
+          "text": "Engineers banked the channel with reinforced clay and rock, redirecting peak flows and reducing downstream erosion by nearly forty percent.",
+          "type": "generated"
+        },
+        {
+          "text": "They banked the ancient moat higher around the estate overnight, a quiet, desperate gesture against the rising sea no one dared mention.",
+          "type": "generated"
+        }
+      ]
+    }
+  ],
+  "pronunciation": {
+    "created_at": "2026-03-09T06:18:41.693000",
+    "updated_at": "2026-03-09T06:18:41.693000",
+    "version": 1,
+    "id": "69ae667ae40679950d45222f",
+    "word_id": "69ae5675b43926b64e476405",
+    "phonetic": "BANK",
+    "ipa": "/ˈbæŋk/",
+    "audio_file_ids": [
+      "69ae667ce40679950d452230"
+    ],
+    "syllables": [],
+    "stress_pattern": null,
+    "model_info": null
+  },
+  "etymology": {
+    "text": "From Proto-Indo-European *bʰeg- (a reconstructed root), through a Proto-Germanic form reconstructed as *bankiz/*banki meaning “bench.” This gave rise to medieval Italian banca (bench, moneylender’s table) and Old French banque, from which English borrowed the financial sense “bank” (bench used by moneylenders) by the 15th century; the modern institution sense developed from that use.",
+    "origin_language": "Proto-Indo-European",
+    "root_words": [
+      "*bʰeg-",
+      "*bankiz",
+      "*banki",
+      "bank",
+      "banca",
+      "banque",
+      "banco"
+    ],
+    "first_known_use": "15th century",
+    "model_info": {
+      "name": "gpt-5-mini",
+      "confidence": 0.9,
+      "temperature": 0.7,
+      "max_tokens": 16384,
+      "top_p": 1.0,
+      "frequency_penalty": 0.0,
+      "presence_penalty": 0.0,
+      "generation_count": 1,
+      "prompt_tokens": 688,
+      "completion_tokens": 1376,
+      "total_tokens": 2064,
+      "response_time_ms": 55548,
+      "last_generated": "2026-03-09T06:19:37.242000"
+    }
+  },
+  "facts": [
+    "The English word \"bank\" for a financial institution comes from Old Italian banca “bench,” because medieval money-changers did business on benches; the phrase banca rotta (“broken bench”)—used when a money-changer’s bench was smashed by creditors—is the direct ancestor of the word \"bankrupt.\"",
+    "The financial \"bank\" and the river \"bank\" are etymological strangers: the money-related sense is an Italian loanword (attested in English from trade with Lombardy and Venice in the late medieval period), whereas river \"bank\" comes from a Germanic/Old Norse root meaning “ridge,” so their identical spelling is a later coincidence that fuels puns and headlines.",
+    "The familiar term \"bank holiday\" literally owes its name to banks: the UK’s Bank Holidays Act of 1871 fixed public holidays on days when banks were closed, so the operational schedule of banks helped shape modern public holiday calendars."
+  ]
+}

@@ -115,6 +115,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["live_api: tests that hit real AI APIs (deselect by default)"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -1,0 +1,198 @@
+{
+  "word": "en coulisses",
+  "language": "fr",
+  "definitions": [
+    {
+      "created_at": "2026-03-04T07:20:37.186000",
+      "updated_at": "2026-03-04T07:20:37.186000",
+      "version": 1,
+      "id": "69a7dd455475a6e39b65f52f",
+      "word_id": "69a7d8304ac863628303ac81",
+      "part_of_speech": "adverbial phrase",
+      "text": "Behind the scenes; conducted away from public view or official scrutiny—used of negotiations, decisions, or maneuvers handled privately or informally, especially in politics, diplomacy, or the performing arts.",
+      "meaning_cluster": {
+        "id": "en_coulisses_adverbial_phrase_behind_the_scenes",
+        "name": "Scenes",
+        "description": "behind the scenes, privately",
+        "order": 0,
+        "relevance": 0.8
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69a7dd835475a6e39b65f535",
+        "69a7dd835475a6e39b65f536",
+        "69a7dd835475a6e39b65f537"
+      ],
+      "synonyms": [
+        "behind the scenes",
+        "privately",
+        "secretly",
+        "behind closed doors",
+        "offstage",
+        "in the wings",
+        "in the shadows",
+        "en coulisses",
+        "entre bambalinas",
+        "off the record"
+      ],
+      "antonyms": [
+        "openly",
+        "in public",
+        "in the full light of day",
+        "au grand jour",
+        "on the record"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "synthesis"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 709,
+        "completion_tokens": 1258,
+        "total_tokens": 1967,
+        "response_time_ms": 23116,
+        "last_generated": "2026-03-04T07:20:37.185000"
+      },
+      "examples": [
+        {
+          "text": "Management settled the staffing dispute en coulisses before announcing any formal changes to the department.",
+          "type": "generated"
+        },
+        {
+          "text": "Faculty members negotiated the curriculum revisions en coulisses to avoid a divisive meeting among colleagues next month.",
+          "type": "generated"
+        },
+        {
+          "text": "At the gala, the director worked en coulisses to reconcile the star's demands and preserve the evening's overall success.",
+          "type": "generated"
+        }
+      ]
+    },
+    {
+      "created_at": "2026-03-04T07:20:37.347000",
+      "updated_at": "2026-03-04T07:20:37.347000",
+      "version": 1,
+      "id": "69a7dd455475a6e39b65f531",
+      "word_id": "69a7d8304ac863628303ac81",
+      "part_of_speech": "prepositional phrase",
+      "text": "In the wings of a theatre—offstage areas flanking the stage where performers and crew wait and prepare for entrances; denotes physical location adjacent to the playing area in stagecraft.",
+      "meaning_cluster": {
+        "id": "en_coulisses_prepositional_phrase_in_the_wings",
+        "name": "Wings",
+        "description": "in the theatre wings",
+        "order": 0,
+        "relevance": 0.5
+      },
+      "sense_number": null,
+      "word_forms": [],
+      "example_ids": [
+        "69a7dd835475a6e39b65f538",
+        "69a7dd835475a6e39b65f539",
+        "69a7dd835475a6e39b65f53a"
+      ],
+      "synonyms": [
+        "backstage",
+        "offstage",
+        "in the wings",
+        "dans les coulisses",
+        "behind the scenes",
+        "entre bambalinas",
+        "wing space",
+        "behind the velvet curtain",
+        "beneath the proscenium",
+        "in the shadowed wings"
+      ],
+      "antonyms": [
+        "onstage",
+        "centre stage",
+        "in the limelight",
+        "sur scène",
+        "on the playing area"
+      ],
+      "language_register": null,
+      "domain": null,
+      "region": null,
+      "usage_notes": [],
+      "grammar_patterns": [],
+      "collocations": [],
+      "transitivity": null,
+      "cefr_level": null,
+      "frequency_band": null,
+      "image_ids": [],
+      "dictionary_entry_id": null,
+      "providers": [
+        "synthesis"
+      ],
+      "source_definitions": [],
+      "model_info": {
+        "name": "gpt-5",
+        "confidence": 0.9,
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "top_p": 1.0,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "generation_count": 1,
+        "prompt_tokens": 707,
+        "completion_tokens": 1126,
+        "total_tokens": 1833,
+        "response_time_ms": 23275,
+        "last_generated": "2026-03-04T07:20:37.346000"
+      },
+      "examples": [
+        {
+          "text": "The manager handled the layoffs en coulisses to avoid alarming the staff before the official announcement.",
+          "type": "generated"
+        },
+        {
+          "text": "En coulisses, the research team negotiated authorship order and data access before submitting the collaborative paper.",
+          "type": "generated"
+        },
+        {
+          "text": "The mayor's popularity masked en coulisses alliances and backroom deals shaping policy, revealed only by investigative journalists.",
+          "type": "generated"
+        }
+      ]
+    }
+  ],
+  "pronunciation": {
+    "created_at": "2026-03-04T07:21:03.194000",
+    "updated_at": "2026-03-04T07:21:03.194000",
+    "version": 1,
+    "id": "69a7dd5f5475a6e39b65f532",
+    "word_id": "69a7d8304ac863628303ac81",
+    "phonetic": "ahn koo-LIZ",
+    "ipa": "/ɑ̃ ku.liˈz/",
+    "audio_file_ids": [
+      "69a7dd5f5475a6e39b65f533"
+    ],
+    "syllables": [],
+    "stress_pattern": null,
+    "model_info": null
+  },
+  "facts": [
+    "The expression comes from the French noun \"coulisse\"—originally the sliding side-panels or wings of a theater stage—so \"en coulisses\" literally meant \"in the wings,\" and French preserves the plural even when referring to a single backstage sphere.",
+    "Outside the theater, \"en coulisses\" is a journalistic and diplomatic staple for negotiations or influence conducted informally or privately, and English often borrows the phrase unchanged to add a slightly clandestine, theatrical nuance.",
+    "Across languages many cultures use theatrical metaphors for secrecy—German \"hinter den Kulissen\" (Kulissen is a cognate), Spanish \"entre bambalinas,\" etc.—because the stage has long been a natural metaphor for power, performance and behind-the-scenes maneuvering."
+  ]
+}
