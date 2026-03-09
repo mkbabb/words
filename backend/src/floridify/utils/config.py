@@ -26,8 +26,7 @@ class OpenAIConfig:
     """OpenAI API configuration."""
 
     api_key: str
-    model: str = "gpt-4o"
-    reasoning_effort: str = "high"
+    model: str = "gpt-5-mini"
     embedding_model: str = "text-embedding-3-large"
 
 
@@ -36,10 +35,8 @@ class AnthropicConfig:
     """Anthropic API configuration."""
 
     api_key: str
-    model: str = "claude-sonnet-4-5-20250929"
+    model: str = "claude-sonnet-4-6"
     max_tokens: int = 64000
-    extended_thinking: bool = False
-    thinking_budget_tokens: int = 32000
 
 
 @dataclass
@@ -283,8 +280,7 @@ class Config:
         models_data = data.get("models", {})
         openai_config = OpenAIConfig(
             api_key=openai_data["api_key"],
-            model=models_data.get("openai_model", "gpt-4o"),
-            reasoning_effort=models_data.get("reasoning_effort", "high"),
+            model=models_data.get("openai_model", "gpt-5-mini"),
             embedding_model=models_data.get("embedding_model", "text-embedding-3-large"),
         )
 
@@ -392,10 +388,8 @@ class Config:
             if "api_key" in anth_data and anth_data["api_key"]:
                 anthropic_config = AnthropicConfig(
                     api_key=anth_data["api_key"],
-                    model=anth_data.get("model", "claude-sonnet-4-5-20250929"),
+                    model=anth_data.get("model", "claude-sonnet-4-6"),
                     max_tokens=anth_data.get("max_tokens", 64000),
-                    extended_thinking=anth_data.get("extended_thinking", False),
-                    thinking_budget_tokens=anth_data.get("thinking_budget_tokens", 32000),
                 )
 
         # Load Google Cloud config (optional)

@@ -83,8 +83,6 @@ class AIProviderConfig(BaseModel):
     effort: ParsedEffort | None = None
     max_completion_tokens: int | None = None
     max_tokens: int | None = None
-    extended_thinking: bool | None = None
-    thinking_budget_tokens: int | None = None
 
 
 __all__ = [

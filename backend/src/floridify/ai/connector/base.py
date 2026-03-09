@@ -1,7 +1,7 @@
 """Multi-provider AI connector with structured outputs, validation retry, and caching.
 
-Ported from dns-analysis AI connector system. Supports OpenAI and Anthropic
-with task-based model selection, semaphore rate limiting, and budget tracking.
+Supports OpenAI (GPT-5 series) and Anthropic (Claude 4.5/4.6) with task-based
+model selection, semaphore rate limiting, and budget tracking.
 """
 
 from __future__ import annotations
@@ -70,11 +70,6 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
     @property
     def last_model_info(self) -> ModelInfo | None:
         return self._last_model_info
-
-    def _is_reasoning_model(self, model: str | None = None) -> bool:
-        """Check if model is a reasoning model (o-series, GPT-5 variants)."""
-        m = (model or self.model).lower()
-        return self.provider == Provider.OPENAI and m.startswith(("o1", "o3", "gpt-5"))
 
     @cached_api_call(
         ttl_hours=24.0,
@@ -222,13 +217,22 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         model_tier: ModelTier,
         max_tokens: int,
     ) -> tuple[T, dict[str, int]]:
-        """OpenAI structured outputs via beta.chat.completions.parse."""
+        """OpenAI structured outputs via beta.chat.completions.parse.
+
+        GPT-5 series API (March 2026):
+        - All GPT-5 models use "developer" role (not "system")
+        - All GPT-5 models use max_completion_tokens (not max_tokens)
+        - reasoning.effort defaults to "none" — no reasoning tokens, supports temperature
+        - Temperature errors when reasoning.effort != "none"
+        - We use effort=none for structured outputs (fast, cheap, temperature works)
+        """
         if not isinstance(self.client, AsyncOpenAI):
             raise TypeError(f"OpenAI call requires AsyncOpenAI client, got {type(self.client).__name__}")
 
         messages: list[dict[str, str]] = []
         if system_prompt:
-            role = "developer" if self._is_reasoning_model(model) else "system"
+            # GPT-5 and o-series use "developer" role; GPT-4 uses "system"
+            role = "developer" if model_tier.uses_developer_role else "system"
             messages.append({"role": role, "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
@@ -238,20 +242,15 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
             "response_format": response_model,
         }
 
-        # Token parameter selection based on model capabilities
+        # Token parameter: GPT-5 and o-series use max_completion_tokens
         if model_tier.uses_completion_tokens:
-            if model_tier.is_reasoning_model:
-                reasoning_multiplier = 30 if max_tokens <= 50 else 15
-                request_params["max_completion_tokens"] = min(
-                    16000, max(4000, max_tokens * reasoning_multiplier)
-                )
-            else:
-                request_params["max_completion_tokens"] = max_tokens
+            request_params["max_completion_tokens"] = max_tokens
         else:
             request_params["max_tokens"] = max_tokens
 
-        # Temperature (reasoning models don't use it)
-        if temperature is not None and not model_tier.is_reasoning_model:
+        # Temperature: supported for GPT-5 when reasoning.effort=none (our default)
+        # NOT supported for o-series models
+        if temperature is not None and not model_tier.is_o_series:
             request_params["temperature"] = temperature
 
         # Retry on transient API errors
@@ -302,7 +301,14 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         system_prompt: str | None,
         temperature: float | None,
     ) -> tuple[T, dict[str, int]]:
-        """Anthropic structured outputs via beta.messages.parse."""
+        """Anthropic structured outputs — GA as of Jan 2026.
+
+        Claude API (March 2026):
+        - Structured outputs: GA for Sonnet 4.5, Opus 4.5, Haiku 4.5 (no beta header)
+        - output_format moved to output_config.format
+        - Effort parameter: GA (no beta header)
+        - Uses messages.create() with output_config, not beta.messages.parse()
+        """
         if not isinstance(self.client, anthropic.AsyncAnthropic):
             raise TypeError(
                 f"Anthropic call requires AsyncAnthropic client, got {type(self.client).__name__}"
@@ -312,19 +318,21 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         if effort == OpenAIEffort.MINIMAL:
             raise ValueError("Anthropic does not support 'minimal' effort level")
 
+        # GA structured outputs: output_config.format replaces output_format
         params: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.kwargs.get("max_tokens", 8192),
             "system": system_prompt or "",
             "messages": [{"role": "user", "content": prompt}],
-            "betas": ["structured-outputs-2025-11-13", "effort-2025-11-24"],
-            "output_format": response_model,
-            "output_config": {"effort": effort.value},
+            "output_config": {
+                "format": response_model,
+                "effort": effort.value,
+            },
         }
         if temperature is not None:
             params["temperature"] = temperature
 
-        response = await self.client.beta.messages.parse(**params)  # type: ignore[arg-type]
+        response = await self.client.messages.create(**params)  # type: ignore[arg-type]
 
         if response.stop_reason == "refusal":
             raise ValueError("Anthropic refusal: content may not comply with guidelines")
@@ -332,9 +340,22 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         if response.stop_reason == "max_tokens":
             logger.warning("Anthropic response truncated (max_tokens reached)")
 
-        result = response.parsed_output
+        # Extract structured output from response content
+        result = None
+        for block in response.content:
+            if hasattr(block, "parsed"):
+                result = block.parsed
+                break
+
         if result is None:
-            raise ValueError("Anthropic returned None for parsed_output")
+            # Fallback: try to parse from text content
+            for block in response.content:
+                if block.type == "text":
+                    result = response_model.model_validate_json(block.text)
+                    break
+
+        if result is None:
+            raise ValueError("Anthropic returned no parseable content")
 
         assert isinstance(result, response_model), "Response type mismatch"
 
@@ -418,7 +439,6 @@ def get_ai_connector(
             api_key = config.openai.api_key
             model_name = config.openai.model
             logger.info(f"OpenAI model: {model_name}")
-            logger.info(f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}")
 
             client = AsyncOpenAI(
                 api_key=api_key,
