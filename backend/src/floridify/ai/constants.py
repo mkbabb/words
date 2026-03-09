@@ -78,13 +78,23 @@ class SynthesisComponent(Enum):
         }
 
 
-# Default counts for AI generation functions
+# Default counts for AI generation functions (used as fallbacks when adaptive counts unavailable)
 DEFAULT_SYNONYM_COUNT = 10
 DEFAULT_ANTONYM_COUNT = 5
 DEFAULT_FACT_COUNT = 3
 DEFAULT_EXAMPLE_COUNT = 3
 DEFAULT_SUGGESTION_COUNT = 10
 DEFAULT_USAGE_NOTE_COUNT = 3
+
+# Bounds for adaptive count system (see adaptive_counts.py)
+MIN_SYNONYM_COUNT = 2
+MAX_SYNONYM_COUNT = 12
+MIN_ANTONYM_COUNT = 1
+MAX_ANTONYM_COUNT = 8
+MIN_EXAMPLE_COUNT = 1
+MAX_EXAMPLE_COUNT = 4
+MIN_FACT_COUNT = 1
+MAX_FACT_COUNT = 4
 
 # Parameter ordering standard
 # Functions should follow this parameter order:
