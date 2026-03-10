@@ -18,7 +18,7 @@ All prompts follow the template defined in `00_TEMPLATE_deep_research.md` with:
 ### 1. [Semantic Encoding and ML Pipeline](01_semantic_encoding_ml_pipeline.md)
 **Focus**: WOTD semantic preference learning, FSQ/HVQ optimization, Matryoshka embeddings
 - Investigate advances beyond FSQ/VQ-VAE for discrete representation
-- Research embedding models surpassing GTE-Qwen2 (MTEB 67.3)
+- Research embedding models surpassing Qwen3-0.6B
 - Explore quantization achieving >97% compression with <5% quality loss
 - Optimize 4-stage pipeline into fewer stages
 
@@ -130,7 +130,7 @@ All prompts expect the following research approach:
 
 ## Notes
 
-- All prompts target 2023-2025 research and technologies
+- All prompts target 2023-2026 research and technologies
 - Focus on production-ready, not experimental solutions
 - Maintain Python ecosystem where possible
 - Consider startup/small team constraints
@@ -139,5 +139,5 @@ All prompts expect the following research approach:
 ---
 
 Generated: January 2025
-Last Updated: January 2025
+Last Updated: March 2026
 Total Prompts: 10+ specialized research areas

@@ -30,7 +30,7 @@ AI creates academically rigorous flashcards from synthesized dictionary definiti
 ## Deck Management
 
 **File Format**: .apkg files compatible with Anki desktop and mobile
-**Styling**: Claude-inspired CSS for professional presentation
+**Styling**: Apple HIG-influenced CSS for professional presentation
 **Organization**: Word lists exported as themed decks with metadata
 
 ### Export Process
@@ -48,7 +48,7 @@ AI creates academically rigorous flashcards from synthesized dictionary definiti
 
 ## Styling System
 
-**Claude Theme**: Professional typography with subtle gradients
+**Apple HIG Theme**: Professional typography with subtle gradients
 **Responsive**: Works across Anki platforms
 **Typography**: Optimized for readability and academic presentation
 

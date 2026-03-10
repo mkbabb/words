@@ -74,11 +74,12 @@ One `DictionaryEntry` per provider per word. The synthesized entry uses `provide
 
 ## Providers
 
-Six dictionary providers, created via `create_connector()` factory (`providers/factory.py`):
+Seven dictionary providers, created via `create_connector()` factory (`providers/factory.py`):
 
 | Provider | Type | Notes |
 |----------|------|-------|
 | Wiktionary | Scraper (MediaWiki API + HTML) | Default, no auth |
+| Wiktionary Wholesale | Bulk scraper (full dump) | Offline corpus building |
 | Apple Dictionary | Local (macOS pyobjc) | Auto-added on Darwin |
 | Oxford | API | Requires `app_id` + `api_key` |
 | Merriam-Webster | API | Requires `api_key` |
@@ -87,7 +88,7 @@ Six dictionary providers, created via `create_connector()` factory (`providers/f
 
 Plus two virtual providers: `AI_FALLBACK` (generated when all providers fail) and `SYNTHESIS` (the merged output).
 
-Rate limiting is handled by `AdaptiveRateLimiter` (`providers/utils.py`)—exponential backoff on errors, speed-up after consecutive successes, Retry-After header support.
+Rate limiting is handled by `AdaptiveRateLimiter` (`providers/rate_limiting.py`)—exponential backoff on errors, speed-up after consecutive successes, Retry-After header support.
 
 ## Lookup Pipeline (`core/lookup_pipeline.py`)
 
@@ -136,13 +137,13 @@ All GPT-5 series. Task complexity determines which model handles each request:
 
 | Tier | Model | Tasks |
 |------|-------|-------|
-| HIGH | gpt-5 | Definition synthesis, clustering, suggestions, synthetic corpus, literature analysis |
+| HIGH | gpt-5.4 | Definition synthesis, clustering, suggestions, synthetic corpus, literature analysis |
 | MEDIUM | gpt-5-mini | Synonyms, examples, dedup, etymology, Anki cards, collocations, word forms, antonyms |
 | LOW | gpt-5-nano | CEFR, frequency, register, domain, pronunciation, usage notes, grammar patterns |
 
 Temperature routing: reasoning models get `None` (model decides). Creative tasks (facts, examples, suggestions): 0.8. Classification tasks (CEFR, frequency, register): 0.3. Default: 0.7.
 
-The `OpenAIConnector` default model is `gpt-5-nano` (`ai/connector.py`). `get_model_for_task()` overrides per call.
+The `AIConnector` supports both OpenAI (GPT-5 series) and Anthropic (Claude) via a unified interface. Default model is `gpt-5-nano` (`ai/connector/`). `get_model_for_task()` overrides per call.
 
 ## Search (`search/core.py`)
 
@@ -178,7 +179,7 @@ Runtime and development both target hosted MongoDB (`mbabb.friday.institute`) wi
 
 ## Anki Export (`anki/`)
 
-`AnkiDeckGenerator` produces `.apkg` files from synthesized entries using genanki. Card types: fill-in-the-blank, multiple choice ("best describes"), definition-to-word, word-to-definition. AI generates card content (questions, distractors) via `OpenAIConnector`. Card styling uses Apple HIG-influenced CSS—system font stack, subdued palette (`#1d1d1f`, `#86868b`, `#007aff`), 12px border radius.
+`AnkiDeckGenerator` produces `.apkg` files from synthesized entries using genanki. Card types: fill-in-the-blank, multiple choice ("best describes"), definition-to-word, word-to-definition. AI generates card content (questions, distractors) via `AIConnector`. Card styling uses Apple HIG-influenced CSS—system font stack, subdued palette (`#1d1d1f`, `#86868b`, `#007aff`), 12px border radius.
 
 ## Configuration
 

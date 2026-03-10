@@ -17,7 +17,7 @@ uv run ./scripts/floridify lookup word "en coulisse"
 - Proper multi-word phrase handling and bolding
 
 **Options**:
-- `--provider`: wiktionary (default), oxford, dictionary_com
+- `--provider`: wiktionary (default), oxford, merriam_webster, free_dictionary, wordhippo, apple_dictionary
 - `--semantic`: Force semantic search only
 - `--no-ai`: Skip AI synthesis
 
@@ -271,7 +271,7 @@ uv run ./scripts/floridify anki info
 
 **Features**:
 - GRE-level academic rigor with strategic question design
-- Clean Apple/Tesla-inspired styling with professional typography
+- Clean Apple HIG-influenced styling with professional typography
 - Two card types: fill-in-blank context and multiple choice definitions
 - AI-generated content using structured OpenAI responses
 - Beautiful HTML preview alongside .apkg export

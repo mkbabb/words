@@ -1,16 +1,20 @@
 # corpus/
 
-Vocabulary management. UUID-based tree hierarchy, per-resource locking, 9 parsers.
+Vocabulary management. UUID-based tree hierarchy, per-resource locking, parsers.
 
 ```
 corpus/
-├── core.py (744)           # Corpus: UUID hierarchy, vocabulary indices
-├── manager.py (1,364)      # TreeCorpusManager: hierarchy ops, aggregation
-├── parser.py (268)         # 9 parsers (text, freq, JSON, CSV, phrasal verbs, etc.)
-├── models.py (37)          # CorpusType/CorpusSource enums
-├── utils.py (53)           # get_vocabulary_hash() for cache isolation
-├── language/core.py (377)  # LanguageCorpus: add/remove/update sources
-└── literature/core.py (358) # LiteratureCorpus: add/remove/update works
+├── core.py                 # Corpus: UUID hierarchy, vocabulary indices
+├── manager.py              # TreeCorpusManager: hierarchy ops, per-resource locking
+├── crud.py                 # CRUD operations
+├── tree.py                 # Tree traversal, hierarchy operations
+├── aggregation.py          # MongoDB aggregation queries
+├── semantic_policy.py      # Semantic search policies
+├── parser.py               # Parsers (text, freq, JSON, CSV, phrasal verbs, etc.)
+├── models.py               # CorpusType/CorpusSource enums
+├── utils.py                # get_vocabulary_hash() for cache isolation
+├── language/core.py        # LanguageCorpus: add/remove/update sources
+└── literature/core.py      # LiteratureCorpus: add/remove/update works
 ```
 
 ## Corpus Model
@@ -19,7 +23,7 @@ corpus/
 
 ## TreeCorpusManager
 
-Recursive aggregation across parent -> child hierarchy. Per-resource locking. N+1 query fix. Cascade deletion. CRUD with vocabulary diff tracking.
+Recursive aggregation across parent → child hierarchy. Per-resource locking. N+1 query fix. Cascade deletion. CRUD with vocabulary diff tracking.
 
 ## Parsers
 

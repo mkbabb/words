@@ -39,14 +39,14 @@ floridify scrape apple-dictionary --language en --session-name "test-2025"
 
 ## Development Scripts
 
-### `dev`
+### `dev.sh`
 **Development environment orchestrator**
 
 ```bash
-./scripts/dev                         # Start Docker containers
-./scripts/dev --native               # Run natively without Docker  
-./scripts/dev --logs                 # Start and follow logs
-./scripts/dev --build                # Rebuild Docker images
+./scripts/dev.sh                     # Start Docker containers
+./scripts/dev.sh --native            # Run natively without Docker
+./scripts/dev.sh --logs              # Start and follow logs
+./scripts/dev.sh --build             # Rebuild Docker images
 ```
 
 ## Performance
@@ -64,6 +64,6 @@ words/
 ├── frontend/          # Vue 3 TypeScript SPA  
 └── scripts/           # Installation & dev tools
     ├── install-floridify    # Complete setup script
-    ├── dev                  # Development orchestrator
+    ├── dev.sh               # Development orchestrator
     └── README.md           # This file
 ```

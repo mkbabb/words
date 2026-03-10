@@ -1,23 +1,37 @@
 # ai/
 
-OpenAI integration. 30 async methods in connector, 25 synthesis functions, 3-tier model selection, batch processing.
+OpenAI integration. AIConnector with mixin-based methods, synthesis pipeline, 3-tier model selection, batch processing.
 
 ```
 ai/
-├── connector.py (1,209)         # OpenAIConnector: 30 async + 3 sync methods
-├── synthesis_functions.py (1,152) # 25 top-level async synthesis/generation functions
-├── synthesizer.py (542)         # DefinitionSynthesizer: dedup->cluster->enhance
-├── models.py (544)              # 54 Pydantic response/request models
-├── model_selection.py (155)     # 3-tier routing: ModelComplexity -> ModelTier
-├── batch_processor.py (362)     # OpenAI Batch API via context manager
-├── prompt_manager.py (201)      # Jinja2 template loading
-├── constants.py (122)           # SynthesisComponent enum (17 values), defaults
-└── prompts/                     # 27 Markdown templates
-    ├── assess/ (7)              # cefr, collocations, domain, frequency, grammar_patterns, regional_variants, register
-    ├── generate/ (3)            # examples, facts, word_forms
-    ├── synthesize/ (6)          # antonyms, deduplicate, definitions, etymology, pronunciation, synonyms
-    ├── misc/ (8)                # anki_best_describes, anki_fill_blank, lookup, meaning_extraction, query_validation, suggestions, usage_note_generation, word_suggestion
-    └── wotd/ (3)                # literature_analysis, synthetic_corpus, word_of_the_day
+├── connector/                  # AIConnector: async interface to OpenAI
+│   ├── __init__.py
+│   ├── base.py                 # AIConnector class (mixes in all method groups)
+│   ├── config.py               # Provider enum, effort settings
+│   ├── synthesis.py            # Synthesis-specific methods
+│   ├── generation.py           # Content generation methods
+│   ├── assessment.py           # Classification/assessment methods
+│   └── suggestions.py          # Word suggestion methods
+├── synthesis/                  # Synthesis pipeline functions
+│   ├── __init__.py
+│   ├── orchestration.py        # Parallel enhancement, clustering
+│   ├── word_level.py           # Pronunciation, etymology, word forms, facts
+│   └── definition_level.py     # 11 per-definition enhancement functions
+├── synthesizer.py              # DefinitionSynthesizer: dedup→cluster→enhance
+├── models.py                   # AI response/request Pydantic models
+├── model_selection.py          # 3-tier routing: ModelComplexity → ModelTier
+├── batch_processor.py          # OpenAI Batch API via context manager
+├── prompt_manager.py           # Jinja2 template loading
+├── constants.py                # SynthesisComponent enum (17 values), defaults
+├── adaptive_counts.py          # Dynamic enhancement counts
+├── tournament.py               # Tournament-style word ranking
+└── prompts/                    # Markdown templates
+    ├── assess/                 # cefr, collocations, domain, frequency, grammar_patterns, regional_variants, register
+    ├── generate/               # examples, facts, word_forms
+    ├── synthesize/             # antonyms, deduplicate, definitions, etymology, pronunciation, synonyms
+    ├── misc/                   # anki_best_describes, anki_fill_blank, lookup, meaning_extraction, query_validation, rank_candidates, suggestions, usage_note_generation, word_suggestion
+    ├── shared/                 # Shared prompt components
+    └── wotd/                   # literature_analysis, synthetic_corpus, word_of_the_day
 ```
 
 ## SynthesisComponent Enum (17 values)
@@ -32,15 +46,15 @@ Utilities: `DEFINITION_TEXT`, `CLUSTER_DEFINITIONS`
 
 | Tier | Model | Example Tasks |
 |------|-------|---------------|
-| HIGH | gpt-5 | synthesize_definitions, suggest_words, extract_cluster_mapping, generate_synthetic_corpus, literature_analysis |
-| MEDIUM | gpt-5-mini | generate_synonyms, generate_examples, synthesize_etymology, deduplicate_definitions, generate_antonyms, lookup_word, text_generation |
-| LOW | gpt-5-nano | assess_cefr_level, assess_frequency, classify_register, classify_domain, generate_pronunciation, validate_query |
+| HIGH | gpt-5.4 | synthesize_definitions, suggest_words, extract_cluster_mapping, generate_synthetic_corpus, literature_analysis |
+| MEDIUM | gpt-5-mini | generate_synonyms, generate_facts, generate_examples, synthesize_etymology, deduplicate_definitions, generate_collocations, generate_word_forms, generate_antonyms, generate_anki_*, generate_suggestions, lookup_word, literature_augmentation, text_generation |
+| LOW | gpt-5-nano | assess_cefr_level, assess_frequency, classify_register, classify_domain, generate_pronunciation, generate_usage_notes, validate_query, identify_grammar_patterns, identify_regional_variants, rank_candidates |
 
-Additional `ModelTier` values: `O3_MINI`, `O1_MINI`, `GPT_4O`, `GPT_4O_MINI` (legacy). Reasoning models (o-series, gpt-5*) use `max_completion_tokens` instead of `max_tokens` and do not accept `temperature`.
+Additional `ModelTier` values: `O3_MINI`, `GPT_4O`, `GPT_4O_MINI` (legacy). GPT-5 models use `max_completion_tokens` instead of `max_tokens` and use `"developer"` role instead of `"system"`. Temperature's only supported when `reasoning.effort=none`.
 
 ## Synthesis Pipeline
 
-Provider data -> `deduplicate_definitions()` -> `cluster_definitions()` -> parallel `asyncio.gather()`:
+Provider data → `deduplicate_definitions()` → `cluster_definitions()` → parallel `asyncio.gather()`:
 - `synthesize_definition_text()`, `synthesize_pronunciation()`, `synthesize_etymology()`, `generate_facts()`
 - `enhance_definitions_parallel()` (sub-tasks: synonyms, examples, antonyms, CEFR, frequency, register, domain, grammar, collocations, usage notes, regional variants, definition text)
 
@@ -48,10 +62,10 @@ Dedup before cluster reduces token input.
 
 ## Batch Processing
 
-`batch_synthesis(connector)` async context manager: patches `_make_structured_request()` to collect requests into `BatchCollector` -> JSONL -> OpenAI Batch API -> poll for completion (max 1h timeout, configurable `check_interval`). `BatchExecutor` handles upload, polling, result download. Futures resolve when batch completes.
+`batch_synthesis(connector)` async context manager: patches `_make_structured_request()` to collect requests into `BatchCollector` → JSONL → OpenAI Batch API → poll for completion (max 1h timeout, configurable `check_interval`). `BatchExecutor` handles upload, polling, result download. Futures resolve when batch completes.
 
 Classes: `AIBatchRequest`, `BatchCollector`, `BatchExecutor`, `BatchContext`.
 
 ## Structured Outputs
 
-All API calls use Pydantic `response_format` for type-safe structured outputs. 54 response/request models in `models.py`. `AIResponseBase` is the common base class for AI responses.
+All API calls use Pydantic `response_format` for type-safe structured outputs. `AIResponseBase` is the common base class for AI responses.

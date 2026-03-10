@@ -142,7 +142,7 @@ docker-compose \
 Add to your nginx site config:
 ```nginx
 server {
-    server_name floridify.com;
+    server_name mbabb.friday.institute;
     
     # PWA essentials
     location /manifest.json {
@@ -173,7 +173,7 @@ server {
 PWAs require HTTPS:
 ```bash
 # Using Let's Encrypt
-sudo certbot --nginx -d floridify.com -d www.floridify.com
+sudo certbot --nginx -d mbabb.friday.institute -d www.mbabb.friday.institute
 ```
 
 ## Monitoring & Maintenance
@@ -181,8 +181,8 @@ sudo certbot --nginx -d floridify.com -d www.floridify.com
 ### Health Checks
 ```bash
 # Check all services
-curl https://floridify.com/api/v1/health
-curl https://floridify.com/api/v1/push/health
+curl https://mbabb.friday.institute/api/v1/health
+curl https://mbabb.friday.institute/api/v1/push/health
 
 # Check Docker containers
 docker ps

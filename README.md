@@ -1,26 +1,32 @@
 # Floridify
 
-AI-enhanced dictionary and word-collecting tool. Fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage.
+AI-enhanced dictionary that fetches from a panoply of providers in parallel, deduplicates and clusters definitions by semantic sense, then synthesizes the result with pronunciation, etymology, and real-world usage examples.
 
 [mbabb.friday.institute/words/](https://mbabb.friday.institute/words/)
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Architecture](#architecture)
+- [CLI](#cli)
+- [API](#api)
+- [Stack](#stack)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Why](#why)
 
 ## Quick Start
 
 ```bash
 # Docker (recommended)
-git clone <repo-url> && cd floridify
-./scripts/dev              # all services, hot reload
+git clone <repo-url> && cd words
+./scripts/dev.sh              # all services, hot reload
 # Frontend: http://localhost:3000
 # API: http://localhost:8000/docs
 
 # Manual (Python 3.12+, Node 20+)
-cd backend
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv && source .venv/bin/activate && uv sync
-cp auth/config.toml.example auth/config.toml  # add your OpenAI key
-uv run scripts/run_api.py
-
-# Frontend (separate terminal)
+cd backend && uv sync && uv run scripts/run_api.py
 cd frontend && npm install && npm run dev
 
 # CLI
@@ -30,13 +36,39 @@ floridify lookup perspicacious
 
 ## Features
 
-Synthesis runs through a three-tier GPT-5 pipeline (Nano/Mini/Full) that deduplicates definitions, clusters them by meaning, and enhances each cluster with synonyms, examples, CEFR levels, and collocations—all concurrently via `asyncio.gather`.
+**[AI Synthesis](docs/synthesis.md)**: 5-stage pipeline—dedup, cluster, synthesize, enhance, version—through a 3-tier GPT-5 routing (5.4/Mini/Nano) that produces one coherent entry from all provider data. Definitions get synonyms, examples, CEFR levels, collocations, and more via parallel enhancement.
 
-Search cascades with early termination: exact match via marisa-trie and Bloom filter (<1ms), fuzzy via RapidFuzz for typos (10–50ms), semantic via FAISS HNSW with Qwen3-0.6B embeddings (50–200ms). Three tiers of caching sit behind it all—in-memory LRU, DiskCache with ZSTD compression, and content-addressable MongoDB with SHA-256 versioning.
+**[Search Cascade](docs/search.md)**: Exact match via marisa-trie, fuzzy via RapidFuzz for typos, semantic via FAISS HNSW with Qwen3-0.6B embeddings. Early termination on exact hit; quality gate before semantic fallback.
 
-Learning tools include SM-2 spaced repetition with mastery progression, Anki `.apkg` export, word lists with frequency tracking, and vocabulary suggestions. The web interface is a mode-based SPA (lookup, wordlist, word-of-the-day) with SSE streaming for real-time progress, dark mode with paper textures, and offline PWA support.
+**[Versioning & Caching](docs/versioning.md)**: Content-addressable versioning (SHA-256) with 3-tier cache—in-memory LRU, DiskCache+ZSTD, MongoDB with delta compression. TimeMachine UI shows inline diffs between versions.
 
-The CLI gives you the same lookup pipeline in the terminal with Rich formatting, 0.07s startup via lazy imports, and ZSH autocomplete:
+**Learning Tools**: SM-2 spaced repetition with mastery progression (Bronze→Silver→Gold), Anki `.apkg` export with AI-generated fill-in-the-blank and multiple-choice cards, word lists with frequency tracking.
+
+**Frontend**: Mode-based Vue 3.5 SPA (lookup, wordlist, word-of-the-day) with SSE streaming, dark mode, paper textures, Clerk authentication, and offline PWA support.
+
+## Architecture
+
+```
+User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesis → Cache → Response
+```
+
+Seven dictionary providers, created via [`create_connector()`](backend/src/floridify/providers/factory.py):
+
+| Provider | Type | Auth |
+|----------|------|------|
+| [Wiktionary](backend/src/floridify/providers/dictionary/scraper/wiktionary.py) | Scraper | None |
+| [Apple Dictionary](backend/src/floridify/providers/dictionary/local/apple_dictionary.py) | Local (macOS) | None |
+| [Oxford](backend/src/floridify/providers/dictionary/api/oxford.py) | API | `app_id` + `api_key` |
+| [Merriam-Webster](backend/src/floridify/providers/dictionary/api/merriam_webster.py) | API | `api_key` |
+| [Free Dictionary](backend/src/floridify/providers/dictionary/api/free_dictionary.py) | API | None |
+| [WordHippo](backend/src/floridify/providers/dictionary/scraper/wordhippo.py) | Scraper | None |
+| AI Synthesis | Generated | OpenAI key |
+
+Plus two literature providers ([Gutenberg](backend/src/floridify/providers/literature/api/gutenberg.py), [Internet Archive](backend/src/floridify/providers/literature/api/internet_archive.py)) for literary example sourcing.
+
+See [docs/architecture.md](docs/architecture.md) for the full system design.
+
+## CLI
 
 ```bash
 floridify lookup perspicacious             # full definition
@@ -45,46 +77,33 @@ floridify search serendipity               # multi-method cascade
 floridify search --semantic happy          # semantic only
 floridify wordlist create my-words word1 word2 word3
 floridify wordlist review my-words --due
+floridify anki export my-words             # Anki flashcard deck
 ```
 
 ## API
 
-121 endpoints. Full spec at `http://localhost:8000/docs`. A few essentials:
+Full spec at `http://localhost:8000/docs`.
 
-```bash
+```
 GET  /api/v1/lookup/{word}              # full definition
 GET  /api/v1/lookup/{word}/stream       # SSE streaming
 GET  /api/v1/search?q={query}           # multi-method search
 GET  /api/v1/search/{query}/suggestions # autocomplete
-POST /api/v1/ai/synthesize/*            # AI generation endpoints
+POST /api/v1/ai/synthesize/*            # AI generation
 GET  /api/v1/wordlist/{id}/due          # due words for review
 ```
 
 ## Stack
 
-**Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB 7.0, Motor (async), UV
-**AI/ML**: OpenAI GPT-5 (3-tier), sentence-transformers (Qwen3-0.6B), FAISS
-**Search**: marisa-trie, RapidFuzz, FAISS HNSW, Bloom filter
-**Cache**: OrderedDict LRU, DiskCache + ZSTD, MongoDB versioned (SHA-256)
-**Frontend**: Vue 3.5, TypeScript 5.9 strict, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4.2, Vite 7.3
-**Infra**: Docker multi-stage, self-hosted (mbabb.friday.institute:1022, behind VPN), nginx
-
-## Development
-
-```bash
-# Backend
-cd backend
-ruff check --fix && ruff format    # lint + format
-mypy src/ --strict                 # type check
-pytest tests/ -v                   # ~720 tests, 80%+ coverage
-
-# Frontend
-cd frontend
-npm run type-check                 # TypeScript strict
-prettier --write .                 # format
-```
-
-Real MongoDB per test, real FAISS indices—only external APIs mocked. See [`backend/CLAUDE.md`](backend/CLAUDE.md) and [`frontend/CLAUDE.md`](frontend/CLAUDE.md) for the full technical map.
+| Layer | Technologies |
+|-------|-------------|
+| Backend | FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV |
+| AI | OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, sentence-transformers (Qwen3-0.6B), FAISS |
+| Search | marisa-trie, RapidFuzz, FAISS HNSW, Bloom filter |
+| Cache | OrderedDict LRU, DiskCache + ZSTD, MongoDB versioned (SHA-256) |
+| Frontend | Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk |
+| TTS | KittenTTS (English), Kokoro-ONNX (8 languages) |
+| Infra | Docker multi-stage, nginx, self-hosted behind VPN |
 
 ## Configuration
 
@@ -95,35 +114,50 @@ BACKEND_PORT=8000
 FRONTEND_PORT=3000
 ```
 
-API keys (`backend/auth/config.toml`, not in git):
+API keys (`backend/auth/config.toml`, not in git—see [`config.example.toml`](config.example.toml)):
 ```toml
 [openai]
 api_key = "sk-..."
-model = "gpt-5"
-
-[embedding]
-model = "Qwen/Qwen3-Embedding-0.6B"
 
 [database]
-runtime_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
-test_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/test_floridify?tls=true"
-runtime_tls_required = true
+runtime_url = "mongodb://user:pass@host:27017/floridify"
+test_url = "mongodb://user:pass@host:27017/test_floridify"
+
+[models]
+openai_model = "gpt-5-mini"
 ```
+
+## Development
+
+```bash
+# Backend
+cd backend
+ruff check --fix && ruff format    # lint + format
+mypy src/ --strict                 # type check
+pytest tests/ -v                   # tests
+
+# Frontend
+cd frontend
+npm run type-check                 # TypeScript strict
+prettier --write .                 # format
+```
+
+Real MongoDB per test, real FAISS indices—only external APIs mocked. See [`backend/CLAUDE.md`](backend/CLAUDE.md) and [`frontend/CLAUDE.md`](frontend/CLAUDE.md) for the full technical map.
 
 ## Deployment
 
 ```bash
-./scripts/deploy    # SSH to server, sync secrets, build, deploy, health check
+./scripts/deploy.sh    # SSH to server, sync secrets, build, deploy, health check
 ```
 
-Server: `mbabb@mbabb.friday.institute -p 1022` (behind VPN). No CI/CD — deploy manually.
+Server: `mbabb@mbabb.friday.institute -p 1022` (behind VPN). No CI/CD—deploy manually.
 
 ## Why
 
-I've been collecting and cataloguing words for years—2,100+ entries and counting. An expanded lexicon is to the interlocutor as an expanded palette is to a painter: it lets you say precisely what you mean. Existing dictionaries scatter their definitions across sources and order them by historical accident; Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can actually learn from. Spaced repetition and Anki export so the words stick.
-
-Architecture docs, module guides, and technical references live in [`CLAUDE.md`](CLAUDE.md), the per-module `CLAUDE.md` files, and [`docs/`](docs/).
+An expanded lexicon is to the interlocutor as an expanded palette is to the painter: it lets you say precisely what you mean. Existing dictionaries scatter definitions across sources and order them by historical accident. Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can learn from.
 
 ---
 
-**License**: MIT | **Author**: Mike Babb (mike@babb.dev) | **Production**: [mbabb.friday.institute/words/](https://mbabb.friday.institute/words/)
+[Architecture](docs/architecture.md) · [AI Synthesis](docs/synthesis.md) · [Search](docs/search.md) · [Versioning](docs/versioning.md) · [CLI](docs/cli.md) · [CLAUDE.md](CLAUDE.md)
+
+**License**: MIT · **Author**: Mike Babb · **Production**: [mbabb.friday.institute/words/](https://mbabb.friday.institute/words/)

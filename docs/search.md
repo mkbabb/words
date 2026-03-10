@@ -1,105 +1,84 @@
-# Search Engine
+# Search
 
-Multi-method search with FAISS acceleration for intelligent word discovery.
+4-method cascade with early termination and quality gating. Exact match via marisa-trie, prefix via trie traversal, fuzzy via RapidFuzz dual-scorer, semantic via FAISS HNSW with Qwen3-0.6B embeddings.
 
-## Core Engine
+## Table of Contents
 
-**SearchEngine** (`search/core.py`) provides unified search interface with method cascade: exact → fuzzy → semantic → AI fallback.
+- [Cascade](#cascade)
+- [Search Methods](#search-methods)
+- [Quality Gate](#quality-gate)
+- [FAISS Index Selection](#faiss-index-selection)
+- [Hot-Reload](#hot-reload)
+- [Dedup & Ranking](#dedup--ranking)
+- [Key Files](#key-files)
 
-```python
-class SearchEngine:
-    def __init__(
-        languages: list[Language] | None = None,
-        min_score: float = 0.6,
-        enable_semantic: bool = True,
-    )
+## Cascade
+
+In SMART mode ([`Search`](../backend/src/floridify/search/core.py)), methods run in order with early termination:
+
+```
+Query → Exact → if no match → Prefix → if no match → Fuzzy
+  → if <33% high-quality → Semantic → Deduplicate → Top N
 ```
 
-**SearchResult** model:
-```python
-class SearchResult(BaseModel):
-    word: str              # Matched word or phrase
-    score: float           # Relevance score (0.0-1.0)
-    method: SearchMethod   # Search method used
-    is_phrase: bool        # Multi-word expression flag
-```
+Exact match terminates immediately. Other modes (`EXACT`, `FUZZY`, `SEMANTIC`) bypass the cascade and run a single method.
 
 ## Search Methods
 
-### Exact Search (`search/trie.py`)
-- Hash-based O(1) word lookup
-- Trie structure for prefix matching
-- Case-insensitive with normalization
+| Method | Implementation | Notes |
+|--------|---------------|-------|
+| Exact | [`TrieSearch`](../backend/src/floridify/search/trie.py) + [`BloomFilter`](../backend/src/floridify/search/bloom.py) | marisa-trie O(m) lookup, Bloom filter for fast negative |
+| Prefix | [`TrieSearch`](../backend/src/floridify/search/trie.py) | Trie prefix traversal |
+| Fuzzy | [`FuzzySearch`](../backend/src/floridify/search/fuzzy.py) | RapidFuzz dual-scorer: `WRatio` + `token_set_ratio`, length-aware scoring |
+| Semantic | [`SemanticSearch`](../backend/src/floridify/search/semantic/core.py) | FAISS HNSW, Qwen3-0.6B embeddings (1024D) |
 
-### Fuzzy Search (`search/fuzzy.py`)
-**Algorithms**: Levenshtein, Jaro-Winkler, Soundex
-**Features**: Length-aware scoring, phrase boundary detection, adaptive algorithm selection
+## Quality Gate
 
-### Semantic Search (`search/semantic.py`)
-**Technology**: FAISS + OpenAI embeddings (text-embedding-3-small)
-**Features**: Conceptual similarity, timeout protection, batch processing
+Before falling through to semantic search, the cascade checks whether fuzzy results are sufficient. If ≥33% of fuzzy results score ≥0.7, semantic search is skipped. This prevents expensive embedding computation when fuzzy matching already found good candidates.
 
-### Hybrid Search
-Combines all methods with score normalization and deduplication.
+## FAISS Index Selection
 
-## Performance
+5 tiers selected by corpus size ([`semantic/constants.py`](../backend/src/floridify/search/semantic/constants.py)):
 
-**Initialization**:
-- Cold start: ~3-5 seconds
-- Warm start: ~200-300ms
+| Corpus Size | Index | Notes |
+|-------------|-------|-------|
+| <10k | `IndexFlatL2` | Brute-force exact search |
+| 10k–50k | `IVF-Flat` | `nlist=max(64, sqrt(n))`, `nprobe=nlist/4` |
+| 50k–100k | `ScalarQuantizer` INT8 | 4x compression |
+| 100k–200k | HNSW | `M=32`, `efConstruction=200`, `efSearch=64` (configurable via env) |
+| >200k | `OPQ+IVF-PQ` | OPQ rotation + product quantization |
 
-**Search Times**:
-- Exact: <1ms
-- Prefix: <5ms  
-- Fuzzy: 10-50ms
-- Semantic: 50-200ms
+HNSW config via environment variables: `FLORIDIFY_USE_HNSW`, `FLORIDIFY_HNSW_M`, `FLORIDIFY_HNSW_EF_CONSTRUCTION`, `FLORIDIFY_HNSW_EF_SEARCH`.
 
-**Memory**: ~150MB per language
+**Embedding model**: Default `Qwen/Qwen3-Embedding-0.6B` (1024D, supports Matryoshka dimensions 32–1024). Model catalog in [`semantic/constants.py`](../backend/src/floridify/search/semantic/constants.py) includes Qwen3-4B, Qwen3-8B, BAAI/bge-m3, all-MiniLM-L6-v2, gte-Qwen2-1.5B.
 
-## Multi-Language Support
+## Hot-Reload
+
+[`SearchEngineManager`](../backend/src/floridify/core/search_pipeline.py) polls `vocabulary_hash` every 30 seconds. When the hash changes (new words added to corpus), it rebuilds the search index in the background and performs an atomic swap of the `Search` instance. No downtime during reindex.
+
+## Dedup & Ranking
+
+When multiple methods return the same word, [`METHOD_PRIORITY`](../backend/src/floridify/search/core.py) determines which result to keep:
 
 ```python
-class Language(Enum):
-    ENGLISH = "en"
-    FRENCH = "fr"
-    # ...
+METHOD_PRIORITY = {EXACT: 4, PREFIX: 3, SEMANTIC: 2, FUZZY: 1}
+METHOD_SORT_BONUS = {EXACT: 0.03, PREFIX: 0.02, SEMANTIC: 0.01, FUZZY: 0.0}
 ```
 
-**PhraseNormalizer** (`search/phrase.py`) handles multi-word expressions with whitespace standardization and punctuation normalization.
+Sort bonuses are tiebreakers only—a fuzzy match at 0.95 still beats a semantic match at 0.80.
 
-## CLI Integration
+## Key Files
 
-```bash
-uv run ./scripts/floridify search init      # Initialize indices
-uv run ./scripts/floridify search word cogn # Search for matches
-```
-
-## Configuration
-
-```toml
-[search]
-min_score = 0.6
-enable_semantic = true
-languages = ["en", "fr"]
-
-[search.fuzzy]
-levenshtein_threshold = 0.8
-max_distance = 3
-
-[search.semantic]
-timeout_seconds = 5.0
-similarity_threshold = 0.7
-```
-
-## Error Handling
-
-**Timeout Protection**: 5-second semantic search timeout with fuzzy fallback
-**Graceful Degradation**: Semantic → Fuzzy → Exact → Empty results
-**FAISS Recovery**: Automatic index rebuilding on corruption
-
-## Caching
-
-**Multi-level**:
-- In-memory LRU cache (1000 entries)
-- Disk-based FAISS/lexicon cache
-- MongoDB API response cache
+| File | Role |
+|------|------|
+| [`search/core.py`](../backend/src/floridify/search/core.py) | `Search`—orchestrator, cascade logic, dedup |
+| [`search/trie.py`](../backend/src/floridify/search/trie.py) | marisa-trie exact + prefix search |
+| [`search/fuzzy.py`](../backend/src/floridify/search/fuzzy.py) | RapidFuzz dual-scorer |
+| [`search/bloom.py`](../backend/src/floridify/search/bloom.py) | Bloom filter for fast negative membership test |
+| [`search/result.py`](../backend/src/floridify/search/result.py) | `SearchResult` model |
+| [`search/search_index.py`](../backend/src/floridify/search/search_index.py) | `SearchIndex`—vocabulary + trie + semantic index |
+| [`search/trie_index.py`](../backend/src/floridify/search/trie_index.py) | `TrieIndex` document model |
+| [`search/semantic/core.py`](../backend/src/floridify/search/semantic/core.py) | `SemanticSearch`—FAISS index building, embedding |
+| [`search/semantic/constants.py`](../backend/src/floridify/search/semantic/constants.py) | Model catalog, FAISS thresholds, HNSW config |
+| [`search/language.py`](../backend/src/floridify/search/language.py) | Multi-corpus orchestration across languages |
+| [`core/search_pipeline.py`](../backend/src/floridify/core/search_pipeline.py) | `SearchEngineManager`—hot-reload, atomic swap |

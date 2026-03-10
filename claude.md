@@ -9,40 +9,42 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 ```
 /
 ├── backend/                    # Python 3.12+ FastAPI (port 8000) → backend/CLAUDE.md
-│   ├── src/floridify/          # 16 modules, ~60K LOC, 236 .py files
-│   │   ├── api/                # REST API: 20 routers, 121 endpoints, 11 repositories
+│   ├── src/floridify/          # 16 modules
+│   │   ├── api/                # REST API: routers, repositories, middleware
 │   │   ├── core/               # Pipelines: lookup, search, WOTD, SSE streaming
-│   │   ├── models/             # 187+ Pydantic/Beanie models across codebase
+│   │   ├── models/             # Pydantic/Beanie models
 │   │   ├── search/             # Multi-method: exact, fuzzy, semantic (FAISS)
-│   │   ├── ai/                 # OpenAI: 30 async methods, 3-tier model selection
+│   │   ├── ai/                 # OpenAI/Anthropic: 3-tier model selection
 │   │   ├── caching/            # L1 memory → L2 disk → L3 versioned MongoDB
-│   │   ├── corpus/             # UUID-based tree hierarchy, 9 parsers
-│   │   ├── providers/          # 7 dictionary providers, 2 literature APIs, 15 author mappings
-│   │   ├── cli/                # Typer CLI with Rich UI
-│   │   ├── text/               # Normalization, lemmatization, signatures
-│   │   ├── storage/            # MongoDB + Beanie ODM, 19 registered document models
+│   │   ├── corpus/             # UUID-based tree hierarchy, parsers
+│   │   ├── providers/          # 7 dictionary providers, 2 literature APIs
+│   │   ├── cli/                # Click CLI with Rich UI
+│   │   ├── text/               # Normalization, lemmatization
+│   │   ├── storage/            # MongoDB + Beanie ODM
 │   │   ├── wordlist/           # SM-2 spaced repetition, file parsers
 │   │   ├── wotd/               # Word-of-the-Day ML pipeline
 │   │   ├── anki/               # .apkg flashcard export
 │   │   ├── audio/              # Multi-language TTS (KittenTTS + Kokoro-ONNX)
 │   │   └── utils/              # Logging, config, paths, validation
-│   ├── tests/                  # 65 files, ~21K lines, 720 tests
+│   ├── tests/                  # Integration tests (real MongoDB, real FAISS)
 │   ├── scripts/                # run_api.py, benchmark_performance.py
-│   └── pyproject.toml          # UV package manager, 39 deps + 13 dev deps
+│   └── pyproject.toml          # UV package manager
 │
 ├── frontend/                   # Vue 3.5 TypeScript SPA (port 3000) → frontend/CLAUDE.md
-│   ├── src/                    # ~34K LOC
-│   │   ├── components/         # 229 .vue files: 123 shadcn/ui + 106 custom
-│   │   ├── stores/             # 14 Pinia store files, mode-based delegation
-│   │   ├── api/                # Axios client, SSE streaming, 14 modules
-│   │   │   ├── ai/             # synthesize, generate, assess, suggestions (split)
-│   │   │   └── sse/            # SSEClient, types (split)
-│   │   ├── composables/        # 5 global composables (iOS PWA, PWA, texture, slug)
+│   ├── src/
+│   │   ├── components/         # shadcn/ui + custom Vue components
+│   │   ├── stores/             # Pinia stores, mode-based delegation
+│   │   ├── api/                # Axios client, SSE streaming
+│   │   │   ├── ai/             # synthesize, generate, assess, suggestions
+│   │   │   └── sse/            # SSEClient, types
+│   │   ├── composables/        # useIOSPWA, usePWA, useTextureSystem, useSlugGeneration, useStateSync
 │   │   ├── types/              # Isomorphic types mirroring backend Pydantic
-│   │   │   └── api/            # models, responses, guards, versions (split)
-│   │   ├── router/             # 7 routes, SPA deep linking
-│   │   ├── views/              # Home.vue (SPA root), NotFound.vue
-│   │   └── utils/              # cn(), debounce, animations
+│   │   │   └── api/            # models, responses, guards, versions
+│   │   ├── router/             # SPA deep linking
+│   │   ├── views/              # Home, NotFound, Admin, Login, Signup
+│   │   ├── lib/                # Utility functions
+│   │   ├── plugins/            # Toast plugin
+│   │   └── utils/              # cn(), debounce, animations, wordDiff
 │   ├── public/                 # PWA manifest, service worker, icons
 │   ├── tailwind.config.ts      # Design system: paper textures, easings
 │   ├── nginx.conf              # Production: rate limiting, SSE, security headers
@@ -50,11 +52,11 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │
 ├── notification-server/        # PWA push notifications (port 3001)
 │   ├── src/server.ts           # Express + web-push + MongoDB
-│   └── Dockerfile              # Node multi-stage, 6 stages
+│   └── Dockerfile              # Node multi-stage
 │
 ├── scripts/                    # Development orchestration
-│   ├── dev                     # Docker/native mode launcher, SSH tunnel management
-│   ├── deploy                  # SSH deployment to production server
+│   ├── dev.sh                  # Docker/native mode launcher, SSH tunnel management
+│   ├── deploy.sh               # SSH deployment to production server
 │   ├── deploy-pwa.sh           # PWA + notification server deployment
 │   ├── install-floridify       # CLI installer with ZSH autocomplete
 │   ├── backup-mongodb.sh       # MongoDB backup script
@@ -63,15 +65,16 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 ├── nginx/                      # Production reverse proxy
 │   └── user_conf.d/floridify.conf  # SSL, HSTS, proxy routes, CORS
 │
-├── docs/                       # 62 files
+├── docs/                       # Documentation
 │   ├── architecture.md         # System design
+│   ├── synthesis.md            # AI synthesis pipeline
 │   ├── search.md               # Multi-method search
-│   ├── ai.md                   # AI synthesis pipeline
-│   ├── prompts/                # 11 deep research prompts
-│   ├── word-of-the-day/        # WOTD ML pipeline docs
-│   └── texture-research/       # Paper texture implementation
+│   ├── versioning.md           # Versioning & caching
+│   ├── ai.md                   # AI integration details
+│   ├── cli.md                  # CLI reference
+│   ├── anki.md                 # Flashcard export
+│   └── prompts/                # Deep research prompts
 │
-├── .github/                      # (no CI/CD — server behind VPN)
 ├── docker-compose.yml          # Dev: backend, frontend, mongo, notifications
 ├── docker-compose.prod.yml     # Prod: configurable workers, nginx, SSL
 └── .env / .env.production      # Environment config (not in git)
@@ -85,28 +88,32 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 
 ## Technology
 
-**Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB 7.0, Motor (async), UV
-**AI/ML**: OpenAI GPT-5 (3-tier: Nano/Mini/Full), sentence-transformers (Qwen3-0.6B), FAISS
+**Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV
+**AI/ML**: OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, sentence-transformers (Qwen3-0.6B), FAISS
 **Search**: marisa-trie (exact), RapidFuzz (fuzzy), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
-**Frontend**: Vue ^3.5, TypeScript ^5.9, Pinia ^3.0, shadcn/ui (Reka UI), Tailwind CSS ^4.2, Vite ^7.3
-**Infra**: Docker multi-stage, self-hosted (mbabb.friday.institute:1022, behind VPN), MongoDB, nginx
+**Frontend**: Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk
+**TTS**: KittenTTS (English), Kokoro-ONNX (8 languages)
+**Infra**: Docker multi-stage, self-hosted (behind VPN), MongoDB, nginx
 
 ## Key Pipelines
 
-**Lookup** (`core/lookup_pipeline.py`, 519 LOC):
+**Lookup** ([`core/lookup_pipeline.py`](backend/src/floridify/core/lookup_pipeline.py)):
 Search → Cache check → Provider fetch (asyncio.gather) → AI synthesis → Store
 
-**Search** (`search/core.py`, 897 LOC):
-Exact (marisa-trie) → Fuzzy (RapidFuzz) → Semantic (FAISS HNSW)—cascade with early termination
+**Search** ([`search/core.py`](backend/src/floridify/search/core.py)):
+Exact (marisa-trie) → Prefix → Fuzzy (RapidFuzz) → Semantic (FAISS HNSW)—cascade with early termination. See [docs/search.md](docs/search.md).
 
-**AI Synthesis** (`ai/synthesizer.py`, 542 LOC):
-Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level components) → Save
+**AI Synthesis** ([`ai/synthesizer.py`](backend/src/floridify/ai/synthesizer.py)):
+Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level components) → Save. See [docs/synthesis.md](docs/synthesis.md).
+
+**Caching** ([`caching/`](backend/src/floridify/caching/)):
+L1 memory → L2 disk → L3 versioned MongoDB with SHA-256 dedup and delta compression. See [docs/versioning.md](docs/versioning.md).
 
 ## Design Decisions
 
 - **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api/` ↔ `models/`)
-- **Async-first**: All I/O async. Motor, httpx, asyncio.gather. 80+ async test fixtures
+- **Async-first**: All I/O async. Motor, httpx, asyncio.gather
 - **Real integration tests**: Actual MongoDB per test, real FAISS indices. Only external APIs mocked
 - **Dedup before cluster**: Deduplicate provider definitions before AI clustering to reduce token usage
 - **Mode-based state**: SearchBarStore delegates to mode-specific stores with onEnter/onExit lifecycle
@@ -115,7 +122,7 @@ Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level compo
 - **Lazy imports**: Heavy modules (torch, FAISS, sentence-transformers) loaded on demand
 - **Content-addressable cache**: L3 uses SHA-256 hashing; identical content reuses versions
 - **Per-resource locking**: Fine-grained concurrency in corpus manager
-- **3-tier model selection**: GPT-5 Nano/Mini/Full routing by task complexity
+- **3-tier model selection**: GPT-5 5.4/Mini/Nano routing by task complexity
 
 ## Configuration
 
@@ -126,27 +133,25 @@ BACKEND_PORT=8000
 FRONTEND_PORT=3000
 ```
 
-**API Keys** (`auth/config.toml`, not in git):
+**API Keys** (`backend/auth/config.toml`, not in git—see [`config.example.toml`](config.example.toml)):
 ```toml
 [openai]
 api_key = "sk-..."
-model = "gpt-5"
-
-[embedding]
-model = "Qwen/Qwen3-Embedding-0.6B"
 
 [database]
-runtime_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/floridify?tls=true"
-test_url = "mongodb://<user>:<password>@mbabb.friday.institute:27017/test_floridify?tls=true"
-runtime_tls_required = true
+runtime_url = "mongodb://user:pass@host:27017/floridify"
+test_url = "mongodb://user:pass@host:27017/test_floridify"
+
+[models]
+openai_model = "gpt-5-mini"
 ```
 
 ## Development
 
 ```bash
 # Docker (recommended)
-./scripts/dev                    # All services, hot reload
-./scripts/dev --native           # Without Docker
+./scripts/dev.sh                 # All services, hot reload
+./scripts/dev.sh --native        # Without Docker
 
 # Manual
 cd backend && uv sync && uv run scripts/run_api.py
@@ -163,7 +168,7 @@ floridify lookup perspicacious
 # Backend
 ruff check --fix && ruff format  # Lint + format
 mypy src/ --strict               # Type check
-pytest tests/ -v                 # 720 tests
+pytest tests/ -v                 # Tests
 
 # Frontend
 npm run type-check               # TypeScript strict
@@ -173,7 +178,7 @@ prettier --write .               # Format
 ## Deployment
 
 ```bash
-./scripts/deploy                 # SSH to server, sync secrets, build, deploy
+./scripts/deploy.sh              # SSH to server, sync secrets, build, deploy
 # Server: mbabb@mbabb.friday.institute -p 1022 (behind VPN)
 # No CI/CD — deploy manually
 # URL: https://mbabb.friday.institute/words/
@@ -181,4 +186,4 @@ prettier --write .               # Format
 
 ## macOS Note
 
-PyTorch + FAISS + scikit-learn each load separate `libomp.dylib`. Set `OMP_NUM_THREADS=1` at import time to prevent SIGSEGV. `KMP_DUPLICATE_LIB_OK=TRUE` as fallback. Safe parallelism lever: batch_size (32->128).
+PyTorch + FAISS + scikit-learn each load separate `libomp.dylib`. Set `OMP_NUM_THREADS=1` at import time to prevent SIGSEGV. `KMP_DUPLICATE_LIB_OK=TRUE` as fallback. Safe parallelism lever: batch_size (32→128).

@@ -4,18 +4,23 @@ Multi-method search: exact (marisa-trie), fuzzy (RapidFuzz), semantic (FAISS). C
 
 ```
 search/
-├── core.py (897)           # Search orchestrator, cascade logic
-├── trie.py (228)           # marisa-trie + Bloom filter
-├── fuzzy.py (234)          # RapidFuzz dual-scorer
-├── bloom.py (196)          # Bitarray membership testing
-├── language.py (240)       # Multi-corpus orchestration
-├── models.py (705)         # SearchResult, TrieIndex, SearchIndex
-├── constants.py (39)       # SearchMethod, SearchMode, FuzzySearchMethod enums
-├── utils.py (206)          # Length correction, default frequency heuristics
-└── semantic/               # FAISS vector search (2,045 LOC)
-    ├── core.py (1,470)     # SemanticSearch: index building, embeddings
-    ├── models.py (480)     # SemanticIndex(Document)
-    └── constants.py (95)   # Model catalog, FAISS thresholds, HNSW config
+├── core.py                 # Search orchestrator, cascade logic
+├── trie.py                 # marisa-trie + Bloom filter
+├── fuzzy.py                # RapidFuzz dual-scorer
+├── bloom.py                # Bitarray membership testing
+├── language.py             # Multi-corpus orchestration
+├── result.py               # SearchResult model
+├── search_index.py         # SearchIndex versioned document model
+├── trie_index.py           # TrieIndex document model
+├── constants.py            # SearchMethod, SearchMode, FuzzySearchMethod enums
+├── utils.py                # Length correction, default frequency heuristics
+└── semantic/               # FAISS vector search
+    ├── core.py             # SemanticSearch: 5-tier index selection, embeddings
+    ├── models.py           # SemanticIndex(Document)
+    ├── constants.py        # Model catalog, FAISS thresholds, HNSW config
+    ├── embedding.py        # Embedding computation
+    ├── index_builder.py    # FAISS index construction
+    └── persistence.py      # Index save/load
 ```
 
 ## Enums
@@ -26,7 +31,7 @@ search/
 
 ## Cascade (SMART mode)
 
-Exact -> if no match -> Fuzzy -> if <33% high-quality (>=0.7) -> Semantic -> Deduplicate -> Top N.
+Exact → if no match → Fuzzy → if <33% high-quality (>=0.7) → Semantic → Deduplicate → Top N.
 
 Early termination: exact match returns immediately. Quality gating: skip semantic if fuzzy suffices.
 
