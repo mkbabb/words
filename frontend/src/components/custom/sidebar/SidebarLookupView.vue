@@ -13,7 +13,7 @@
                 :empty-message="'No recent lookups'"
             >
                 <template #item="{ item }">
-                    <SidebarRecentItem
+                    <RecentItem
                         :item="item"
                         :title="item.word"
                         :subtitle="getFirstDefinition(item)"
@@ -94,7 +94,7 @@ import { Accordion } from '@/components/ui/accordion';
 import { Search, Sparkles } from 'lucide-vue-next';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
-import SidebarRecentItem from './SidebarRecentItem.vue';
+import RecentItem from './RecentItem.vue';
 import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import type { SynthesizedDictionaryEntry } from '@/types';
 import { logger } from '@/utils/logger';

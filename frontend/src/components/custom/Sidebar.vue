@@ -3,7 +3,7 @@
     <!-- Desktop Sidebar -->
     <aside
       :class="cn(
-        'bg-background border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-hidden border-r transition-all duration-500 ease-apple-smooth lg:flex',
+        'bg-background border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-hidden border-r transition-[width] duration-300 ease-apple-smooth lg:flex',
         sidebarCollapsed ? 'w-16' : 'w-80'
       )"
     >
@@ -26,14 +26,14 @@
         <div
           v-if="sidebarOpen"
           @click="ui.toggleSidebar()"
-          class="pointer-events-auto fixed inset-0 bg-black/60 backdrop-blur-sm"
+          class="pointer-events-auto fixed inset-0 glass-overlay"
         />
       </Transition>
 
       <!-- Mobile Sidebar Content -->
       <div
         :class="cn(
-          'bg-background/[0.98] border-border pointer-events-auto fixed top-0 left-0 z-[61] flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl backdrop-blur-sm transition-transform duration-400 ease-apple-smooth',
+          'border-border pointer-events-auto fixed top-0 left-0 z-[81] flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl glass-light transition-transform duration-400 ease-apple-smooth',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
         @touchstart.passive="onTouchStart"

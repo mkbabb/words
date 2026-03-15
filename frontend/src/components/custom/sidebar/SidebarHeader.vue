@@ -51,8 +51,8 @@
                     />
                 </div>
             </div>
-            <div v-else key="collapsed" class="flex items-center justify-between w-full">
-                <DarkModeToggle class="h-7 w-7" />
+            <div v-else key="collapsed" class="flex flex-col items-center gap-2 w-full">
+                <DarkModeToggle class="h-6 w-6 flex-shrink-0" />
                 <button
                     @click="ui.setSidebarCollapsed(false)"
                     class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
