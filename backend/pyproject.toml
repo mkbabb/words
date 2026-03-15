@@ -115,7 +115,12 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-markers = ["live_api: tests that hit real AI APIs (deselect by default)"]
+markers = [
+    "live_api: tests that hit real AI APIs (deselect by default)",
+    "performance: reproducible performance microbenchmarks",
+    "search: search pipeline benchmarks",
+    "semantic: semantic search benchmarks",
+]
 
 [tool.mypy]
 python_version = "3.12"
