@@ -22,6 +22,17 @@
   --color-input: hsl(48 5% 89.8%);
   --color-ring: hsl(0 0% 3.9%);
 
+  /* Accent colors for AI and error states */
+  --ai-accent: #fbbf24;
+  --error-accent: #f87171;
+
+  /* Named easings as CSS custom properties (mirrors tailwind.config.ts) */
+  --ease-apple-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-apple-ease-in: cubic-bezier(0.42, 0, 1, 1);
+  --ease-apple-ease-out: cubic-bezier(0, 0, 0.58, 1);
+
   /* Paper texture variables */
   --paper-clean-texture: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.18'/%3E%3C/svg%3E");
   --paper-aged-texture: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.25'/%3E%3C/svg%3E");
@@ -51,6 +62,10 @@
   --color-border: hsl(24 4% 16%);
   --color-input: hsl(24 4% 16%);
   --color-ring: hsl(48 8% 83%);
+
+  /* Accent colors for AI and error states (dark variants) */
+  --ai-accent: #d97706;
+  --error-accent: #dc2626;
 
   /* Dark mode texture variants */
   --paper-clean-texture: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.10'/%3E%3C/svg%3E");

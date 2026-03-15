@@ -1,41 +1,22 @@
 import { gsap } from 'gsap';
 import { CSSPlugin } from 'gsap/CSSPlugin';
+import { GSAP_EASE, GSAP_DURATION } from '@/lib/design-tokens';
 
 // Register GSAP plugins to prevent property warnings
 gsap.registerPlugin(CSSPlugin);
 
-// Check for reduced motion preference
-const prefersReducedMotion = () => {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-};
+// Re-export design tokens as the single source of truth for GSAP timings
+export { GSAP_EASE, GSAP_DURATION };
 
-// Subtle timing configurations for modern UI
-export const timings = {
-  instant: { duration: prefersReducedMotion() ? 0 : 0.15, ease: 'power2.out' },
-  fast: { duration: prefersReducedMotion() ? 0 : 0.25, ease: 'power2.out' },
-  normal: { duration: prefersReducedMotion() ? 0 : 0.35, ease: 'power3.out' },
-  smooth: { duration: prefersReducedMotion() ? 0 : 0.5, ease: 'power3.inOut' },
-  // Deprecated - use timings instead
-  springConfig: {
-    gentle: { duration: prefersReducedMotion() ? 0 : 0.5, ease: 'power3.out' },
-    bouncy: { duration: prefersReducedMotion() ? 0 : 0.5, ease: 'power3.out' },
-    snappy: { duration: prefersReducedMotion() ? 0 : 0.3, ease: 'power2.out' },
-    smooth: { duration: prefersReducedMotion() ? 0 : 0.5, ease: 'power3.out' },
-    material: { duration: prefersReducedMotion() ? 0 : 0.3, ease: 'power2.out' },
-  }
+// Standard animation configs derived from design tokens
+const animConfigs = {
+  instant: { duration: 0.15, ease: GSAP_EASE.press },
+  fast: { duration: GSAP_DURATION.release, ease: GSAP_EASE.press },
+  normal: { duration: 0.35, ease: GSAP_EASE.press },
+  smooth: { duration: GSAP_DURATION.slide, ease: GSAP_EASE.smooth },
 } as const;
 
-// Keep springConfig for backward compatibility
-export const springConfig = timings.springConfig;
-
-// Standard durations
-export const durations = {
-  instant: 0.15,
-  fast: 0.25,
-  normal: 0.35,
-  slow: 0.5,
-  verySlow: 0.8,
-} as const;
+type AnimTiming = keyof typeof animConfigs;
 
 // Stagger configurations for cascading animations
 export const staggerConfig = {
@@ -57,15 +38,14 @@ export function animateVisibility(
   element: HTMLElement,
   show: boolean,
   options: {
-    timing?: keyof typeof timings;
+    timing?: AnimTiming;
     onComplete?: () => void;
   } = {}
 ) {
   const { timing = 'fast', onComplete } = options;
-  const config = timings[timing];
-  
+  const config = animConfigs[timing];
+
   if (show) {
-    // Ensure element is visible first
     gsap.set(element, { display: 'block' });
     return gsap.to(element, {
       ...animationStates.visible,
@@ -87,19 +67,18 @@ export function animateVisibility(
 // Animate container height smoothly
 export function animateContainerHeight(
   container: HTMLElement,
-  timing: keyof typeof timings = 'normal'
+  timing: AnimTiming = 'normal'
 ) {
-  const config = timings[timing];
+  const config = animConfigs[timing];
   const children = Array.from(container.children) as HTMLElement[];
-  
-  // Calculate total height needed
+
   let totalHeight = 0;
   children.forEach(child => {
     if (child.style.display !== 'none' && child.style.opacity !== '0') {
       totalHeight += child.offsetHeight + parseInt(getComputedStyle(child).marginBottom || '0');
     }
   });
-  
+
   return gsap.to(container, {
     height: totalHeight,
     ...config,
@@ -109,10 +88,10 @@ export function animateContainerHeight(
 // Simple fade animation for state changes
 export function fadeTransition(
   element: HTMLElement,
-  timing: keyof typeof timings = 'fast'
+  timing: AnimTiming = 'fast'
 ) {
-  const config = timings[timing];
-  
+  const config = animConfigs[timing];
+
   return gsap.fromTo(
     element,
     { opacity: 0 },
@@ -130,7 +109,7 @@ export function createAutoHide(
   onHide?: () => void
 ) {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  
+
   const start = () => {
     cancel();
     timer = setTimeout(() => {
@@ -139,14 +118,14 @@ export function createAutoHide(
       });
     }, delay);
   };
-  
+
   const cancel = () => {
     if (timer) {
       clearTimeout(timer);
       timer = null;
     }
   };
-  
+
   return { start, cancel };
 }
 
@@ -163,7 +142,6 @@ export function generateRainbowGradient(steps: number = 7): string {
     'rgb(236, 72, 153)',  // pink-500
   ];
 
-  // Calculate which colors to use based on steps
   const selectedColors = [];
   for (let i = 0; i < steps; i++) {
     const index = Math.floor((i / (steps - 1)) * (colors.length - 1));
@@ -177,7 +155,7 @@ export function generateRainbowGradient(steps: number = 7): string {
 export function generateAnimatedRainbowGradient(): string {
   const baseColors = [
     'rgb(239, 68, 68)',   // red-500
-    'rgb(249, 115, 22)',  // orange-500  
+    'rgb(249, 115, 22)',  // orange-500
     'rgb(234, 179, 8)',   // yellow-500
     'rgb(34, 197, 94)',   // green-500
     'rgb(6, 182, 212)',   // cyan-500
@@ -186,8 +164,7 @@ export function generateAnimatedRainbowGradient(): string {
     'rgb(236, 72, 153)',  // pink-500
   ];
 
-  // Create a longer gradient for smooth animation
   const extendedColors = [...baseColors, ...baseColors.slice(0, 3)];
-  
+
   return `linear-gradient(90deg, ${extendedColors.join(', ')})`;
 }

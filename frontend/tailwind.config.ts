@@ -322,6 +322,19 @@ const config: Config = {
           '@apply opacity-100 pointer-events-auto': {},
           transform: 'scale(1)',
         },
+        // Glass-morphism utilities
+        '.glass-light': {
+          '@apply bg-background/80 backdrop-blur-sm border border-border/30': {},
+        },
+        '.glass-medium': {
+          '@apply bg-background/80 backdrop-blur-md border border-border/30': {},
+        },
+        '.glass-heavy': {
+          '@apply bg-background/80 backdrop-blur-xl border border-border/30': {},
+        },
+        '.glass-overlay': {
+          '@apply bg-black/60 backdrop-blur-sm': {},
+        },
         // Active states
         '.active-scale': {
           '@apply active:scale-[0.97] active:transition-transform active:duration-150': {},
