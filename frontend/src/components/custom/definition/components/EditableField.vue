@@ -7,7 +7,10 @@
             @keydown="handleKeydown"
             @input="handleInput"
             :contenteditable="isEditing"
-            :class="[isEditing && 'focus:outline-none']"
+            :class="[
+                isEditing && 'focus:outline-none',
+                editMode && !isEditing && 'decoration-dotted decoration-muted-foreground/25 underline underline-offset-4 cursor-pointer text-foreground/80',
+            ]"
             :data-placeholder="placeholder"
         >
             <slot name="display" :value="modelValue">
@@ -18,25 +21,25 @@
         <!-- Hover action buttons - positioned absolutely to not affect flow -->
         <span
             v-if="editMode && !isEditing"
-            class="pointer-events-none absolute -top-3 -right-3 z-10 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            class="pointer-events-none absolute -top-4 -right-4 z-10 flex gap-1 opacity-30 transition-opacity duration-150 group-hover:opacity-100"
         >
             <button
                 @click.stop="startEdit"
-                class="pointer-events-auto rounded-full border border-border bg-background p-1 shadow-sm transition-colors hover:bg-muted"
+                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-md transition-all duration-150 hover:bg-muted hover:border-border hover:shadow-lg hover:scale-110"
                 :title="`Edit ${fieldName}`"
             >
-                <Edit2 class="h-4 w-4 text-muted-foreground" />
+                <Edit2 class="h-[18px] w-[18px] text-muted-foreground" />
             </button>
             <button
                 v-if="canRegenerate"
                 @click.stop="$emit('regenerate')"
                 :disabled="isRegenerating"
-                class="pointer-events-auto rounded-full border border-border bg-background p-1 shadow-sm transition-colors hover:bg-muted disabled:opacity-50"
+                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-md transition-all duration-150 hover:bg-muted hover:border-border hover:shadow-lg hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                 :title="`Regenerate ${fieldName}`"
             >
                 <RefreshCw
                     :class="[
-                        'h-4 w-4 text-muted-foreground',
+                        'h-[18px] w-[18px] text-muted-foreground',
                         isRegenerating && 'animate-spin',
                     ]"
                 />
