@@ -1,7 +1,7 @@
 <template>
     <div
         ref="controlsDropdown"
-        class="dropdown-element cartoon-shadow-sm mb-2 flex max-h-[min(500px,70dvh)] origin-top flex-col rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
+        class="dropdown-element cartoon-shadow-sm mb-2 flex max-h-[min(500px,70dvh)] origin-top flex-col rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl"
         tabindex="0"
         @mousedown.prevent
         @click="$emit('interaction')"
@@ -188,17 +188,17 @@ defineExpose({
 </script>
 
 <style scoped>
-/* Mode switch transitions — opacity uses fast ease-out, transform uses spring */
+/* Mode switch transitions */
 .controls-mode-switch-enter-active {
     transition:
-        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 200ms var(--ease-apple-smooth),
+        transform 400ms var(--ease-apple-spring);
 }
 
 .controls-mode-switch-leave-active {
     transition:
-        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1),
-        transform 200ms cubic-bezier(0.4, 0.0, 1, 1);
+        opacity 150ms var(--ease-apple-smooth),
+        transform 200ms var(--ease-apple-smooth);
 }
 
 .controls-mode-switch-enter-from {

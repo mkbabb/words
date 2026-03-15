@@ -46,9 +46,9 @@
                     overflowY: searchBar.isAIQuery ? 'visible' : 'visible',
                     borderColor:
                         searchBar.isAIQuery && !searchBar.hasErrorAnimation
-                            ? '#fbbf24'
+                            ? 'var(--ai-accent)'
                             : searchBar.hasErrorAnimation
-                              ? '#f87171'
+                              ? 'var(--error-accent)'
                               : undefined,
                 }"
             >
@@ -56,7 +56,7 @@
                 <BorderShimmer
                     v-if="searchBar.isAIQuery && !searchBar.hasErrorAnimation"
                     :active="true"
-                    color="rgb(251 191 36)"
+                    color="var(--ai-accent)"
                     :thickness="3"
                     :border-width="2"
                     :duration="2400"
@@ -712,6 +712,7 @@ onUnmounted(() => {
     grid-template-rows: 1fr;
     opacity: 1;
     margin-bottom: 0.5rem;
+    /* ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1) */
     transition:
         grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
         opacity 150ms cubic-bezier(0, 0, 0.2, 1),

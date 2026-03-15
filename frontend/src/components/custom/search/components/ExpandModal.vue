@@ -3,13 +3,13 @@
         <Transition :css="false" @enter="modalEnter" @leave="modalLeave">
             <div
                 v-if="show"
-                class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                class="fixed inset-0 z-modal flex items-center justify-center p-4"
                 @click="handleClose"
             >
                 <!-- Backdrop -->
                 <div
                     ref="modalBackdrop"
-                    class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    class="absolute inset-0 glass-overlay"
                 />
 
                 <!-- Modal Content -->

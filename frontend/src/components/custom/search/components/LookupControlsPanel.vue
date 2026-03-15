@@ -3,28 +3,38 @@
     <div class="border-t border-border/50 px-4 py-3">
         <h3 class="mb-3 text-sm font-medium">Sources</h3>
         <div class="flex flex-wrap gap-2">
-            <button
+            <HoverCard
                 v-for="source in DICTIONARY_SOURCES"
                 :key="source.id"
-                @click="toggleSource(source.id)"
-                @keydown.enter.stop.prevent="toggleSource(source.id)"
-                :disabled="
-                    noAI &&
-                    selectedSources.length > 0 &&
-                    !selectedSources.includes(source.id)
-                "
-                :class="[
-                    'hover-lift ease-apple-spring flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300',
-                    selectedSources.includes(source.id)
-                        ? 'bg-primary text-primary-foreground shadow-sm hover:scale-[1.05] hover:bg-primary/90 active:scale-[0.97]'
-                        : noAI && selectedSources.length > 0
-                          ? 'cursor-not-allowed bg-muted/50 text-muted-foreground/50'
-                          : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
-                ]"
+                :open-delay="400"
+                :close-delay="100"
             >
-                <component :is="source.icon" :size="16" />
-                {{ source.name }}
-            </button>
+                <HoverCardTrigger as-child>
+                    <button
+                        @click="toggleSource(source.id)"
+                        @keydown.enter.stop.prevent="toggleSource(source.id)"
+                        :disabled="
+                            noAI &&
+                            selectedSources.length > 0 &&
+                            !selectedSources.includes(source.id)
+                        "
+                        :class="[
+                            'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
+                            selectedSources.includes(source.id)
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:scale-[1.05]'
+                                : noAI && selectedSources.length > 0
+                                  ? 'cursor-not-allowed bg-muted/50 text-muted-foreground/50'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
+                        ]"
+                    >
+                        <component :is="source.icon" :size="16" />
+                        {{ source.name }}
+                    </button>
+                </HoverCardTrigger>
+                <HoverCardContent class="w-auto p-2" side="top">
+                    <p class="text-sm">{{ selectedSources.includes(source.id) ? 'Remove' : 'Add' }} {{ source.name }}</p>
+                </HoverCardContent>
+            </HoverCard>
         </div>
     </div>
 
@@ -32,21 +42,31 @@
     <div class="border-t border-border/50 px-4 py-3">
         <h3 class="mb-3 text-sm font-medium">Languages</h3>
         <div class="flex flex-wrap gap-2">
-            <button
+            <HoverCard
                 v-for="language in LANGUAGES"
                 :key="language.value"
-                @click="toggleLanguage(language.value)"
-                @keydown.enter.stop.prevent="toggleLanguage(language.value)"
-                :class="[
-                    'hover-lift ease-apple-spring flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300',
-                    selectedLanguages.includes(language.value)
-                        ? 'bg-primary text-primary-foreground shadow-sm hover:scale-[1.05] hover:bg-primary/90 active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
-                ]"
+                :open-delay="400"
+                :close-delay="100"
             >
-                <component :is="language.icon" :size="16" />
-                {{ language.label }}
-            </button>
+                <HoverCardTrigger as-child>
+                    <button
+                        @click="toggleLanguage(language.value)"
+                        @keydown.enter.stop.prevent="toggleLanguage(language.value)"
+                        :class="[
+                            'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
+                            selectedLanguages.includes(language.value)
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:scale-[1.05]'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
+                        ]"
+                    >
+                        <component :is="language.icon" :size="16" />
+                        {{ language.label }}
+                    </button>
+                </HoverCardTrigger>
+                <HoverCardContent class="w-auto p-2" side="top">
+                    <p class="text-sm">{{ selectedLanguages.includes(language.value) ? 'Remove' : 'Add' }} {{ language.label }}</p>
+                </HoverCardContent>
+            </HoverCard>
         </div>
     </div>
 
@@ -105,6 +125,7 @@ import { storeToRefs } from 'pinia';
 import { useStores } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionsRow from './ActionsRow.vue';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';
 

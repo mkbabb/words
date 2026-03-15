@@ -5,7 +5,7 @@
         <div
             v-if="show"
             ref="searchResultsDropdown"
-            class="dropdown-element cartoon-shadow-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
+            class="dropdown-element cartoon-shadow-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl"
             @mousedown.prevent
             @click="$emit('interaction')"
         >

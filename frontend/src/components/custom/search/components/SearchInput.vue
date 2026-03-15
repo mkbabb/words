@@ -14,7 +14,7 @@
         :class="[
             'relative z-10 w-full rounded-xl bg-transparent text-lg transition-all duration-300 ease-out outline-none',
             'resize-none placeholder:truncate placeholder:text-muted-foreground',
-            'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600',
+            'focus:ring-0',
             'flex items-center leading-relaxed',
             {
                 'text-center': textAlign === 'center',

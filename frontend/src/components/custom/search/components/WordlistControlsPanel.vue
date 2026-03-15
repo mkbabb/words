@@ -6,10 +6,10 @@
             <button
                 @click="toggleFilter('showBronze')"
                 :class="[
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out select-none',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
                     wordlistFilters.showBronze
-                        ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
+                        ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
                 ]"
             >
                 <div
@@ -20,10 +20,10 @@
             <button
                 @click="toggleFilter('showSilver')"
                 :class="[
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out select-none',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
                     wordlistFilters.showSilver
-                        ? 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
+                        ? 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
                 ]"
             >
                 <div
@@ -34,10 +34,10 @@
             <button
                 @click="toggleFilter('showGold')"
                 :class="[
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out select-none',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
                     wordlistFilters.showGold
-                        ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
+                        ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-white shadow-sm hover:scale-[1.05] hover:shadow-md'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
                 ]"
             >
                 <div
@@ -55,10 +55,10 @@
             <button
                 @click="toggleFilter('showHotOnly')"
                 :class="[
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out select-none',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
                     wordlistFilters.showHotOnly
-                        ? 'bg-red-500 text-white shadow-sm hover:scale-[1.05] hover:bg-red-600 hover:shadow-md active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
+                        ? 'bg-red-500 text-white shadow-sm hover:scale-[1.05] hover:bg-red-600 hover:shadow-md'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
                 ]"
             >
                 <Flame :size="14" />
@@ -67,10 +67,10 @@
             <button
                 @click="toggleFilter('showDueOnly')"
                 :class="[
-                    'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out select-none',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ease-apple-spring select-none active:scale-[0.97]',
                     wordlistFilters.showDueOnly
-                        ? 'bg-blue-500 text-white shadow-sm hover:scale-[1.05] hover:bg-blue-600 hover:shadow-md active:scale-[0.97]'
-                        : 'bg-muted text-muted-foreground hover:scale-[1.03] hover:bg-muted/70 hover:text-foreground active:scale-[0.98]',
+                        ? 'bg-blue-500 text-white shadow-sm hover:scale-[1.05] hover:bg-blue-600 hover:shadow-md'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03]',
                 ]"
             >
                 <Clock :size="14" />
