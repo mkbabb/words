@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 import autoprefixer from 'autoprefixer';
 
 const API_TARGET = process.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const VITE_PORT = Number(process.env.VITE_PORT) || 3000;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -95,11 +96,11 @@ export default defineConfig({
     },
   ],
   server: {
-    port: 3000,
+    port: VITE_PORT,
     host: '0.0.0.0',
     strictPort: true,
     hmr: {
-      clientPort: 3000,
+      clientPort: VITE_PORT,
       host: 'localhost',
       protocol: 'ws',
       timeout: 120000
