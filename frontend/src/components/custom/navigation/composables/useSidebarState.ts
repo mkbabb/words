@@ -3,7 +3,9 @@ import { useStores } from '@/stores';
 import { useDefinitionGroups } from '@/components/custom/definition/composables';
 import { PART_OF_SPEECH_ORDER } from '@/components/custom/definition/constants';
 import { normalizeEtymology } from '@/utils/guards';
+import { useTreeIndex } from './useTreeIndex';
 import type { SidebarCluster } from '../types';
+import type { TreeNode } from './types';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
 export function useSidebarState() {
@@ -86,12 +88,29 @@ export function useSidebarState() {
     const shouldShowSidebar = computed(() => {
         return sidebarSections.value.length > 1;
     });
-    
+
+    // Build tree nodes from sidebar sections for scroll tracking
+    const treeNodes = computed((): TreeNode[] => {
+        return sidebarSections.value.map(section => ({
+            id: section.clusterId,
+            children: section.partsOfSpeech.map(pos => ({
+                id: `${section.clusterId}-${pos.type}`,
+            })),
+        }));
+    });
+
+    // Build tree index (reactive — rebuilds when treeNodes change)
+    const treeIndex = computed(() => {
+        return useTreeIndex(treeNodes.value);
+    });
+
     return {
         sidebarSections,
         activeCluster,
         activePartOfSpeech,
         shouldShowSidebar,
-        groupedDefinitions
+        groupedDefinitions,
+        treeNodes,
+        treeIndex,
     };
 }

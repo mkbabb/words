@@ -1,40 +1,45 @@
+import { useStores } from '@/stores';
 
 interface NavigationOptions {
     scrollOffset?: number;
     behavior?: ScrollBehavior;
+    /** Called before scrolling to ensure the target is rendered (for virtual windowing). */
+    ensureTargetWindow?: (id: string) => void;
 }
 
 export function useSidebarNavigation(options: NavigationOptions = {}) {
     const { scrollOffset = 96, behavior = 'smooth' } = options;
-    
-    const scrollToElement = (selector: string) => {
-        const element = document.querySelector(selector);
+
+    const scrollToElement = (id: string) => {
+        options.ensureTargetWindow?.(id);
+
+        const element = document.getElementById(id);
         if (!element) return;
-        
+
         const elementRect = element.getBoundingClientRect();
         const bodyRect = document.body.getBoundingClientRect();
         const elementPosition = elementRect.top - bodyRect.top;
         const offsetPosition = elementPosition - scrollOffset;
-        
+
         window.scrollTo({
             top: offsetPosition,
-            behavior
+            behavior,
         });
     };
-    
+
     const scrollToCluster = (clusterId: string) => {
-        scrollToElement(`[data-cluster-id="${clusterId}"]`);
+        scrollToElement(clusterId);
     };
-    
+
     const scrollToPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
-        scrollToElement(`[data-part-of-speech="${clusterId}-${partOfSpeech}"]`);
+        scrollToElement(`${clusterId}-${partOfSpeech}`);
     };
-    
+
     const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
         const { content } = useStores();
         const entry = content.currentEntry;
         if (!entry?.definitions) return [];
-        
+
         return entry.definitions
             .filter((def) => {
                 const defCluster = def.meaning_cluster?.slug || def.meaning_cluster?.id || 'default';
@@ -42,12 +47,11 @@ export function useSidebarNavigation(options: NavigationOptions = {}) {
             })
             .sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0));
     };
-    
+
     return {
         scrollToCluster,
         scrollToPartOfSpeech,
-        getDefinitionsForPartOfSpeech
+        scrollToElement,
+        getDefinitionsForPartOfSpeech,
     };
 }
-
-import { useStores } from '@/stores';

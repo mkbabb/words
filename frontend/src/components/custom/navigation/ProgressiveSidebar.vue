@@ -1,10 +1,10 @@
 <template>
-    <div 
+    <div
         class="themed-card themed-shadow-lg rounded-lg bg-background/95 p-2 backdrop-blur-sm"
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
-        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0 overflow-y-auto overflow-x-hidden">
+        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0 overflow-y-auto">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
                 <!-- Special handling for etymology -->
                 <template v-if="cluster.clusterId === 'etymology'">
@@ -15,6 +15,7 @@
                     />
                     <button
                         @click="handleClusterClick('etymology')"
+                        data-toc-id="etymology"
                         data-sidebar-cluster="etymology"
                         :class="[
                             'w-full text-left px-3 py-2 rounded-md transition-all duration-200',
@@ -26,7 +27,7 @@
                         <h4 class="text-sm font-semibold">Etymology</h4>
                     </button>
                 </template>
-                
+
                 <!-- Regular clusters -->
                 <template v-else>
                     <SidebarCluster
@@ -37,7 +38,7 @@
                         @cluster-click="handleClusterClick(cluster.clusterId)"
                         @part-of-speech-click="(pos) => handlePartOfSpeechClick(cluster.clusterId, pos)"
                     />
-                    
+
                     <!-- Regular separator between non-etymology clusters -->
                     <hr
                         v-if="index < sidebarSections.length - 1 && sidebarSections[index + 1].clusterId !== 'etymology'"
@@ -50,93 +51,74 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue';
+import { ref, computed, watch, inject } from 'vue';
 import { useLookupMode } from '@/stores/search/modes/lookup';
-import { useSidebarState, useSidebarNavigation, useActiveTracking } from './composables';
+import { useStores } from '@/stores';
+import { useSidebarState, useSidebarNavigation, useScrollTracker, useSidebarFollow } from './composables';
 import SidebarCluster from './components/SidebarCluster.vue';
 
 const lookupMode = useLookupMode();
+const { content } = useStores();
 const selectedCardVariant = computed(() => lookupMode.selectedCardVariant);
 
 // Template refs
-const navContainer = ref<HTMLElement>();
+const navContainer = ref<HTMLElement | null>(null);
+
+// Inject ensureTargetWindow from DefinitionDisplay (provided via provide/inject)
+const ensureTargetWindow = inject<((id: string) => void) | null>('ensureTargetWindow', null);
 
 // Use composables
-const { 
-    sidebarSections, 
-    activeCluster, 
-    activePartOfSpeech 
-} = useSidebarState();
-
-const { 
-    scrollToCluster, 
-    scrollToPartOfSpeech 
-} = useSidebarNavigation();
-
-// Set up active tracking
-useActiveTracking({
+const {
+    sidebarSections,
     activeCluster,
     activePartOfSpeech,
-    sidebarSections
+    treeNodes,
+    treeIndex,
+} = useSidebarState();
+
+const {
+    scrollToCluster,
+    scrollToPartOfSpeech,
+} = useSidebarNavigation({
+    ensureTargetWindow: ensureTargetWindow ?? undefined,
 });
 
-// Auto-scroll sidebar to keep active elements visible
-const scrollSidebarToElement = async (selector: string) => {
-    await nextTick();
-    
-    if (!navContainer.value) return;
-    
-    const element = navContainer.value.querySelector(selector) as HTMLElement;
-    if (!element) return;
-    
-    const containerRect = navContainer.value.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-    
-    // Check if element is already fully visible
-    const isVisible = (
-        elementRect.top >= containerRect.top &&
-        elementRect.bottom <= containerRect.bottom
-    );
-    
-    if (!isVisible) {
-        // Calculate scroll position to center the element
-        const elementTop = element.offsetTop;
-        const containerHeight = navContainer.value.clientHeight;
-        const elementHeight = element.clientHeight;
-        
-        // Center the element in the container
-        const scrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
-        
-        navContainer.value.scrollTo({
-            top: Math.max(0, scrollTop),
-            behavior: 'smooth'
-        });
-    }
-};
+// Set up tree-based scroll tracking (reactive — re-initializes on tree change)
+const { activeId, activeRootId } = useScrollTracker(
+    () => treeNodes.value,
+    () => treeIndex.value.index,
+    { sidebarEl: navContainer },
+);
 
-// Watch for active changes and auto-scroll sidebar
-watch([activeCluster, activePartOfSpeech], async ([newCluster, newPOS]: [string | null, string | null]) => {
-    if (newPOS) {
-        // Scroll to the active part of speech button
-        await scrollSidebarToElement(`[data-sidebar-pos="${newPOS}"]`);
-    } else if (newCluster) {
-        // Scroll to the active cluster
-        await scrollSidebarToElement(`[data-sidebar-cluster="${newCluster}"]`);
+// Set up damped sidebar follow
+useSidebarFollow({
+    sidebarEl: navContainer,
+    activeId,
+    activeRootId,
+});
+
+// Sync scroll tracker's activeId back to content store
+watch(activeId, (id) => {
+    if (!id) return;
+
+    const entry = treeIndex.value.index.get(id);
+    if (!entry) return;
+
+    if (entry.depth === 0) {
+        content.setSidebarActiveCluster(id);
+        content.setSidebarActivePartOfSpeech(null);
+    } else {
+        content.setSidebarActiveCluster(entry.parentId);
+        content.setSidebarActivePartOfSpeech(id);
     }
 });
 
 // Handlers
-const handleClusterClick = async (clusterId: string) => {
+const handleClusterClick = (clusterId: string) => {
     scrollToCluster(clusterId);
-    // Ensure clicked element is visible in sidebar
-    await scrollSidebarToElement(`[data-sidebar-cluster="${clusterId}"]`);
 };
 
-const handlePartOfSpeechClick = async (clusterId: string, partOfSpeech: string) => {
+const handlePartOfSpeechClick = (clusterId: string, partOfSpeech: string) => {
     scrollToPartOfSpeech(clusterId, partOfSpeech);
-    // Ensure clicked element is visible in sidebar
-    const posId = `${clusterId}-${partOfSpeech}`;
-    await scrollSidebarToElement(`[data-sidebar-pos="${posId}"]`);
 };
 </script>
-
