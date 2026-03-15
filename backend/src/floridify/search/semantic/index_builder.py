@@ -7,8 +7,8 @@ Flat L2, IVF-Flat, INT8 ScalarQuantizer, HNSW, IVF-PQ, and OPQ+IVF-PQ.
 from __future__ import annotations
 
 import math
+from typing import Any
 
-import faiss
 import numpy as np
 
 from ...utils.logging import get_logger
@@ -55,7 +55,7 @@ def build_optimized_index(
     dimension: int,
     vocab_size: int,
     sentence_embeddings: np.ndarray | None,
-) -> faiss.Index:
+) -> Any:  # Returns faiss.Index
     """Build optimized FAISS index with model-aware quantization strategies.
 
     Quantization strategies by corpus size:
@@ -98,6 +98,8 @@ def build_optimized_index(
     Returns:
         Built and populated FAISS index
     """
+    import faiss
+
     # Handle empty corpus
     if vocab_size == 0 or sentence_embeddings is None or sentence_embeddings.size == 0:
         logger.warning("No embeddings to index - creating empty index")

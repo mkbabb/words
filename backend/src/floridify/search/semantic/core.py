@@ -3,21 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import math
 import multiprocessing as mp
 import os
 import platform
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
-import faiss
 import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
 
-from ...caching.core import get_global_cache
-from ...caching.models import CacheNamespace, VersionConfig
+from ...caching.models import VersionConfig
 from ...corpus.core import Corpus
 from ...corpus.manager import get_tree_corpus_manager
 from ...utils.logging import get_logger
@@ -27,6 +23,8 @@ from .constants import (
     DEFAULT_SENTENCE_MODEL,
     ENABLE_GPU_ACCELERATION,
     L2_DISTANCE_NORMALIZATION,
+    MATRYOSHKA_DIM,
+    MATRYOSHKA_DIMENSIONS,
     QUANTIZATION_PRECISION,
     USE_QUANTIZATION,
     SemanticModel,
@@ -39,6 +37,7 @@ from .persistence import (
     load_faiss_index_from_binary_data,
     save_embeddings_and_index,
 )
+from .query_cache import SemanticQueryCache
 
 logger = get_logger(__name__)
 
@@ -63,24 +62,20 @@ class SemanticSearch:
         self.corpus = corpus
 
         # Runtime objects (built from index)
-        self.sentence_model: SentenceTransformer | None = None
+        self.sentence_model: Any | None = None  # SentenceTransformer
         self.sentence_embeddings: np.ndarray | None = None
-        self.sentence_index: faiss.Index | None = None
+        self.sentence_index: Any | None = None  # faiss.Index
         self.device: str = "cpu"
 
-        # Query embedding cache (LRU)
-        self.query_cache: dict[str, np.ndarray] = {}
-        self.query_cache_size = query_cache_size
-        self.query_cache_order: list[str] = []  # For LRU tracking
+        # Per-word embedding cache for incremental updates (<50k words)
+        self._word_embeddings: dict[str, np.ndarray] | None = None
 
-        # Result cache (LRU) - cache final search results
-        self.result_cache: dict[str, list[SearchResult]] = {}
-        self.result_cache_order: list[str] = []
-        self.result_cache_size = 500  # Cache up to 500 unique searches
-
-        # Debounced flush tasks for persisting caches to L2
-        self._flush_task: asyncio.Task[None] | None = None
-        self._result_flush_task: asyncio.Task[None] | None = None
+        # Query/result cache manager (LRU + L2 persistence)
+        self._query_cache_manager = SemanticQueryCache(
+            corpus_uuid=index.corpus_uuid if index else "",
+            model_name=index.model_name if index else "",
+            query_cache_size=query_cache_size,
+        )
 
         # Note: _load_from_index is now async, caller must await it after construction
         # This is handled in from_corpus() and from_index() class methods
@@ -183,21 +178,26 @@ class SemanticSearch:
             )
 
         # Load embeddings and FAISS index - current format only, no legacy support
-        # CRITICAL FIX: Offload blocking gzip decompression and FAISS deserialization
-        # to a thread pool so the event loop stays responsive. For 278K-word corpora
-        # this can take several seconds of CPU-bound decompression.
+        # CRITICAL FIX: Use a dedicated ThreadPoolExecutor so decompression (601MB
+        # embeddings + 392MB FAISS index) doesn't saturate the default executor
+        # that asyncio.to_thread() uses—starving HTTP request handlers.
         try:
             corpus_name = self.index.corpus_name
-            self.sentence_embeddings = await asyncio.to_thread(
-                load_embeddings_from_binary_data, binary_data, corpus_name
-            )
-            self.sentence_index = await asyncio.to_thread(
-                load_faiss_index_from_binary_data, binary_data, corpus_name
-            )
+
+            def _load_all():
+                embeddings = load_embeddings_from_binary_data(binary_data, corpus_name)
+                index = load_faiss_index_from_binary_data(binary_data, corpus_name)
+                return embeddings, index
+
+            loop = asyncio.get_running_loop()
+            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="semantic-init") as executor:
+                self.sentence_embeddings, self.sentence_index = await loop.run_in_executor(
+                    executor, _load_all
+                )
 
             # Restore persisted caches from L2
-            await self._load_query_cache_from_l2()
-            await self._load_result_cache_from_l2()
+            await self._query_cache_manager.load_query_cache_from_l2()
+            await self._query_cache_manager.load_result_cache_from_l2()
 
         except Exception as e:
             logger.error(f"Failed to load embeddings/index from cache: {e}", exc_info=True)
@@ -213,6 +213,8 @@ class SemanticSearch:
         if not ENABLE_GPU_ACCELERATION:
             return "cpu"
 
+        import torch
+
         if torch.cuda.is_available():
             device_name = f"cuda:{torch.cuda.current_device()}"
             logger.info(f"🚀 GPU acceleration enabled: {torch.cuda.get_device_name()}")
@@ -220,7 +222,7 @@ class SemanticSearch:
         logger.info("💻 Using CPU for embedding generation")
         return "cpu"
 
-    async def _initialize_optimized_model(self) -> SentenceTransformer:
+    async def _initialize_optimized_model(self) -> Any:  # Returns SentenceTransformer
         """Initialize sentence transformer with standard optimizations using cached model."""
         if not self.index:
             raise ValueError("Index required to initialize model")
@@ -248,196 +250,6 @@ class SemanticSearch:
             f"Model ready: {self.index.model_name} on {self.device} ({quantization_status})"
         )
         return model
-
-    def _get_cached_query_embedding(self, query: str) -> np.ndarray | None:
-        """Get cached query embedding using LRU eviction.
-
-        Args:
-            query: Normalized query string
-
-        Returns:
-            Cached embedding if available, None otherwise
-
-        """
-        # Generate cache key from query (use hash for consistent keys)
-        cache_key = hashlib.md5(query.encode()).hexdigest()
-
-        if cache_key in self.query_cache:
-            # Move to end of LRU order (most recently used)
-            if cache_key in self.query_cache_order:
-                self.query_cache_order.remove(cache_key)
-            self.query_cache_order.append(cache_key)
-            return self.query_cache[cache_key]
-
-        return None
-
-    def _cache_query_embedding(self, query: str, embedding: np.ndarray) -> None:
-        """Cache query embedding with LRU eviction and L2 persistence.
-
-        Args:
-            query: Normalized query string
-            embedding: Query embedding to cache
-
-        """
-        cache_key = hashlib.md5(query.encode()).hexdigest()
-
-        # LRU eviction if cache is full
-        if len(self.query_cache) >= self.query_cache_size:
-            if self.query_cache_order:
-                # Remove least recently used
-                oldest_key = self.query_cache_order.pop(0)
-                self.query_cache.pop(oldest_key, None)
-
-        # Add to cache
-        self.query_cache[cache_key] = embedding
-        self.query_cache_order.append(cache_key)
-
-        # Schedule debounced flush to L2
-        self._schedule_query_cache_flush()
-
-    def _get_result_cache_key(self, query: str) -> str:
-        """Generate cache key for search results (query-only for max reuse)."""
-        return hashlib.md5(query.encode()).hexdigest()
-
-    def _get_cached_results(
-        self, query: str, max_results: int, min_score: float
-    ) -> list[SearchResult] | None:
-        """Get cached search results using LRU eviction. Truncates from full cache."""
-        cache_key = self._get_result_cache_key(query)
-
-        if cache_key in self.result_cache:
-            # Move to end of LRU order (most recently used)
-            if cache_key in self.result_cache_order:
-                self.result_cache_order.remove(cache_key)
-            self.result_cache_order.append(cache_key)
-            # Filter and truncate from cached full result set
-            cached = self.result_cache[cache_key]
-            return [r for r in cached if r.score >= min_score][:max_results]
-
-        return None
-
-    def _cache_results(
-        self, query: str, max_results: int, min_score: float, results: list[SearchResult]
-    ) -> None:
-        """Cache search results with LRU eviction. Stores full result set."""
-        cache_key = self._get_result_cache_key(query)
-
-        # LRU eviction if cache is full
-        if len(self.result_cache) >= self.result_cache_size:
-            if self.result_cache_order:
-                # Remove least recently used
-                oldest_key = self.result_cache_order.pop(0)
-                self.result_cache.pop(oldest_key, None)
-
-        # Add to cache
-        self.result_cache[cache_key] = results
-        self.result_cache_order.append(cache_key)
-
-        # Schedule debounced flush to L2
-        self._schedule_result_cache_flush()
-
-    def _query_cache_l2_key(self) -> str:
-        """L2 cache key for this index's query embedding cache."""
-        return f"query_embed_cache:{self.index.corpus_uuid}:{self.index.model_name}"
-
-    async def _load_query_cache_from_l2(self) -> None:
-        """Load persisted query embeddings from L2 cache on startup."""
-        if not self.index:
-            return
-        cache = await get_global_cache()
-        cached = await cache.get(
-            namespace=CacheNamespace.SEMANTIC,
-            key=self._query_cache_l2_key(),
-        )
-        if not isinstance(cached, dict):
-            return
-        count = 0
-        for key, emb_bytes in cached.items():
-            if isinstance(emb_bytes, bytes):
-                self.query_cache[key] = np.frombuffer(emb_bytes, dtype=np.float32).copy()
-                self.query_cache_order.append(key)
-                count += 1
-        if count > 0:
-            logger.debug(f"Loaded {count} cached query embeddings from L2")
-
-    def _schedule_query_cache_flush(self) -> None:
-        """Schedule a debounced (5s) flush of query cache to L2."""
-        if self._flush_task and not self._flush_task.done():
-            self._flush_task.cancel()
-        try:
-            loop = asyncio.get_running_loop()
-            self._flush_task = loop.create_task(self._debounced_flush())
-        except RuntimeError:
-            # By design: no event loop means flush is skipped (e.g., sync context)
-            pass
-
-    async def _debounced_flush(self) -> None:
-        """Wait 5s then persist query cache to L2."""
-        await asyncio.sleep(5.0)
-        if not self.index or not self.query_cache:
-            return
-        cache = await get_global_cache()
-        serializable = {k: v.tobytes() for k, v in self.query_cache.items()}
-        await cache.set(
-            namespace=CacheNamespace.SEMANTIC,
-            key=self._query_cache_l2_key(),
-            value=serializable,
-        )
-        logger.debug(f"Flushed {len(serializable)} query embeddings to L2")
-
-    # --- Result cache L2 persistence ---
-
-    def _result_cache_l2_key(self) -> str:
-        """L2 cache key for this index's result cache."""
-        return f"result_cache:{self.index.corpus_uuid}:{self.index.model_name}"
-
-    async def _load_result_cache_from_l2(self) -> None:
-        """Load persisted search results from L2 cache on startup."""
-        if not self.index:
-            return
-        cache = await get_global_cache()
-        cached = await cache.get(
-            namespace=CacheNamespace.SEMANTIC,
-            key=self._result_cache_l2_key(),
-        )
-        if not isinstance(cached, dict):
-            return
-        count = 0
-        for key, results_data in cached.items():
-            if isinstance(results_data, list):
-                self.result_cache[key] = [SearchResult.model_validate(r) for r in results_data]
-                self.result_cache_order.append(key)
-                count += 1
-        if count > 0:
-            logger.debug(f"Loaded {count} cached search results from L2")
-
-    def _schedule_result_cache_flush(self) -> None:
-        """Schedule a debounced (5s) flush of result cache to L2."""
-        if self._result_flush_task and not self._result_flush_task.done():
-            self._result_flush_task.cancel()
-        try:
-            loop = asyncio.get_running_loop()
-            self._result_flush_task = loop.create_task(self._debounced_result_flush())
-        except RuntimeError:
-            # By design: no event loop means flush is skipped (e.g., sync context)
-            pass
-
-    async def _debounced_result_flush(self) -> None:
-        """Wait 5s then persist result cache to L2."""
-        await asyncio.sleep(5.0)
-        if not self.index or not self.result_cache:
-            return
-        cache = await get_global_cache()
-        serializable = {
-            k: [r.model_dump(mode="json") for r in results]
-            for k, results in self.result_cache.items()
-        }
-        await cache.set(
-            namespace=CacheNamespace.SEMANTIC,
-            key=self._result_cache_l2_key(),
-            value=serializable,
-        )
-        logger.debug(f"Flushed {len(serializable)} search result sets to L2")
 
     def _encode(self, texts: list[str], use_multiprocessing: bool = True) -> np.ndarray:
         """Encode texts with optimizations (quantization + GPU acceleration + multiprocessing).
@@ -529,7 +341,7 @@ class SemanticSearch:
                 f"({len(texts) / elapsed:.0f} words/sec, {num_workers} workers)"
             )
 
-            return embeddings
+            return self._truncate_matryoshka(embeddings)
         else:
             # Single-process for small batches or GPU
             if USE_QUANTIZATION and len(texts) > 100:
@@ -538,7 +350,7 @@ class SemanticSearch:
                     f"(~{self._get_compression_ratio(precision):.0%} compression)"
                 )
 
-            return self.sentence_model.encode(
+            embeddings = self.sentence_model.encode(
                 sentences=texts,
                 batch_size=self.index.batch_size,
                 show_progress_bar=len(texts) > 1000,
@@ -549,6 +361,7 @@ class SemanticSearch:
                 device=self.device,
                 normalize_embeddings=True,
             )
+            return self._truncate_matryoshka(embeddings)
 
     def _get_compression_ratio(self, precision: str) -> float:
         """Calculate compression ratio for different precisions."""
@@ -560,6 +373,35 @@ class SemanticSearch:
             "ubinary": 0.03125,
         }
         return ratios.get(precision, 1.0)
+
+    def _truncate_matryoshka(self, embeddings: np.ndarray) -> np.ndarray:
+        """Truncate embeddings using Matryoshka Representation Learning.
+
+        Only applies to MRL-capable models (Qwen3) when MATRYOSHKA_DIM is set.
+        Truncated embeddings are re-normalized to maintain unit length.
+        """
+        if MATRYOSHKA_DIM is None or not self.index:
+            return embeddings
+
+        model_name = self.index.model_name
+        supported_dims = MATRYOSHKA_DIMENSIONS.get(model_name)
+        if not supported_dims or MATRYOSHKA_DIM not in supported_dims:
+            return embeddings
+
+        if embeddings.ndim == 1:
+            truncated = embeddings[:MATRYOSHKA_DIM]
+        else:
+            truncated = embeddings[:, :MATRYOSHKA_DIM]
+
+        # Re-normalize to unit length after truncation
+        norms = np.linalg.norm(truncated, axis=-1, keepdims=True)
+        norms = np.where(norms == 0, 1, norms)
+        truncated = truncated / norms
+
+        if embeddings.shape[-1] != MATRYOSHKA_DIM:
+            logger.debug(f"Matryoshka truncation: {embeddings.shape[-1]}D → {MATRYOSHKA_DIM}D")
+
+        return truncated
 
     async def initialize(self) -> None:
         """Initialize semantic search by building embeddings."""
@@ -605,6 +447,10 @@ class SemanticSearch:
     async def update_corpus(self, corpus: Corpus) -> None:
         """Update corpus and reinitialize if vocabulary hash has changed.
 
+        Uses incremental embedding updates for corpora <50k words:
+        only encodes new words and removes deleted ones, then rebuilds
+        the FAISS index (cheap) from the updated embedding matrix.
+
         Args:
             corpus: New corpus instance
 
@@ -613,27 +459,91 @@ class SemanticSearch:
             raise ValueError("Index required for corpus update")
 
         if corpus.vocabulary_hash != self.index.vocabulary_hash:
-            logger.info(
-                f"Vocabulary hash changed for corpus '{corpus.corpus_name}', reinitializing semantic search",
-            )
-            self.corpus = corpus
+            old_vocab = set(self.corpus.lemmatized_vocabulary) if self.corpus else set()
+            new_vocab = set(corpus.lemmatized_vocabulary)
 
-            # Create new index with updated corpus
-            self.index = await SemanticIndex.create(
-                corpus=corpus,
-                model_name=self.index.model_name,
-                batch_size=self.index.batch_size,
+            can_incremental = (
+                self.sentence_embeddings is not None
+                and self._word_embeddings is not None
+                and len(new_vocab) < 50000
+                and old_vocab  # Must have previous vocab to diff against
             )
 
-            # Clear existing runtime data to force rebuild
-            self.sentence_embeddings = None
-            self.sentence_index = None
-            self.result_cache.clear()
-            self.result_cache_order.clear()
+            if can_incremental:
+                added = new_vocab - old_vocab
+                removed = old_vocab - new_vocab
 
-            await self._build_embeddings_from_corpus()
+                logger.info(
+                    f"Incremental update for '{corpus.corpus_name}': "
+                    f"+{len(added)} -{len(removed)} words "
+                    f"(total: {len(old_vocab)} → {len(new_vocab)})"
+                )
+
+                self.corpus = corpus
+                self.index = await SemanticIndex.create(
+                    corpus=corpus,
+                    model_name=self.index.model_name,
+                    batch_size=self.index.batch_size,
+                )
+
+                # Remove deleted words from per-word cache
+                for w in removed:
+                    self._word_embeddings.pop(w, None)
+
+                # Encode only new words
+                if added:
+                    added_list = sorted(added)
+                    new_embs = self._encode(added_list, use_multiprocessing=False)
+                    for word, emb in zip(added_list, new_embs):
+                        self._word_embeddings[word] = emb
+
+                # Rebuild embedding matrix from per-word cache in corpus order
+                ordered_vocab = corpus.lemmatized_vocabulary
+                self.sentence_embeddings = np.vstack(
+                    [self._word_embeddings[w] for w in ordered_vocab]
+                )
+
+                # Identity variant mapping
+                self.index.variant_mapping = {i: i for i in range(len(ordered_vocab))}
+
+                # Rebuild FAISS index (cheap — sub-millisecond for <50k)
+                configure_faiss_threading()
+                dimension = self.sentence_embeddings.shape[1]
+                self.sentence_index = build_optimized_index(
+                    dimension, len(ordered_vocab), self.sentence_embeddings
+                )
+
+                self.index.vocabulary_hash = corpus.vocabulary_hash
+                self.index.num_embeddings = len(ordered_vocab)
+                self.index.embedding_dimension = dimension
+
+                self._query_cache_manager.clear_result_cache()
+
+                # Save updated index
+                await save_embeddings_and_index(
+                    index=self.index,
+                    sentence_embeddings=self.sentence_embeddings,
+                    sentence_index=self.sentence_index,
+                    build_time=0.0,
+                    corpus_uuid=corpus.corpus_uuid if corpus else self.index.corpus_uuid,
+                )
+            else:
+                logger.info(
+                    f"Vocabulary hash changed for corpus '{corpus.corpus_name}', "
+                    f"full rebuild (incremental not available)"
+                )
+                self.corpus = corpus
+                self.index = await SemanticIndex.create(
+                    corpus=corpus,
+                    model_name=self.index.model_name,
+                    batch_size=self.index.batch_size,
+                )
+                self.sentence_embeddings = None
+                self.sentence_index = None
+                self._word_embeddings = None
+                self._query_cache_manager.clear_result_cache()
+                await self._build_embeddings_from_corpus()
         else:
-            # Just update the corpus reference
             self.corpus = corpus
 
     async def _build_embeddings_from_corpus(self) -> None:
@@ -658,10 +568,12 @@ class SemanticSearch:
         logger.info("Building new semantic embeddings using pre-computed lemmas")
 
         start_time = time.perf_counter()
-        # CRITICAL FIX: Offload blocking embedding work to a thread pool so
-        # the async event loop stays responsive for HTTP requests while the
-        # (potentially minutes-long) encoding runs in background.
-        await asyncio.to_thread(self._build_embeddings)
+        # CRITICAL FIX: Use dedicated executor so embedding work (potentially
+        # minutes-long) doesn't saturate the default thread pool and starve
+        # HTTP request handlers.
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="embed-build") as executor:
+            await loop.run_in_executor(executor, self._build_embeddings)
         build_time_seconds = time.perf_counter() - start_time
 
         logger.info(f"Built semantic embeddings in {build_time_seconds * 1000:.1f}ms")
@@ -811,6 +723,15 @@ class SemanticSearch:
         memory_mb = self.sentence_embeddings.nbytes / (1024 * 1024)
         logger.info(f"✅ Embeddings optimized: {memory_mb:.1f}MB")
 
+        # Build per-word embedding cache for incremental updates (<50k words)
+        if vocab_count < 50000:
+            self._word_embeddings = {
+                word: self.sentence_embeddings[i] for i, word in enumerate(embedding_vocabulary)
+            }
+            logger.debug(f"Built per-word embedding cache: {vocab_count} entries")
+        else:
+            self._word_embeddings = None
+
         # Build FAISS index for sentence embeddings with dynamic optimization
         dimension = self.sentence_embeddings.shape[1]
         vocab_size = len(self.corpus.lemmatized_vocabulary)
@@ -921,7 +842,9 @@ class SemanticSearch:
                 return []
 
             # Check result cache first (fastest path)
-            cached_results = self._get_cached_results(normalized_query, max_results, min_score)
+            cached_results = self._query_cache_manager.get_cached_results(
+                normalized_query, max_results, min_score
+            )
             if cached_results is not None:
                 return cached_results
 
@@ -930,7 +853,9 @@ class SemanticSearch:
 
             if query_embedding is None:
                 # Check embedding cache
-                query_embedding = self._get_cached_query_embedding(normalized_query)
+                query_embedding = self._query_cache_manager.get_cached_query_embedding(
+                    normalized_query
+                )
 
             if query_embedding is None:
                 # Cache miss - generate embedding asynchronously (releases GIL)
@@ -941,7 +866,7 @@ class SemanticSearch:
                     return []
 
                 # Cache the embedding for future queries
-                self._cache_query_embedding(normalized_query, query_embedding)
+                self._query_cache_manager.cache_query_embedding(normalized_query, query_embedding)
 
             # Search using FAISS asynchronously (releases GIL)
             distances, indices = await asyncio.to_thread(
@@ -1014,7 +939,9 @@ class SemanticSearch:
                     break
 
             # Cache results for future queries
-            self._cache_results(normalized_query, max_results, min_score, results)
+            self._query_cache_manager.cache_results(
+                normalized_query, max_results, min_score, results
+            )
 
             return results
 

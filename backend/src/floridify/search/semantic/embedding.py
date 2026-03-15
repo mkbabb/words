@@ -10,7 +10,6 @@ import time
 from typing import Any
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from ...utils.logging import get_logger
 
@@ -37,6 +36,8 @@ def _encode_chunk_worker(
     Returns:
         Numpy array of embeddings for the chunk
     """
+    from sentence_transformers import SentenceTransformer
+
     # Each worker loads its own model to avoid shared state
     model = SentenceTransformer(model_name)
 
@@ -102,7 +103,9 @@ async def get_cached_model(
         # CRITICAL FIX: Offload blocking model loading to a thread pool.
         # SentenceTransformer() loads ~600MB of weights from disk (or downloads
         # them), which blocks the event loop for 1-3s and stalls HTTP requests.
-        def _load_model() -> SentenceTransformer:
+        def _load_model() -> Any:  # Returns SentenceTransformer
+            from sentence_transformers import SentenceTransformer
+
             if use_onnx:
                 try:
                     m = SentenceTransformer(model_name, backend="onnx", trust_remote_code=True)
@@ -112,7 +115,13 @@ async def get_cached_model(
                     logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
             return SentenceTransformer(model_name, trust_remote_code=True)
 
-        model = await asyncio.to_thread(_load_model)
+        # Use a dedicated executor so loading ~600MB of weights doesn't
+        # saturate the default thread pool and starve HTTP request handlers.
+        from concurrent.futures import ThreadPoolExecutor
+
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-load") as executor:
+            model = await loop.run_in_executor(executor, _load_model)
 
         # Set device for GPU acceleration (fast, no I/O)
         model = model.to(device)
@@ -134,7 +143,7 @@ async def get_cached_model(
 def get_cached_model_sync(
     model_name: str,
     device: str = "cpu",
-) -> SentenceTransformer:
+) -> Any:  # Returns SentenceTransformer
     """Synchronous model load, shares _model_cache with async get_cached_model().
 
     Used by WOTD embeddings and other sync contexts that need the same model.
@@ -154,6 +163,8 @@ def get_cached_model_sync(
 
     logger.info(f"⏳ Loading model {model_name} on {device} (sync, will be cached)")
     start_time = time.perf_counter()
+
+    from sentence_transformers import SentenceTransformer
 
     model = SentenceTransformer(model_name, trust_remote_code=True).to(device)
     _model_cache[cache_key] = model

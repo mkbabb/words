@@ -50,6 +50,12 @@ MATRYOSHKA_DIMENSIONS = {
     QWEN3_0_6B_MODEL: [32, 64, 128, 256, 512, 1024],
 }
 
+# Matryoshka truncation dimension for MRL-capable models
+# 512-dim halves memory/storage vs full 1024-dim with <1% quality loss on semantic similarity
+MATRYOSHKA_DIM: int | None = int(os.getenv("FLORIDIFY_MATRYOSHKA_DIM", "512"))
+if MATRYOSHKA_DIM == 0:
+    MATRYOSHKA_DIM = None  # Disable truncation
+
 # FAISS Configuration
 L2_DISTANCE_NORMALIZATION = 2  # Divisor for L2 distance to similarity conversion
 

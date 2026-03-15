@@ -20,13 +20,23 @@ from ...caching.models import (
 )
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
-from .constants import DEFAULT_BATCH_SIZE, DEFAULT_SENTENCE_MODEL, MODEL_BATCH_SIZES
+from .constants import DEFAULT_BATCH_SIZE, DEFAULT_SENTENCE_MODEL, MATRYOSHKA_DIM, MODEL_BATCH_SIZES
 
 logger = get_logger(__name__)
 
 __all__ = [
     "SemanticIndex",
 ]
+
+
+def _build_resource_id(corpus_uuid: str, model_name: str, vocab_hash: str) -> str:
+    """Build a consistent resource ID for semantic indices.
+
+    Includes MATRYOSHKA_DIM so old (full-dim) and new (truncated) indices coexist.
+    """
+    vocab_hash_short = vocab_hash[:8] if vocab_hash else "none"
+    dim_suffix = f":d{MATRYOSHKA_DIM}" if MATRYOSHKA_DIM else ""
+    return f"{corpus_uuid}:semantic:{model_name}:{vocab_hash_short}{dim_suffix}"
 
 
 class SemanticIndex(BaseModel):
@@ -148,9 +158,7 @@ class SemanticIndex(BaseModel):
                 logger.warning(f"Corpus not found: uuid={corpus_uuid}, name={corpus_name}")
                 return None
 
-        # Build resource ID including vocabulary_hash to invalidate cache on vocab changes
-        vocab_hash_short = corpus.vocabulary_hash[:8] if corpus.vocabulary_hash else "none"
-        resource_id = f"{corpus.corpus_uuid}:semantic:{model_name}:{vocab_hash_short}"
+        resource_id = _build_resource_id(corpus.corpus_uuid, model_name, corpus.vocabulary_hash)
 
         # Get the latest semantic index metadata
         metadata: SemanticIndex.Metadata | None = await manager.get_latest(
@@ -301,11 +309,8 @@ class SemanticIndex(BaseModel):
 
         """
         manager = get_version_manager()
-        # Use corpus_uuid for consistency with get() method
         cid = corpus_uuid or self.corpus_uuid
-        # Include vocabulary_hash in resource_id to invalidate cache on vocab changes
-        vocab_hash_short = self.vocabulary_hash[:8] if self.vocabulary_hash else "none"
-        resource_id = f"{cid}:semantic:{self.model_name}:{vocab_hash_short}"
+        resource_id = _build_resource_id(cid, self.model_name, self.vocabulary_hash)
 
         # CRITICAL FIX: Prepare content WITHOUT binary_data for manager.save()
         # binary_data will be added to external storage AFTER metadata is saved
@@ -446,9 +451,7 @@ class SemanticIndex(BaseModel):
         )
 
         manager = get_version_manager()
-        # Include vocabulary_hash in resource_id to match save() and get()
-        vocab_hash_short = self.vocabulary_hash[:8] if self.vocabulary_hash else "none"
-        resource_id = f"{self.corpus_uuid}:semantic:{self.model_name}:{vocab_hash_short}"
+        resource_id = _build_resource_id(self.corpus_uuid, self.model_name, self.vocabulary_hash)
 
         try:
             # Get the latest version to delete

@@ -1,7 +1,8 @@
 """Persistence layer for semantic search embeddings and FAISS indices.
 
-Handles serialization, compression (gzip), and storage of embedding arrays
-and FAISS indices using native FAISS I/O and pickle.
+Handles serialization and storage of embedding arrays and FAISS indices
+using native FAISS I/O and pickle. Compression is delegated to the L2
+cache layer (ZSTD) to avoid double compression.
 """
 
 from __future__ import annotations
@@ -10,8 +11,8 @@ import gzip
 import os
 import pickle
 import tempfile
+from typing import Any
 
-import faiss
 import numpy as np
 
 from ...caching.filesystem import safe_pickle_loads
@@ -38,21 +39,28 @@ def load_embeddings_from_binary_data(
     Raises:
         RuntimeError: If data is missing, corrupted, or in an unsupported format
     """
-    if "embeddings_compressed_bytes" not in binary_data:
+    if "embeddings_bytes" not in binary_data and "embeddings_compressed_bytes" not in binary_data:
         raise RuntimeError(
             f"Invalid semantic index format for '{corpus_name}': "
-            f"missing 'embeddings_compressed_bytes'. Legacy formats no longer supported."
+            f"missing 'embeddings_bytes' or 'embeddings_compressed_bytes'."
         )
 
     try:
-        compressed_bytes = binary_data["embeddings_compressed_bytes"]
+        # Support both new (raw) and old (gzip-compressed) formats
+        if "embeddings_bytes" in binary_data:
+            raw_bytes = binary_data["embeddings_bytes"]
+            logger.debug(f"Loading raw embeddings ({len(raw_bytes) / 1024 / 1024:.1f}MB)")
+            embeddings = safe_pickle_loads(raw_bytes)
+        else:
+            compressed_bytes = binary_data["embeddings_compressed_bytes"]
+            logger.debug(
+                f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)"
+            )
+            raw_bytes = gzip.decompress(compressed_bytes)
+            embeddings = safe_pickle_loads(raw_bytes)
+
         logger.debug(
-            f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)"
-        )
-        embeddings_bytes = gzip.decompress(compressed_bytes)
-        embeddings = safe_pickle_loads(embeddings_bytes)
-        logger.debug(
-            f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB, "
+            f"Loaded embeddings: {len(raw_bytes) / 1024 / 1024:.2f}MB, "
             f"shape={embeddings.shape if embeddings is not None else 'none'}"
         )
 
@@ -70,7 +78,7 @@ def load_embeddings_from_binary_data(
 def load_faiss_index_from_binary_data(
     binary_data: dict[str, object],
     corpus_name: str,
-) -> faiss.Index:
+) -> Any:  # Returns faiss.Index
     """Load and decompress a FAISS index from binary data.
 
     Args:
@@ -83,22 +91,33 @@ def load_faiss_index_from_binary_data(
     Raises:
         RuntimeError: If data is missing, corrupted, or in an unsupported format
     """
-    if "index_compressed_bytes" not in binary_data:
+    if "index_bytes" not in binary_data and "index_compressed_bytes" not in binary_data:
         raise RuntimeError(
             f"Invalid semantic index format for '{corpus_name}': "
-            f"missing 'index_compressed_bytes'. Legacy formats no longer supported."
+            f"missing 'index_bytes' or 'index_compressed_bytes'."
         )
 
     try:
-        compressed = binary_data["index_compressed_bytes"]
-        if isinstance(compressed, str):
-            raise RuntimeError(
-                f"Invalid index format for '{corpus_name}': base64-encoded data no longer supported"
-            )
+        import faiss
 
-        logger.debug("Decompressing gzip FAISS index")
-        index_bytes = gzip.decompress(compressed)
-        logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
+        # Support both new (raw) and old (gzip-compressed) formats
+        if "index_bytes" in binary_data:
+            raw_index = binary_data["index_bytes"]
+            if isinstance(raw_index, str):
+                raise RuntimeError(
+                    f"Invalid index format for '{corpus_name}': base64-encoded data no longer supported"
+                )
+            logger.debug(f"Loading raw FAISS index ({len(raw_index) / 1024 / 1024:.1f}MB)")
+            index_bytes = raw_index
+        else:
+            compressed = binary_data["index_compressed_bytes"]
+            if isinstance(compressed, str):
+                raise RuntimeError(
+                    f"Invalid index format for '{corpus_name}': base64-encoded data no longer supported"
+                )
+            logger.debug("Decompressing gzip FAISS index")
+            index_bytes = gzip.decompress(compressed)
+            logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
 
         # Write bytes to temp file and load with FAISS native read
         with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
@@ -122,7 +141,7 @@ def load_faiss_index_from_binary_data(
 async def save_embeddings_and_index(
     index: SemanticIndex,
     sentence_embeddings: np.ndarray | None,
-    sentence_index: faiss.Index | None,
+    sentence_index: Any | None,  # faiss.Index
     build_time: float,
     corpus_uuid: str,
 ) -> None:
@@ -146,26 +165,19 @@ async def save_embeddings_and_index(
     # Architecture: Write raw compressed bytes to cache filesystem using pickle
     binary_data: dict[str, object] = {}
 
-    # Serialize and always compress embeddings (gzip level 1 is fast even for small data)
+    # Serialize embeddings (compression delegated to L2 cache layer)
     if sentence_embeddings is not None and sentence_embeddings.size > 0:
         embeddings_bytes = pickle.dumps(sentence_embeddings)
         embeddings_size_mb = len(embeddings_bytes) / 1024 / 1024
-
-        logger.info(f"Compressing embeddings ({embeddings_size_mb:.1f}MB)...")
-        compressed_bytes = gzip.compress(embeddings_bytes, compresslevel=1)
-        compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-        compression_ratio = (1 - compressed_size_mb / embeddings_size_mb) * 100
-        logger.info(
-            f"Compressed embeddings: {embeddings_size_mb:.1f}MB -> {compressed_size_mb:.1f}MB "
-            f"({compression_ratio:.1f}% reduction)"
-        )
-        binary_data["embeddings_compressed_bytes"] = compressed_bytes
-        binary_data["embeddings_compressed"] = "gzip"
+        logger.info(f"Serialized embeddings: {embeddings_size_mb:.1f}MB")
+        binary_data["embeddings_bytes"] = embeddings_bytes
 
     # CRITICAL FIX (2025-10-22): Use FAISS native disk I/O instead of pickle serialization
     # pickle.dumps(faiss.serialize_index()) does DOUBLE serialization which hangs for 20+ mins
     # FAISS's write_index() writes directly to disk using optimized C++ I/O
     if sentence_index is not None:
+        import faiss
+
         logger.info("Serializing FAISS index using native disk I/O (not pickle)...")
 
         # Write FAISS index directly to temp file using optimized C++ serialization
@@ -182,14 +194,7 @@ async def save_embeddings_and_index(
 
             index_size_mb = len(index_bytes) / 1024 / 1024
             logger.info(f"FAISS index serialized: {index_size_mb:.1f}MB using native disk I/O")
-
-            # Always compress FAISS index (gzip level 1 is fast even for small data)
-            logger.info(f"Compressing FAISS index ({index_size_mb:.1f}MB)...")
-            compressed_bytes = gzip.compress(index_bytes, compresslevel=1)
-            compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-            logger.info(f"Compressed FAISS: {index_size_mb:.1f}MB → {compressed_size_mb:.1f}MB")
-            binary_data["index_compressed_bytes"] = compressed_bytes
-            binary_data["index_compressed"] = "gzip"
+            binary_data["index_bytes"] = index_bytes
         finally:
             # Clean up temp file
             if os.path.exists(tmp_path):
@@ -227,7 +232,7 @@ async def save_embeddings_and_index(
             binary_data=binary_data,
         )
         logger.info(
-            "✅ Semantic index saved successfully (metadata in MongoDB, data in cache backend)"
+            "\u2705 Semantic index saved successfully (metadata in MongoDB, data in cache backend)"
         )
     except Exception as e:
         logger.error(f"Failed to save semantic index: {e}")
