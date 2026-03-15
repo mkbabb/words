@@ -176,6 +176,6 @@ async def save_definitions_batch_versioned(
         word_text: Word text for resource ID context.
 
     """
-    await asyncio.gather(
-        *[save_definition_versioned(d, word_text) for d in definitions],
-    )
+    async with asyncio.TaskGroup() as tg:
+        for d in definitions:
+            tg.create_task(save_definition_versioned(d, word_text))

@@ -113,18 +113,15 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
 
     async def _cascade_delete(self, word: Word) -> None:
         """Delete related documents when deleting a word."""
-        # Delete all related documents in parallel for better performance
         word_id_str = str(word.id)
-        await asyncio.gather(
-            Definition.find({"word_id": word_id_str}).delete(),
-            Example.find({"word_id": word_id_str}).delete(),
-            Fact.find({"word_id": word_id_str}).delete(),
-            Pronunciation.find({"word_id": word_id_str}).delete(),
-            DictionaryEntry.find({"word_id": word_id_str}).delete(),
-            # Delete relationships where word is source or target
-            WordRelationship.find({"from_word_id": word.id}).delete(),
-            WordRelationship.find({"to_word_id": word.id}).delete(),
-        )
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(Definition.find({"word_id": word_id_str}).delete())
+            tg.create_task(Example.find({"word_id": word_id_str}).delete())
+            tg.create_task(Fact.find({"word_id": word_id_str}).delete())
+            tg.create_task(Pronunciation.find({"word_id": word_id_str}).delete())
+            tg.create_task(DictionaryEntry.find({"word_id": word_id_str}).delete())
+            tg.create_task(WordRelationship.find({"from_word_id": word.id}).delete())
+            tg.create_task(WordRelationship.find({"to_word_id": word.id}).delete())
 
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get word with related document counts."""
@@ -139,11 +136,11 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         examples_count_task = Example.find({"word_id": word_id_str}).count()
         facts_count_task = Fact.find({"word_id": word_id_str}).count()
 
-        definitions_count, examples_count, facts_count = await asyncio.gather(
-            definitions_count_task,
-            examples_count_task,
-            facts_count_task,
-        )
+        async with asyncio.TaskGroup() as tg:
+            t1 = tg.create_task(definitions_count_task)
+            t2 = tg.create_task(examples_count_task)
+            t3 = tg.create_task(facts_count_task)
+        definitions_count, examples_count, facts_count = t1.result(), t2.result(), t3.result()
 
         word_dict["counts"] = {
             "definitions": definitions_count,

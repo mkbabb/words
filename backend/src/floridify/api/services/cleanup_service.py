@@ -32,13 +32,17 @@ class CleanupService:
             Total number of documents modified across all collections
 
         """
-        tasks = [
-            collection.update_many({array_field: object_id}, {"$pull": {array_field: object_id}})
-            for collection in collections
-        ]
-
-        results = await asyncio.gather(*tasks)
-        total_modified = sum(result.modified_count for result in results)
+        results = []
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(
+                    collection.update_many(
+                        {array_field: object_id}, {"$pull": {array_field: object_id}}
+                    )
+                )
+                for collection in collections
+            ]
+        total_modified = sum(t.result().modified_count for t in tasks)
 
         logger.warning(
             f"Removed ObjectId {object_id} from {total_modified} documents across {len(collections)} collections",
