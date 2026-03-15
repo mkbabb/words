@@ -41,6 +41,26 @@
                 definitionIndex + 1
             }}</sup>
 
+            <!-- Frequency stars (edit mode) — inline with POS -->
+            <div v-if="editModeEnabled && (definition.frequency_band || editModeEnabled)" class="ml-auto flex items-center gap-1">
+                <span class="text-xs text-muted-foreground">Freq:</span>
+                <div class="flex gap-0.5">
+                    <button
+                        v-for="star in 5"
+                        :key="star"
+                        @click="
+                            fields.frequency_band.value = star;
+                            fields.frequency_band.isDirty = true;
+                            save();
+                        "
+                        class="text-sm transition-colors hover:scale-110"
+                        :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
+                    >
+                        &#9733;
+                    </button>
+                </div>
+            </div>
+
             <!-- Streaming Indicator -->
             <div
                 v-if="isStreaming && isPartialDefinition"
@@ -181,10 +201,10 @@
                 @synonym-click="emit('searchWord', $event)"
             />
 
-            <!-- Domain & Region (edit mode only) -->
-            <div v-if="editModeEnabled" class="mt-3 flex flex-wrap items-center gap-3">
+            <!-- Domain & Region (edit mode, only when values exist) -->
+            <div v-if="editModeEnabled && (definition.domain || definition.region)" class="mt-3 flex flex-wrap items-center gap-3">
                 <EditableField
-                    v-if="definition.domain || editModeEnabled"
+                    v-if="definition.domain"
                     v-model="fields.domain.value"
                     field-name="domain"
                     :edit-mode="editModeEnabled"
@@ -200,14 +220,14 @@
                     "
                 >
                     <template #display>
-                        <span v-if="definition.domain" class="text-xs text-muted-foreground">
+                        <span class="text-xs text-muted-foreground">
                             Domain: {{ definition.domain }}
                         </span>
                     </template>
                 </EditableField>
 
                 <EditableField
-                    v-if="definition.region || editModeEnabled"
+                    v-if="definition.region"
                     v-model="fields.region.value"
                     field-name="region"
                     :edit-mode="editModeEnabled"
@@ -220,31 +240,11 @@
                     "
                 >
                     <template #display>
-                        <span v-if="definition.region" class="text-xs text-muted-foreground">
+                        <span class="text-xs text-muted-foreground">
                             Region: {{ definition.region }}
                         </span>
                     </template>
                 </EditableField>
-            </div>
-
-            <!-- Frequency (edit mode only, standalone row for alignment) -->
-            <div v-if="editModeEnabled && (definition.frequency_band || editModeEnabled)" class="mt-2 flex items-center gap-1">
-                <span class="text-xs text-muted-foreground">Freq:</span>
-                <div class="flex gap-0.5">
-                    <button
-                        v-for="star in 5"
-                        :key="star"
-                        @click="
-                            fields.frequency_band.value = star;
-                            fields.frequency_band.isDirty = true;
-                            save();
-                        "
-                        class="text-xs transition-colors"
-                        :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
-                    >
-                        &#9733;
-                    </button>
-                </div>
             </div>
 
             <!-- Usage Notes (edit mode) -->
