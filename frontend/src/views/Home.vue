@@ -12,7 +12,7 @@
             "
         >
         <!-- Main View -->
-        <div class="relative min-h-screen p-0 lg:p-4">
+        <div class="relative min-h-screen px-2 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
                 <SearchBar
@@ -32,13 +32,13 @@
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
                     <div
-                        class="hidden lg:block transition-all duration-300 ease-out"
-                        :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0'"
+                        class="hidden lg:block transition-all duration-200 ease-out overflow-hidden"
+                        :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0 pointer-events-none'"
                     >
                         <div
                             v-if="shouldShowProgressiveSidebar"
                             class="sticky w-48"
-                            :style="{ top: '5.5rem', zIndex: 30 }"
+                            :style="{ top: '5.5rem' /* search bar height + padding */ }"
                         >
                             <ProgressiveSidebar />
                         </div>
@@ -50,7 +50,7 @@
                         <Transition
                     name="content-switch"
                     mode="out-in"
-                    :duration="{ enter: 300, leave: 500 }"
+                    :duration="{ enter: 300, leave: 250 }"
                 >
                     <!-- Definition Content -->
                     <div v-if="searchBar.searchMode === 'lookup' && lookupSubMode !== 'suggestions'" key="lookup">
@@ -331,9 +331,9 @@ const searchBarClasses = computed(() => [
     'transition-all duration-300 ease-out',
     'sticky',
     {
-        'py-8': scrollProgress.value < 0.3,
-        'py-4': scrollProgress.value >= 0.3 && scrollProgress.value < 0.7,
-        'py-2': scrollProgress.value >= 0.7,
+        'py-4 sm:py-8': scrollProgress.value < 0.3,
+        'py-2 sm:py-4': scrollProgress.value >= 0.3 && scrollProgress.value < 0.7,
+        'py-1 sm:py-2': scrollProgress.value >= 0.7,
     },
 ]);
 
@@ -357,7 +357,8 @@ onMounted(async () => {
 /* Content switch animation */
 .content-switch-enter-active,
 .content-switch-leave-active {
-    transition: opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: opacity 0.3s var(--ease-apple-default),
+                transform 0.3s var(--ease-apple-default);
 }
 
 .content-switch-enter-from {
@@ -392,6 +393,6 @@ onMounted(async () => {
 }
 
 .animate-card-fade-in {
-    animation: cardFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    animation: cardFadeIn 0.4s var(--ease-apple-default) forwards;
 }
 </style>
