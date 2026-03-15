@@ -9,19 +9,16 @@ from pydantic import BaseModel, Field
 from ....models import Word
 from ....models.base import Language
 from ...core import (
+    AdminDep,
     ErrorDetail,
     ErrorResponse,
-    FieldSelection,
+    FieldsDep,
     ListResponse,
-    PaginationParams,
+    PaginationDep,
     ResourceResponse,
     ResponseBuilder,
-    SortParams,
-    get_fields,
-    get_pagination,
-    get_sort,
+    SortDep,
 )
-from ...middleware.auth import require_admin
 from ...repositories import (
     DefinitionRepository,
     WordCreate,
@@ -51,10 +48,10 @@ class WordQueryParams(BaseModel):
 
 @router.get("", response_model=ListResponse[Word])
 async def list_words(
+    pagination: PaginationDep,
+    sort: SortDep,
+    fields: FieldsDep,
     repo: WordRepository = Depends(get_word_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-    sort: SortParams = Depends(get_sort),
-    fields: FieldSelection = Depends(get_fields),
     params: WordQueryParams = Depends(),
 ) -> ListResponse[Word]:
     """Retrieve paginated word list with filtering and sorting.
@@ -115,7 +112,7 @@ async def list_words(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_word(
     data: WordCreate,
-    _admin: str = Depends(require_admin),
+    _admin: AdminDep,
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Create new word entry.
@@ -172,8 +169,8 @@ async def get_word(
     word_id: PydanticObjectId,
     request: Request,
     response: Response,
+    fields: FieldsDep,
     repo: WordRepository = Depends(get_word_repo),
-    fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
     """Retrieve word details by ID.
 
@@ -231,8 +228,8 @@ async def get_word(
 async def update_word(
     word_id: PydanticObjectId,
     data: WordUpdate,
+    _admin: AdminDep,
     version: int | None = Query(None, description="Version for optimistic locking"),
-    _admin: str = Depends(require_admin),
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Update word with optimistic concurrency control.
@@ -267,8 +264,8 @@ async def update_word(
 @router.delete("/{word_id}", status_code=204, response_model=None)
 async def delete_word(
     word_id: PydanticObjectId,
+    _admin: AdminDep,
     cascade: bool = Query(False, description="Delete related documents"),
-    _admin: str = Depends(require_admin),
     repo: WordRepository = Depends(get_word_repo),
 ) -> None:
     """Delete word and optionally cascade to related documents.

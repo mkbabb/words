@@ -17,14 +17,12 @@ from ....wordlist.models import WordList
 from ....wordlist.parser import parse_file
 from ....wordlist.utils import generate_wordlist_name
 from ...core import (
+    CurrentUserDep,
     ListResponse,
-    PaginationParams,
+    PaginationDep,
     ResourceResponse,
-    SortParams,
-    get_pagination,
-    get_sort,
+    SortDep,
 )
-from ...middleware.auth import get_current_user
 from ...repositories import (
     WordListCreate,
     WordListFilter,
@@ -56,9 +54,9 @@ class WordListQueryParams(BaseModel):
 
 @router.get("", response_model=ListResponse[dict[str, Any]])
 async def list_wordlists(
+    pagination: PaginationDep,
+    sort: SortDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-    sort: SortParams = Depends(get_sort),
     params: WordListQueryParams = Depends(),
 ) -> ListResponse[WordList]:
     """List wordlists with filtering and pagination.
@@ -113,7 +111,7 @@ async def list_wordlists(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_wordlist(
     data: WordListCreate,
-    user_id: str = Depends(get_current_user),
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Create a new wordlist.
@@ -230,7 +228,7 @@ async def get_wordlist_statistics(
 async def update_wordlist(
     wordlist_id: PydanticObjectId,
     data: WordListUpdate,
-    user_id: str = Depends(get_current_user),
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Update wordlist metadata.
@@ -262,7 +260,7 @@ async def update_wordlist(
 @router.delete("/{wordlist_id}", status_code=204, response_model=None)
 async def delete_wordlist(
     wordlist_id: PydanticObjectId,
-    user_id: str = Depends(get_current_user),
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> None:
     """Delete a wordlist."""
@@ -271,11 +269,11 @@ async def delete_wordlist(
 
 @router.post("/upload", response_model=ResourceResponse, status_code=201)
 async def upload_wordlist(
+    user_id: CurrentUserDep,
     file: UploadFile = File(...),
     name: str | None = None,
     description: str | None = None,
     is_public: bool = False,
-    user_id: str = Depends(get_current_user),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Upload a wordlist from a file.

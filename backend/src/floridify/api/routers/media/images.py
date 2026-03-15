@@ -18,11 +18,9 @@ from ...core import (
     ErrorDetail,
     ErrorResponse,
     ListResponse,
-    PaginationParams,
+    PaginationDep,
     ResourceResponse,
-    SortParams,
-    get_pagination,
-    get_sort,
+    SortDep,
 )
 from ...repositories import (
     ImageCreate,
@@ -65,9 +63,9 @@ class ImageUploadResponse(BaseModel):
 
 @router.get("", response_model=ListResponse[dict[str, Any]])
 async def list_images(
+    pagination: PaginationDep,
+    sort: SortDep,
     repo: ImageRepository = Depends(get_image_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-    sort: SortParams = Depends(get_sort),
     params: ImageQueryParams = Depends(),
 ) -> ListResponse[dict[str, Any]]:
     """List images with filtering and pagination.

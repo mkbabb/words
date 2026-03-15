@@ -27,7 +27,7 @@ from ...models.user import UserRole
 from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
-from ..middleware.auth import get_optional_user_role, require_admin
+from ..core import AdminDep, OptionalUserRoleDep
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -126,8 +126,8 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
 @router.get("/lookup/{word}", response_model=DictionaryEntryResponse)
 async def lookup_word(
     word: str,
+    user_role: OptionalUserRoleDep,
     params: LookupParams = Depends(parse_lookup_params),
-    user_role: UserRole | None = Depends(get_optional_user_role),
 ) -> DictionaryEntryResponse:
     """Comprehensive word definition lookup with AI-enhanced synthesis.
 
@@ -334,8 +334,8 @@ async def _lookup_with_tracking(
 @router.get("/lookup/{word}/stream")
 async def lookup_word_stream(
     word: str,
+    user_role: OptionalUserRoleDep,
     params: LookupParams = Depends(parse_lookup_params),
-    user_role: UserRole | None = Depends(get_optional_user_role),
 ) -> StreamingResponse:
     """Stream word lookup progress via Server-Sent Events (SSE).
 
@@ -393,7 +393,7 @@ async def lookup_word_stream(
 @router.post("/lookup/{word}/re-synthesize", response_model=DictionaryEntryResponse)
 async def re_synthesize_word(
     word: str,
-    _admin: str = Depends(require_admin),
+    _admin: AdminDep,
 ) -> DictionaryEntryResponse:
     """Re-synthesize a word entry (admin only).
 
@@ -456,7 +456,7 @@ class SynthesizeFromRequest(BaseModel):
 async def synthesize_from_versions(
     word: str,
     request: SynthesizeFromRequest,
-    _admin: str = Depends(require_admin),
+    _admin: AdminDep,
 ) -> DictionaryEntryResponse:
     """Re-synthesize a word from specific provider versions (admin only).
 

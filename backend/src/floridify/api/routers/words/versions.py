@@ -6,7 +6,7 @@ and rollback to previous versions.
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from ....caching.delta import compute_diff_between
 from ....caching.manager import get_version_manager
@@ -17,8 +17,7 @@ from ....models.responses import (
     VersionSummary,
 )
 from ....utils.logging import get_logger
-from ...middleware.auth import require_admin
-
+from ...core import AdminDep
 from ...services.loaders import DefinitionLoader, PronunciationLoader
 
 logger = get_logger(__name__)
@@ -54,7 +53,9 @@ async def _hydrate_version_content(content: dict[str, Any], word: str) -> dict[s
                 DictionaryEntry.word_id == word_id,
                 DictionaryEntry.provider != DictionaryProvider.SYNTHESIS,
             ).to_list()
-            provider_entry_ids = [str(pe.id) for pe in provider_entries] if provider_entries else None
+            provider_entry_ids = (
+                [str(pe.id) for pe in provider_entries] if provider_entries else None
+            )
         else:
             provider_entry_ids = None
 
@@ -92,12 +93,24 @@ async def _hydrate_version_content(content: dict[str, Any], word: str) -> dict[s
     return hydrated
 
 
-_NOISY_KEYS = frozenset({
-    "id", "word_id", "definition_ids", "pronunciation_id", "image_ids",
-    "created_at", "updated_at", "definition_id", "entry_id",
-    "model_info", "last_generated",
-    "audio_file_ids", "audio_files", "fact_ids",
-})
+_NOISY_KEYS = frozenset(
+    {
+        "id",
+        "word_id",
+        "definition_ids",
+        "pronunciation_id",
+        "image_ids",
+        "created_at",
+        "updated_at",
+        "definition_id",
+        "entry_id",
+        "model_info",
+        "last_generated",
+        "audio_file_ids",
+        "audio_files",
+        "fact_ids",
+    }
+)
 
 
 def _strip_noisy_fields(obj: Any, depth: int = 0) -> None:
@@ -162,7 +175,9 @@ async def list_word_versions(word: str) -> VersionHistoryResponse:
 async def get_word_version(
     word: str,
     version: str,
-    hydrate: bool = Query(False, description="Hydrate definition_ids, pronunciation, images into full objects"),
+    hydrate: bool = Query(
+        False, description="Hydrate definition_ids, pronunciation, images into full objects"
+    ),
 ) -> dict[str, Any]:
     """Get a specific historical version of a word's synthesized entry.
 
@@ -373,8 +388,8 @@ async def diff_provider_versions(
 @router.post("/{word}/rollback")
 async def rollback_word_version(
     word: str,
+    _admin: AdminDep,
     version: str = Query(..., description="Version to rollback to (e.g. 1.0.1)"),
-    _admin: str = Depends(require_admin),
 ) -> dict[str, Any]:
     """Rollback a word's synthesized entry to a previous version.
 

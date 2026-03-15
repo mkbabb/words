@@ -3,15 +3,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ...models.user import User, UserHistory, UserRole
-from ..middleware.auth import (
-    get_current_user,
-    get_current_user_object,
-    require_admin,
-)
+from ..core import AdminDep, CurrentUserDep, CurrentUserObjectDep
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -82,7 +78,7 @@ class UserListItem(BaseModel):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_my_profile(user: User = Depends(get_current_user_object)):
+async def get_my_profile(user: CurrentUserObjectDep):
     """Get the current user's profile."""
     return UserProfileResponse(
         clerk_id=user.clerk_id,
@@ -99,7 +95,7 @@ async def get_my_profile(user: User = Depends(get_current_user_object)):
 @router.patch("/me", response_model=UserProfileResponse)
 async def update_my_profile(
     body: UpdateProfileRequest,
-    user: User = Depends(get_current_user_object),
+    user: CurrentUserObjectDep,
 ):
     """Update the current user's profile fields."""
     if body.username is not None:
@@ -122,7 +118,7 @@ async def update_my_profile(
 
 @router.get("/me/preferences")
 async def get_my_preferences(
-    user: User = Depends(get_current_user_object),
+    user: CurrentUserObjectDep,
 ) -> dict[str, Any]:
     """Get the current user's preferences."""
     return user.preferences
@@ -131,7 +127,7 @@ async def get_my_preferences(
 @router.put("/me/preferences")
 async def set_my_preferences(
     body: UpdatePreferencesRequest,
-    user: User = Depends(get_current_user_object),
+    user: CurrentUserObjectDep,
 ) -> dict[str, Any]:
     """Set the current user's preferences (full replacement)."""
     user.preferences = body.preferences
@@ -140,7 +136,7 @@ async def set_my_preferences(
 
 
 @router.get("/me/history", response_model=HistoryResponse)
-async def get_my_history(user_id: str = Depends(get_current_user)):
+async def get_my_history(user_id: CurrentUserDep):
     """Get the current user's search and lookup history."""
     history = await UserHistory.find_one(UserHistory.clerk_id == user_id)
     if not history:
@@ -155,7 +151,7 @@ async def get_my_history(user_id: str = Depends(get_current_user)):
 @router.post("/me/history/sync", response_model=HistoryResponse)
 async def sync_my_history(
     body: SyncHistoryRequest,
-    user_id: str = Depends(get_current_user),
+    user_id: CurrentUserDep,
 ):
     """Merge history from frontend with backend storage.
 
@@ -206,7 +202,7 @@ async def sync_my_history(
 
 @router.get("", response_model=list[UserListItem])
 async def list_users(
-    _admin_id: str = Depends(require_admin),
+    _admin_id: AdminDep,
     skip: int = 0,
     limit: int = 50,
 ):
@@ -230,7 +226,7 @@ async def list_users(
 async def update_user_role(
     clerk_id: str,
     body: UpdateRoleRequest,
-    _admin_id: str = Depends(require_admin),
+    _admin_id: AdminDep,
 ):
     """Change a user's role (admin only)."""
     user = await User.find_one(User.clerk_id == clerk_id)

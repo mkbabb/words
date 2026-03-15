@@ -27,21 +27,19 @@ from ....ai.synthesis import (
 from ....models import Definition, Word
 from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ...core import (
+    AdminDep,
     ErrorDetail,
     ErrorResponse,
-    FieldSelection,
+    FieldsDep,
     ListResponse,
-    PaginationParams,
+    PaginationDep,
+    PremiumDep,
     ResourceResponse,
-    SortParams,
+    SortDep,
     check_etag,
     get_etag,
-    get_fields,
-    get_pagination,
-    get_sort,
 )
 from ...core.protocols import TypedFieldUpdater
-from ...middleware.auth import require_admin, require_premium
 from ...repositories import (
     DefinitionCreate,
     DefinitionFilter,
@@ -98,10 +96,10 @@ class DefinitionImageUpdate(BaseModel):
 
 @router.get("", response_model=ListResponse[Definition])
 async def list_definitions(
+    pagination: PaginationDep,
+    sort: SortDep,
+    fields: FieldsDep,
     repo: DefinitionRepository = Depends(get_definition_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-    sort: SortParams = Depends(get_sort),
-    fields: FieldSelection = Depends(get_fields),
     params: DefinitionQueryParams = Depends(),
 ) -> ListResponse[Definition]:
     """List definitions with advanced filtering.
@@ -160,7 +158,7 @@ async def list_definitions(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_definition(
     data: DefinitionCreate,
-    _admin: str = Depends(require_admin),
+    _admin: AdminDep,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Create definition entry.
@@ -189,8 +187,8 @@ async def get_definition(
     definition_id: PydanticObjectId,
     request: Request,
     response: Response,
+    fields: FieldsDep,
     repo: DefinitionRepository = Depends(get_definition_repo),
-    fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
     """Retrieve definition with optional expansions.
 
@@ -243,8 +241,8 @@ async def get_definition(
 async def update_definition(
     definition_id: PydanticObjectId,
     data: DefinitionUpdate,
+    _admin: AdminDep,
     version: int | None = Query(None, description="Version for optimistic locking"),
-    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Update definition with version control.
@@ -272,8 +270,8 @@ async def update_definition(
 @router.delete("/{definition_id}", status_code=204, response_model=None)
 async def delete_definition(
     definition_id: PydanticObjectId,
+    _admin: AdminDep,
     cascade: bool = Query(False, description="Delete related examples"),
-    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> None:
     """Delete definition.
@@ -288,8 +286,8 @@ async def delete_definition(
 async def update_definition_partial(
     definition_id: PydanticObjectId,
     update: DefinitionUpdate,
+    _admin: AdminDep,
     increment_version: bool = Query(True, description="Auto-increment version or edit in place"),
-    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
     if_match: str | None = Depends(check_etag),
 ) -> ResourceResponse:
@@ -324,7 +322,7 @@ async def update_definition_partial(
 async def regenerate_components(
     definition_id: PydanticObjectId,
     request: ComponentRegenerationRequest,
-    _premium: str = Depends(require_premium),
+    _premium: PremiumDep,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """AI-regenerate definition components.
@@ -472,7 +470,7 @@ async def regenerate_components(
 @router.post("/batch/regenerate", response_model=dict[str, Any])
 async def batch_regenerate_components(
     request: BatchComponentUpdate,
-    _premium: str = Depends(require_premium),
+    _premium: PremiumDep,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> dict[str, Any]:
     """Batch AI-regenerate components.

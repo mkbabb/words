@@ -21,13 +21,11 @@ from ...core import (
     ListResponse,
     # Centralized exception handling
     NotFoundException,
-    PaginationParams,
+    PaginationDep,
     PayloadTooLargeException,
     ResourceResponse,
-    SortParams,
+    SortDep,
     VersionConflictException,
-    get_pagination,
-    get_sort,
 )
 from ...repositories import (
     AudioCreate,
@@ -119,9 +117,9 @@ class AudioQueryParams(BaseModel):
 
 @router.get("", response_model=ListResponse[dict[str, Any]])
 async def list_audio_files(
+    pagination: PaginationDep,
+    sort: SortDep,
     repo: AudioRepository = Depends(get_audio_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-    sort: SortParams = Depends(get_sort),
     params: AudioQueryParams = Depends(),
 ) -> ListResponse[dict[str, Any]]:
     """List audio files with filtering and pagination.

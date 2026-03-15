@@ -26,7 +26,7 @@ from ...search.search_index import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 from ...utils.sanitization import sanitize_mongodb_input
-from ..middleware.auth import require_admin
+from ..core import AdminDep
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -570,8 +570,8 @@ async def stream_semantic_status(request: Request) -> StreamingResponse:
 
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)
 async def rebuild_search_index(
+    _admin: AdminDep,
     request: RebuildIndexRequest = RebuildIndexRequest(),
-    _admin: str = Depends(require_admin),
 ) -> RebuildIndexResponse:
     """Streamlined rebuild of search index with unified corpus management.
 
