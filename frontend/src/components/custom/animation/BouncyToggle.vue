@@ -5,14 +5,13 @@
       v-for="(_slider, idx) in sliderElements"
       :key="'slider-' + idx"
       :ref="(el) => { if (el) sliderRefs[idx] = el as HTMLElement }"
-      class="absolute inset-y-0 rounded-lg bg-primary shadow-sm transition-all duration-300 ease-out"
+      class="absolute inset-y-0 rounded-lg bg-primary shadow-sm"
     />
     <!-- Single slider fallback for non-multi mode -->
     <div
       v-if="!multiSelect"
       ref="backgroundSlider"
-      class="absolute inset-y-0 rounded-lg bg-primary shadow-sm transition-all duration-300 ease-out"
-      :style="backgroundStyle"
+      class="absolute inset-y-0 rounded-lg bg-primary shadow-sm"
     />
 
     <!-- Toggle buttons -->
@@ -24,7 +23,7 @@
               ref="buttonRefs"
               @click="handleSelect(option.value, index)"
               :class="[
-                'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
+                'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-colors duration-200',
                 option.disabled
                   ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
                   : isActive(option.value)
@@ -46,7 +45,7 @@
         ref="buttonRefs"
         @click="handleSelect(option.value, index)"
         :class="[
-          'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
+          'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-colors duration-200',
           option.disabled
             ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
             : isActive(option.value)
@@ -62,9 +61,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch, useAttrs } from 'vue';
+import { ref, computed, nextTick, onMounted, watch, onUnmounted, useAttrs } from 'vue';
 import { gsap } from 'gsap';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { GSAP_EASE, GSAP_DURATION } from '@/lib/design-tokens';
 
 // Disable automatic attribute inheritance
 defineOptions({
@@ -98,6 +98,10 @@ const backgroundSlider = ref<HTMLElement>();
 const buttonRefs = ref<HTMLButtonElement[]>([]);
 const sliderRefs = ref<Record<number, HTMLElement>>({});
 
+// Store current timeline for cancellation on rapid clicks
+let currentSliderTimeline: gsap.core.Timeline | null = null;
+let currentButtonTimeline: gsap.core.Timeline | null = null;
+
 // For multi-select, track which values are active
 const activeValues = computed<string[]>(() => {
   if (props.multiSelect) {
@@ -114,33 +118,27 @@ const sliderElements = computed(() => {
   return activeValues.value;
 });
 
-const backgroundStyle = ref({
-  width: '0px',
-  transform: 'translateX(0px)'
-});
-
 const updateBackground = (activeIndex: number, animate = true) => {
   if (props.multiSelect) return; // Multi-select handles its own sliders
   nextTick(() => {
     const activeButton = buttonRefs.value[activeIndex];
     if (!activeButton || !backgroundSlider.value) return;
 
-    const newWidth = `${activeButton.offsetWidth}px`;
-    const newTransform = `translateX(${activeButton.offsetLeft}px)`;
-
-    if (animate) {
-      gsap.to(backgroundSlider.value, {
-        width: newWidth,
-        x: activeButton.offsetLeft,
-        duration: 0.4,
-        ease: "back.out(1.7)"
-      });
-    } else {
-      backgroundStyle.value = {
-        width: newWidth,
-        transform: newTransform
-      };
+    // Kill any in-flight slider animation
+    if (currentSliderTimeline) {
+      currentSliderTimeline.kill();
+      currentSliderTimeline = null;
     }
+
+    // Use GSAP for both paths — duration: 0 for instant, GSAP_DURATION.slide for animated
+    const tl = gsap.timeline();
+    tl.to(backgroundSlider.value, {
+      width: activeButton.offsetWidth,
+      x: activeButton.offsetLeft,
+      duration: animate ? GSAP_DURATION.slide : 0,
+      ease: animate ? GSAP_EASE.spring : 'none',
+    });
+    currentSliderTimeline = tl;
   });
 };
 
@@ -153,17 +151,12 @@ const updateMultiSliders = (animate = true) => {
       const slider = sliderRefs.value[sliderIdx];
       if (!button || !slider) return;
 
-      if (animate) {
-        gsap.to(slider, {
-          width: button.offsetWidth,
-          x: button.offsetLeft,
-          duration: 0.4,
-          ease: "back.out(1.7)"
-        });
-      } else {
-        slider.style.width = `${button.offsetWidth}px`;
-        slider.style.transform = `translateX(${button.offsetLeft}px)`;
-      }
+      gsap.to(slider, {
+        width: button.offsetWidth,
+        x: button.offsetLeft,
+        duration: animate ? GSAP_DURATION.slide : 0,
+        ease: animate ? GSAP_EASE.spring : 'none',
+      });
     });
   });
 };
@@ -175,18 +168,25 @@ const handleSelect = (value: string, index: number) => {
   const activeButton = buttonRefs.value[index];
   if (!activeButton) return;
 
+  // Kill previous button press animation before starting new one
+  if (currentButtonTimeline) {
+    currentButtonTimeline.kill();
+    currentButtonTimeline = null;
+  }
+
   // Button press animation
-  gsap.timeline()
-    .to(activeButton, {
+  const tl = gsap.timeline();
+  tl.to(activeButton, {
       scale: 0.95,
-      duration: 0.1,
-      ease: "power2.out"
+      duration: GSAP_DURATION.press,
+      ease: GSAP_EASE.press,
     })
     .to(activeButton, {
       scale: 1,
-      duration: 0.2,
-      ease: "back.out(1.7)"
+      duration: GSAP_DURATION.release,
+      ease: GSAP_EASE.spring,
     });
+  currentButtonTimeline = tl;
 
   if (props.multiSelect) {
     const current = [...activeValues.value];
@@ -205,6 +205,12 @@ const handleSelect = (value: string, index: number) => {
     emit('update:modelValue', value);
   }
 };
+
+// Cleanup GSAP timelines on unmount
+onUnmounted(() => {
+  currentSliderTimeline?.kill();
+  currentButtonTimeline?.kill();
+});
 
 // Initialize background position
 onMounted(() => {
