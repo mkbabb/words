@@ -1,4 +1,4 @@
-"""Comprehensive tests for AppleDictionary connector - 526 lines of previously untested code.
+"""Tests for AppleDictionary connector.
 
 Tests cover platform compatibility, PyObjC integration, regex parsing, and full pipeline.
 """
@@ -13,6 +13,7 @@ from floridify.models.dictionary import DictionaryProvider
 from floridify.providers.dictionary.local.apple_dictionary import (
     AppleDictionaryConnector,
 )
+from floridify.providers.dictionary.models import DictionaryProviderEntry
 
 # Sample raw definition from Apple Dictionary (realistic format)
 SAMPLE_RAW_DEFINITION = """apple |ˈapəl|
@@ -40,7 +41,6 @@ class TestAppleDictionaryPlatformCompatibility:
         """Test connector initialization on macOS (Darwin)."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
 
-        # Mock the CoreServices import to avoid actual dependency
         mock_dict_service = MagicMock()
         with patch.dict(
             "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
@@ -93,22 +93,15 @@ class TestAppleDictionaryImportHandling:
     """Tests for PyObjC import error handling."""
 
     def test_init_with_import_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test graceful handling when PyObjC cannot be imported.
-
-        Note: This tests the error path by verifying behavior when service is not available.
-        The actual ImportError handling is covered by testing on non-Darwin platforms.
-        """
+        """Test graceful handling when PyObjC cannot be imported."""
         monkeypatch.setattr("platform.system", lambda: "Linux")
 
-        # On non-Darwin platform, service should be None (similar to import error case)
         connector = AppleDictionaryConnector()
 
-        # Should be platform incompatible and service should be None
         assert connector._platform_compatible is False
         assert connector._dictionary_service is None
         assert connector._is_available() is False
 
-        # Verify can still call methods without crashing
         result = connector._lookup_definition("test")
         assert result is None
 
@@ -210,7 +203,6 @@ class TestAppleDictionaryExampleExtraction:
         text = "manage or organize: e.g., she runs a small business."
         examples = connector._extract_examples(text)
 
-        # Should extract something (exact match may vary due to regex)
         assert isinstance(examples, list)
 
     def test_extract_examples_filters_short_matches(
@@ -220,7 +212,6 @@ class TestAppleDictionaryExampleExtraction:
         text = 'a fruit: "an" or "the"'
         examples = connector._extract_examples(text)
 
-        # Should filter out "an" and "the" (too short)
         short_examples = [ex for ex in examples if len(ex) <= 5]
         assert len(short_examples) == 0
 
@@ -249,7 +240,7 @@ class TestAppleDictionaryExampleExtraction:
 
 
 class TestAppleDictionaryPronunciationExtraction:
-    """Tests for pronunciation and IPA extraction."""
+    """Tests for pronunciation and IPA extraction via _parse_definition_text."""
 
     @pytest.fixture
     def connector(self, monkeypatch: pytest.MonkeyPatch) -> AppleDictionaryConnector:
@@ -261,53 +252,14 @@ class TestAppleDictionaryPronunciationExtraction:
         ):
             return AppleDictionaryConnector()
 
-    @pytest.mark.asyncio
-    async def test_extract_pronunciation_with_ipa(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test extraction of IPA pronunciation."""
-        from floridify.models.dictionary import Word
+    def test_parse_extracts_pronunciation(self, connector: AppleDictionaryConnector) -> None:
+        """Test extraction of IPA pronunciation via _parse_definition_text."""
+        _, pronunciation, _ = connector._parse_definition_text("apple |ˈapəl| noun a fruit")
+        assert pronunciation == "ˈapəl"
 
-        word = Word(text="apple")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": "apple |ˈapəl| noun"}
-        pronunciation = await connector.extract_pronunciation(raw_data, word.id)
-
-        assert pronunciation is not None
-        assert pronunciation.ipa == "ˈapəl"
-        assert pronunciation.phonetic is not None
-
-    @pytest.mark.asyncio
-    async def test_extract_pronunciation_no_ipa(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test pronunciation extraction when no IPA present."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="test")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": "test noun a procedure"}
-        pronunciation = await connector.extract_pronunciation(raw_data, word.id)
-
-        assert pronunciation is None
-
-    @pytest.mark.asyncio
-    async def test_extract_pronunciation_empty_data(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test pronunciation extraction with empty data."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="test")
-        await word.save()
-        assert word.id is not None
-
-        pronunciation = await connector.extract_pronunciation({}, word.id)
-
+    def test_parse_no_pronunciation(self, connector: AppleDictionaryConnector) -> None:
+        """Test when no IPA present."""
+        _, pronunciation, _ = connector._parse_definition_text("test noun a procedure")
         assert pronunciation is None
 
     def test_ipa_to_phonetic_conversion(self, connector: AppleDictionaryConnector) -> None:
@@ -315,7 +267,6 @@ class TestAppleDictionaryPronunciationExtraction:
         ipa = "ˈæpəl"
         phonetic = connector._ipa_to_phonetic(ipa)
 
-        # Should remove stress marks and convert special characters
         assert "ˈ" not in phonetic
         assert "æ" not in phonetic
         assert "ə" not in phonetic
@@ -325,12 +276,12 @@ class TestAppleDictionaryPronunciationExtraction:
     ) -> None:
         """Test IPA conversion with various phonetic symbols."""
         test_cases = [
-            ("æ", "a"),  # ash
-            ("ə", "uh"),  # schwa
-            ("ɪ", "i"),  # near-close front unrounded
-            ("ʊ", "u"),  # near-close back rounded
-            ("ˈ", ""),  # primary stress
-            ("ˌ", ""),  # secondary stress
+            ("æ", "a"),
+            ("ə", "uh"),
+            ("ɪ", "i"),
+            ("ʊ", "u"),
+            ("ˈ", ""),
+            ("ˌ", ""),
         ]
 
         for ipa_char, expected in test_cases:
@@ -338,8 +289,8 @@ class TestAppleDictionaryPronunciationExtraction:
             assert result == expected
 
 
-class TestAppleDictionaryDefinitionExtraction:
-    """Tests for definition extraction and parsing."""
+class TestAppleDictionaryDefinitionParsing:
+    """Tests for definition parsing via _parse_definition_text."""
 
     @pytest.fixture
     def connector(self, monkeypatch: pytest.MonkeyPatch) -> AppleDictionaryConnector:
@@ -351,95 +302,44 @@ class TestAppleDictionaryDefinitionExtraction:
         ):
             return AppleDictionaryConnector()
 
-    @pytest.mark.asyncio
-    async def test_extract_definitions_noun(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test definition extraction for noun."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="apple")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": SAMPLE_RAW_DEFINITION}
-        definitions = await connector.extract_definitions(raw_data, word.id)
+    def test_parse_noun(self, connector: AppleDictionaryConnector) -> None:
+        """Test definition parsing for noun."""
+        definitions, _, _ = connector._parse_definition_text(SAMPLE_RAW_DEFINITION)
 
         assert len(definitions) > 0
-        assert definitions[0].part_of_speech == "noun"
-        assert len(definitions[0].text) > 0
+        assert definitions[0]["part_of_speech"] == "noun"
+        assert len(definitions[0]["text"]) > 0
 
-    @pytest.mark.asyncio
-    async def test_extract_definitions_verb(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test definition extraction for verb."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="run")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": SAMPLE_RAW_DEFINITION_VERB}
-        definitions = await connector.extract_definitions(raw_data, word.id)
+    def test_parse_verb(self, connector: AppleDictionaryConnector) -> None:
+        """Test definition parsing for verb."""
+        definitions, _, _ = connector._parse_definition_text(SAMPLE_RAW_DEFINITION_VERB)
 
         assert len(definitions) > 0
-        assert definitions[0].part_of_speech == "verb"
+        assert definitions[0]["part_of_speech"] == "verb"
 
-    @pytest.mark.asyncio
-    async def test_extract_definitions_with_examples(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test definition extraction includes examples."""
-        from floridify.models.dictionary import Word
+    def test_parse_includes_examples(self, connector: AppleDictionaryConnector) -> None:
+        """Test that parsed definitions include examples."""
+        definitions, _, _ = connector._parse_definition_text(SAMPLE_RAW_DEFINITION)
 
-        word = Word(text="apple")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": SAMPLE_RAW_DEFINITION}
-        definitions = await connector.extract_definitions(raw_data, word.id)
-
-        # Should extract examples and save them
         assert len(definitions) > 0
-        # Examples should be linked if any were found
-        assert isinstance(definitions[0].example_ids, list)
+        assert isinstance(definitions[0].get("examples"), list)
 
-    @pytest.mark.asyncio
-    async def test_extract_definitions_empty_data(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test definition extraction with empty data."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="test")
-        await word.save()
-        assert word.id is not None
-
-        definitions = await connector.extract_definitions({}, word.id)
+    def test_parse_empty_text(self, connector: AppleDictionaryConnector) -> None:
+        """Test parsing empty text."""
+        definitions, _, _ = connector._parse_definition_text("")
 
         assert definitions == []
 
-    @pytest.mark.asyncio
-    async def test_extract_definitions_minimal(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test definition extraction with minimal data."""
-        from floridify.models.dictionary import Word
-
-        word = Word(text="test")
-        await word.save()
-        assert word.id is not None
-
-        raw_data = {"raw_definition": SAMPLE_RAW_DEFINITION_MINIMAL}
-        definitions = await connector.extract_definitions(raw_data, word.id)
+    def test_parse_minimal(self, connector: AppleDictionaryConnector) -> None:
+        """Test parsing minimal definition text."""
+        definitions, _, _ = connector._parse_definition_text(SAMPLE_RAW_DEFINITION_MINIMAL)
 
         assert len(definitions) > 0
-        assert definitions[0].part_of_speech == "noun"
+        assert definitions[0]["part_of_speech"] == "noun"
 
 
-class TestAppleDictionaryEtymologyExtraction:
-    """Tests for etymology extraction."""
+class TestAppleDictionaryEtymologyParsing:
+    """Tests for etymology extraction via _parse_definition_text."""
 
     @pytest.fixture
     def connector(self, monkeypatch: pytest.MonkeyPatch) -> AppleDictionaryConnector:
@@ -451,28 +351,16 @@ class TestAppleDictionaryEtymologyExtraction:
         ):
             return AppleDictionaryConnector()
 
-    @pytest.mark.asyncio
-    async def test_extract_etymology_with_origin(self, connector: AppleDictionaryConnector) -> None:
+    def test_parse_extracts_etymology(self, connector: AppleDictionaryConnector) -> None:
         """Test etymology extraction with ORIGIN marker."""
-        raw_data = {"raw_definition": SAMPLE_RAW_DEFINITION}
-        etymology = await connector.extract_etymology(raw_data)
+        _, _, etymology = connector._parse_definition_text(SAMPLE_RAW_DEFINITION)
 
         assert etymology is not None
-        # Etymology text should contain origin information (may vary based on regex matching)
-        assert len(etymology.text) > 0
+        assert len(etymology) > 0
 
-    @pytest.mark.asyncio
-    async def test_extract_etymology_no_origin(self, connector: AppleDictionaryConnector) -> None:
-        """Test etymology extraction without ORIGIN marker."""
-        raw_data = {"raw_definition": "test noun a procedure"}
-        etymology = await connector.extract_etymology(raw_data)
-
-        assert etymology is None
-
-    @pytest.mark.asyncio
-    async def test_extract_etymology_empty_data(self, connector: AppleDictionaryConnector) -> None:
-        """Test etymology extraction with empty data."""
-        etymology = await connector.extract_etymology({})
+    def test_parse_no_etymology(self, connector: AppleDictionaryConnector) -> None:
+        """Test when no ORIGIN marker present."""
+        _, _, etymology = connector._parse_definition_text("test noun a procedure")
 
         assert etymology is None
 
@@ -518,7 +406,7 @@ class TestAppleDictionaryLookup:
 
 
 class TestAppleDictionaryFetchFromProvider:
-    """Tests for the full fetch pipeline."""
+    """Tests for the full fetch pipeline returning DictionaryProviderEntry."""
 
     @pytest.fixture
     def connector(self, monkeypatch: pytest.MonkeyPatch) -> AppleDictionaryConnector:
@@ -529,26 +417,24 @@ class TestAppleDictionaryFetchFromProvider:
             "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
         ):
             connector = AppleDictionaryConnector()
-            # Mock the lookup method
             connector._lookup_definition = MagicMock(return_value=SAMPLE_RAW_DEFINITION)
             return connector
 
     @pytest.mark.asyncio
-    async def test_fetch_from_provider_success(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
-        """Test successful fetch from provider."""
+    async def test_fetch_from_provider_success(self, connector: AppleDictionaryConnector) -> None:
+        """Test successful fetch from provider returns DictionaryProviderEntry."""
         result = await connector._fetch_from_provider("apple")
 
         assert result is not None
-        assert result["word"] == "apple"
-        assert result["provider"] == DictionaryProvider.APPLE_DICTIONARY.value
-        assert "definitions" in result
-        assert len(result["definitions"]) > 0
+        assert isinstance(result, DictionaryProviderEntry)
+        assert result.word == "apple"
+        assert result.provider == DictionaryProvider.APPLE_DICTIONARY.value
+        assert len(result.definitions) > 0
+        assert result.definitions[0]["part_of_speech"] == "noun"
 
     @pytest.mark.asyncio
     async def test_fetch_from_provider_empty_word(
-        self, connector: AppleDictionaryConnector, test_db
+        self, connector: AppleDictionaryConnector
     ) -> None:
         """Test fetch with empty word."""
         result = await connector._fetch_from_provider("")
@@ -556,9 +442,7 @@ class TestAppleDictionaryFetchFromProvider:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_fetch_from_provider_not_found(
-        self, connector: AppleDictionaryConnector, test_db
-    ) -> None:
+    async def test_fetch_from_provider_not_found(self, connector: AppleDictionaryConnector) -> None:
         """Test fetch when word not found."""
         connector._lookup_definition = MagicMock(return_value=None)
 
@@ -568,7 +452,7 @@ class TestAppleDictionaryFetchFromProvider:
 
     @pytest.mark.asyncio
     async def test_fetch_from_provider_service_unavailable(
-        self, monkeypatch: pytest.MonkeyPatch, test_db
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test fetch when service is unavailable."""
         monkeypatch.setattr("platform.system", lambda: "Linux")
@@ -580,7 +464,7 @@ class TestAppleDictionaryFetchFromProvider:
 
     @pytest.mark.asyncio
     async def test_fetch_from_provider_with_state_tracker(
-        self, connector: AppleDictionaryConnector, test_db
+        self, connector: AppleDictionaryConnector
     ) -> None:
         """Test fetch with state tracker updates."""
         from floridify.core.state_tracker import StateTracker
@@ -588,9 +472,25 @@ class TestAppleDictionaryFetchFromProvider:
         state_tracker = StateTracker()
         result = await connector._fetch_from_provider("apple", state_tracker=state_tracker)
 
-        # Should update state tracker during execution
-        # State tracker should be updated (check if any stage was set)
-        assert result is not None  # Just verify it completed successfully
+        assert result is not None
+        assert isinstance(result, DictionaryProviderEntry)
+
+    @pytest.mark.asyncio
+    async def test_fetch_includes_pronunciation(self, connector: AppleDictionaryConnector) -> None:
+        """Test that pronunciation is extracted from raw definition."""
+        result = await connector._fetch_from_provider("apple")
+
+        assert result is not None
+        assert result.pronunciation == "ˈapəl"
+
+    @pytest.mark.asyncio
+    async def test_fetch_includes_etymology(self, connector: AppleDictionaryConnector) -> None:
+        """Test that etymology is extracted from raw definition."""
+        result = await connector._fetch_from_provider("apple")
+
+        assert result is not None
+        assert result.etymology is not None
+        assert "Old English" in result.etymology
 
 
 class TestAppleDictionaryServiceInfo:
@@ -629,8 +529,8 @@ class TestAppleDictionaryIntegration:
     """Integration tests for full workflow."""
 
     @pytest.mark.asyncio
-    async def test_full_pipeline_darwin(self, monkeypatch: pytest.MonkeyPatch, test_db) -> None:
-        """Test complete pipeline on Darwin."""
+    async def test_full_pipeline_darwin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test complete pipeline on Darwin returns DictionaryProviderEntry."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
 
         mock_dict_service = MagicMock(return_value=SAMPLE_RAW_DEFINITION)
@@ -642,21 +542,20 @@ class TestAppleDictionaryIntegration:
 
             result = await connector._fetch_from_provider("apple")
 
-            # Verify complete data structure
             assert result is not None
-            assert "word" in result
-            assert "definitions" in result
-            assert "pronunciation" in result
-            assert "etymology" in result
-            assert "raw_data" in result
+            assert isinstance(result, DictionaryProviderEntry)
+            assert result.word == "apple"
+            assert len(result.definitions) > 0
+            assert result.pronunciation is not None
+            assert result.etymology is not None
+            assert result.raw_data is not None
 
     @pytest.mark.asyncio
-    async def test_full_pipeline_non_darwin(self, monkeypatch: pytest.MonkeyPatch, test_db) -> None:
+    async def test_full_pipeline_non_darwin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test complete pipeline on non-Darwin platform."""
         monkeypatch.setattr("platform.system", lambda: "Linux")
 
         connector = AppleDictionaryConnector()
         result = await connector._fetch_from_provider("apple")
 
-        # Should gracefully return None on unsupported platform
         assert result is None
