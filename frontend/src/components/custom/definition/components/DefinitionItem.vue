@@ -1,8 +1,8 @@
 <template>
     <div
-        :id="`def-${definitionIndex}`"
+        :id="isFirstInGroup ? `${definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}` : `def-${definitionIndex}`"
         :data-definition-index="definitionIndex"
-        :data-part-of-speech="`${definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}`"
+        :data-part-of-speech="`${definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}`"
         class="space-y-2"
     >
         <!-- Separator for definitions within same cluster -->

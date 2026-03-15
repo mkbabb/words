@@ -1,5 +1,5 @@
 <template>
-    <div :data-cluster-id="cluster.clusterId" class="space-y-1 text-2xl">
+    <div :id="cluster.clusterId" :data-cluster-id="cluster.clusterId" class="space-y-1 text-2xl">
         <!-- Cluster header with gradient divider -->
         <div
             v-if="totalClusters > 1"

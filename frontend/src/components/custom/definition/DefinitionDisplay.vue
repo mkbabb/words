@@ -165,20 +165,23 @@
                         :key="searchBar.getSubMode('lookup')"
                         class="space-y-4"
                     >
-                        <!-- Dictionary Mode with Progressive Loading -->
+                        <!-- Dictionary Mode with Virtual Windowing -->
                         <template
                             v-if="
                                 searchBar.getSubMode('lookup') === 'dictionary'
                             "
                         >
-                            <!-- Render available definition clusters -->
+                            <div ref="clusterContainerRef">
+                            <!-- Top spacer for virtualized clusters -->
+                            <div :style="{ height: topSpacerPx + 'px' }" />
+
+                            <!-- Render only visible definition clusters -->
                             <DefinitionCluster
-                                v-for="(
-                                    cluster, clusterIndex
-                                ) in groupedDefinitions"
-                                :key="cluster.clusterId"
-                                :cluster="cluster"
-                                :clusterIndex="clusterIndex"
+                                v-for="item in visibleItems"
+                                :key="item.cluster.clusterId"
+                                :ref="(el: any) => measureSection(item.id, el?.$el)"
+                                :cluster="item.cluster"
+                                :clusterIndex="item.index"
                                 :totalClusters="groupedDefinitions.length"
                                 :cardVariant="selectedCardVariant"
                                 :editModeEnabled="editModeEnabled"
@@ -190,19 +193,19 @@
                                 <DefinitionItem
                                     v-for="(
                                         definition, defIndex
-                                    ) in cluster.definitions"
-                                    :key="`${cluster.clusterId}-${defIndex}`"
+                                    ) in item.cluster.definitions"
+                                    :key="`${item.cluster.clusterId}-${defIndex}`"
                                     :definition="definition"
                                     :definitionIndex="
                                         getGlobalDefinitionIndex(
-                                            clusterIndex,
+                                            item.index,
                                             defIndex
                                         )
                                     "
                                     :isRegenerating="
                                         contentStore.regeneratingDefinitionIndex ===
                                         getGlobalDefinitionIndex(
-                                            clusterIndex,
+                                            item.index,
                                             defIndex
                                         )
                                     "
@@ -218,6 +221,10 @@
                                     @addToWordlist="actions.handleAddToWordlist"
                                 />
                             </DefinitionCluster>
+
+                            <!-- Bottom spacer for virtualized clusters -->
+                            <div :style="{ height: bottomSpacerPx + 'px' }" />
+                            </div>
 
                             <!-- Progressive skeleton for expected definitions -->
                             <DefinitionStreamingSkeleton
@@ -258,7 +265,7 @@
             </CardContent>
 
             <!-- Progressive Etymology -->
-            <div v-if="normalizedEtymology" data-cluster-id="etymology">
+            <div v-if="normalizedEtymology" id="etymology" data-cluster-id="etymology">
                 <Etymology :etymology="normalizedEtymology" :edit-mode-enabled="editModeEnabled" />
             </div>
             <!-- Etymology Skeleton -->
@@ -328,7 +335,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, provide } from 'vue';
 import { useContentStore } from '@/stores';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSearchBarStore } from '@/stores/search/search-bar';
@@ -357,6 +364,8 @@ import {
     useImageManagement,
     useDefinitionActions,
     useTimeMachine,
+    useVirtualSectionWindow,
+    flattenDefinitionClusters,
 } from './composables';
 import {
     getErrorTitle,
@@ -566,6 +575,27 @@ const normalizedEtymology = computed(() => {
 
 // Composables
 const { groupedDefinitions } = useDefinitionGroups(entry);
+
+// Virtual windowing for definition clusters
+const clusterContainerRef = ref<HTMLElement | null>(null);
+const flatClusters = computed(() => flattenDefinitionClusters(groupedDefinitions.value));
+const {
+    visibleItems,
+    topSpacerPx,
+    bottomSpacerPx,
+    measureSection,
+    ensureTargetWindow,
+} = useVirtualSectionWindow({
+    items: flatClusters,
+    scrollContainer: ref(null), // null = use window/document scroll
+    contentEl: clusterContainerRef,
+    overscanBeforePx: 400,
+    overscanAfterPx: 800,
+});
+
+// Provide ensureTargetWindow for sidebar navigation (via provide/inject)
+provide('ensureTargetWindow', ensureTargetWindow);
+
 const { usedProviders } = useProviders(entry);
 const { allImages, handleImageClick, handleImageError } =
     useImageManagement(entry);

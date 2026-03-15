@@ -5,3 +5,7 @@ export { useDefinitionEditMode } from './useDefinitionEditMode';
 export { useAudioPlayback } from './useAudioPlayback';
 export { useDefinitionActions } from './useDefinitionActions';
 export { useTimeMachine } from './useTimeMachine';
+export { useVirtualSectionWindow } from './useVirtualSectionWindow';
+export { flattenDefinitionClusters } from './flattenDefinitions';
+export type { FlatDefinitionCluster } from './flattenDefinitions';
+export type { FlatSection } from './virtualSectionLayout';
