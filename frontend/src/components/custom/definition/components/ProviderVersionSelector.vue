@@ -248,7 +248,8 @@ async function loadProviders() {
                 (r): r is PromiseFulfilledResult<ProviderInfo> =>
                     r.status === 'fulfilled'
             )
-            .map((r) => r.value);
+            .map((r) => r.value)
+            .filter((p) => p.versions.length > 0 || p.definitionCount > 0);
 
         // Select all providers by default
         for (const p of providerList.value) {

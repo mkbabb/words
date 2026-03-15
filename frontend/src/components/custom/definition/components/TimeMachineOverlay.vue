@@ -19,7 +19,7 @@
 
                 <!-- Close button -->
                 <button
-                    class="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-border/30 bg-background/60 text-muted-foreground backdrop-blur-sm transition-colors hover:bg-background/80 hover:text-foreground"
+                    class="absolute top-4 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-border/30 bg-background/60 text-muted-foreground backdrop-blur-sm transition-colors hover:bg-background/80 hover:text-foreground"
                     @click.stop="emit('close')"
                 >
                     <X :size="16" />

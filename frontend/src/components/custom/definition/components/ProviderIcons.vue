@@ -79,7 +79,7 @@
             <PopoverTrigger as-child>
                 <button
                     v-if="providers.length > 0"
-                    class="flex items-center"
+                    class="flex items-center focus:outline-none focus:ring-0"
                     :class="[
                         interactive
                             ? 'cursor-pointer'
