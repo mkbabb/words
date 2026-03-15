@@ -32,7 +32,7 @@
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
                     <div
-                        class="hidden lg:block transition-all duration-200 ease-out overflow-hidden"
+                        class="hidden lg:block transition-all duration-200 ease-out"
                         :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0 pointer-events-none'"
                     >
                         <div
