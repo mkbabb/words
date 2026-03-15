@@ -9,36 +9,25 @@ services:
     container_name: floridify-backend
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-8003}:8000"
     environment:
-      # Application settings
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
-      # Cache directory inside container
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost:3004","http://localhost:5173"]}
       FLORIDIFY_CACHE_DIR: /app/cache
-      # Database configuration handled by auth/config.toml
-      # Threading configuration for FAISS and numerical libraries
-      # Optimized for sentence-transformers + FAISS without conflicts
       OMP_NUM_THREADS: 4
       MKL_NUM_THREADS: 4
       NUMEXPR_NUM_THREADS: 4
       OPENBLAS_NUM_THREADS: 4
       VECLIB_MAXIMUM_THREADS: 4
-      # Enable tokenizer parallelism (works with reduced thread count)
       TOKENIZERS_PARALLELISM: "true"
-      # Set multiprocessing start method for Docker compatibility
       MULTIPROCESSING_START_METHOD: "spawn"
-      # Semantic search toggle (set false on low-memory servers to skip model loading)
       SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
-      # Docker-internal MongoDB URL (overrides auth/config.toml runtime_url)
       MONGODB_URL: ${MONGODB_URL:-}
-      # Clerk Authentication
       CLERK_DOMAIN: ${CLERK_DOMAIN:-}
       CLERK_SUPER_ADMINS: ${CLERK_SUPER_ADMINS:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "mbabb.friday.institute:host-gateway"
     networks:
       - app-network
     volumes:
@@ -58,9 +47,10 @@ services:
     container_name: floridify-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_INTERNAL_PORT:-3000}"
+      - "${FRONTEND_PORT:-3004}:${FRONTEND_PORT:-3004}"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_PORT: ${FRONTEND_PORT:-3004}
+      VITE_API_URL: ${VITE_API_URL:-http://backend:8000}
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
       VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       BASE_PATH: ${VITE_BASE_PATH:-/}
