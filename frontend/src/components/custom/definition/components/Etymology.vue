@@ -7,7 +7,22 @@
         <div
             class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-all duration-200 hover:border-border/50 hover:bg-muted/10"
         >
-            <p class="text-base leading-relaxed text-foreground">
+            <EditableField
+                v-if="editModeEnabled"
+                :model-value="etymology.text"
+                field-name="etymology"
+                :multiline="true"
+                :edit-mode="editModeEnabled"
+                :can-regenerate="false"
+                @update:model-value="(val: string | number | string[]) => $emit('update:text', String(val))"
+            >
+                <template #display>
+                    <p class="text-base leading-relaxed text-foreground">
+                        {{ etymology.text }}
+                    </p>
+                </template>
+            </EditableField>
+            <p v-else class="text-base leading-relaxed text-foreground">
                 {{ etymology.text }}
             </p>
             <div
@@ -33,10 +48,18 @@
 <script setup lang="ts">
 import { CardContent } from '@/components/ui/card';
 import type { Etymology } from '@/types/api';
+import EditableField from './EditableField.vue';
 
 interface EtymologyProps {
     etymology: Etymology | null | undefined;
+    editModeEnabled?: boolean;
 }
 
-defineProps<EtymologyProps>();
+withDefaults(defineProps<EtymologyProps>(), {
+    editModeEnabled: false,
+});
+
+defineEmits<{
+    'update:text': [value: string];
+}>();
 </script>
