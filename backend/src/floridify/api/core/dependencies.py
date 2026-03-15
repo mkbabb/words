@@ -4,8 +4,19 @@ This module provides reusable dependency injection functions for FastAPI endpoin
 eliminating code duplication across routers.
 """
 
-from fastapi import Query
+from typing import Annotated
 
+from fastapi import Depends, Query
+
+from ...models.user import User, UserRole
+from ..middleware.auth import (
+    get_current_user,
+    get_current_user_object,
+    get_optional_user,
+    get_optional_user_role,
+    require_admin,
+    require_premium,
+)
 from .base import FieldSelection, PaginationParams, SortParams
 
 
@@ -76,4 +87,13 @@ def get_fields(
     )
 
 
-# Additional common dependencies can be added here as needed
+# Annotated dependency aliases for common injection patterns
+PaginationDep = Annotated[PaginationParams, Depends(get_pagination)]
+SortDep = Annotated[SortParams, Depends(get_sort)]
+FieldsDep = Annotated[FieldSelection, Depends(get_fields)]
+AdminDep = Annotated[str, Depends(require_admin)]
+PremiumDep = Annotated[str, Depends(require_premium)]
+CurrentUserDep = Annotated[str, Depends(get_current_user)]
+CurrentUserObjectDep = Annotated[User, Depends(get_current_user_object)]
+OptionalUserDep = Annotated[str | None, Depends(get_optional_user)]
+OptionalUserRoleDep = Annotated[UserRole | None, Depends(get_optional_user_role)]

@@ -18,6 +18,15 @@ from .cache import (
     generate_cache_key,
 )
 from .dependencies import (
+    AdminDep,
+    CurrentUserDep,
+    CurrentUserObjectDep,
+    FieldsDep,
+    OptionalUserDep,
+    OptionalUserRoleDep,
+    PaginationDep,
+    PremiumDep,
+    SortDep,
     get_fields,
     get_pagination,
     get_sort,
@@ -79,6 +88,16 @@ __all__ = [
     "get_fields",
     "get_pagination",
     "get_sort",
+    # Annotated dependency aliases
+    "PaginationDep",
+    "SortDep",
+    "FieldsDep",
+    "AdminDep",
+    "PremiumDep",
+    "CurrentUserDep",
+    "CurrentUserObjectDep",
+    "OptionalUserDep",
+    "OptionalUserRoleDep",
     # Extended Responses
     "StreamResponse",
     "ProgressResponse",
