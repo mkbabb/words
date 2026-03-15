@@ -31,6 +31,7 @@ import { useUIStore } from './ui/ui-state'
 import { useNotifications } from './composables/useNotifications'
 import { useLoadingState } from './ui/loading'
 import { useLookupMode } from './search/modes/lookup'
+import { useWordlistMode } from './search/modes/wordlist'
 
 // Store aggregator for components
 export function useStores() {
@@ -42,7 +43,8 @@ export function useStores() {
     notifications: useNotifications(),
     ui: useUIStore(),
     loading: useLoadingState(),
-    lookupMode: useLookupMode()
+    lookupMode: useLookupMode(),
+    wordlistMode: useWordlistMode(),
   }
 }
 

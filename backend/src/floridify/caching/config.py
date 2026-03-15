@@ -127,6 +127,12 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
         memory_ttl=timedelta(days=7),
         disk_ttl=timedelta(days=30),
     ),
+    CacheNamespace.WORDLIST: NamespaceCacheConfig(
+        namespace=CacheNamespace.WORDLIST,
+        memory_limit=100,
+        memory_ttl=timedelta(hours=1),
+        disk_ttl=timedelta(hours=12),
+    ),
 }
 
 # String -> CacheNamespace mapping (all 13 namespaces)
@@ -144,6 +150,7 @@ NAMESPACE_MAP: dict[str, CacheNamespace] = {
     "openai": CacheNamespace.OPENAI,
     "lexicon": CacheNamespace.LEXICON,
     "wotd": CacheNamespace.WOTD,
+    "wordlist": CacheNamespace.WORDLIST,
 }
 
 # ResourceType -> CacheNamespace mapping (all 7 resource types)

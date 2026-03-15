@@ -1,6 +1,6 @@
 """Learning statistics and analytics for wordlists."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
@@ -47,7 +47,7 @@ class LearningStats(BaseModel):
         self.total_reviews += 1
 
         # Update streak
-        now = datetime.now()
+        now = datetime.now(UTC)
         if self.last_study_date:
             days_since = (now.date() - self.last_study_date.date()).days
             if days_since == 1:
@@ -64,7 +64,7 @@ class LearningStats(BaseModel):
         if not self.last_study_date:
             return False
 
-        days_since = (datetime.now().date() - self.last_study_date.date()).days
+        days_since = (datetime.now(UTC).date() - self.last_study_date.date()).days
         return days_since <= 1
 
     def get_mastery_distribution(self, words: list["WordListItem"]) -> dict[MasteryLevel, int]:

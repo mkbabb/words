@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ...corpus.core import Corpus
 from ...corpus.manager import TreeCorpusManager, get_tree_corpus_manager
+from ...corpus.models import CorpusType
 from ...models import Word
 from ...models.base import Language
 from ...text import normalize
@@ -171,15 +172,18 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             .to_list()
         )
 
-    async def create(self, data: WordListCreate) -> WordList:
-        """Create a new word list."""
+    async def create(self, data: WordListCreate) -> tuple[WordList, bool]:
+        """Create a new word list. Returns (wordlist, created) tuple.
+
+        If a wordlist with the same content hash already exists, returns (existing, False).
+        """
         # Generate hash from words
         hash_id = generate_wordlist_hash(data.words)
 
         # Check for existing list with same hash
         existing = await self.find_by_hash(hash_id)
         if existing:
-            return existing
+            return existing, False
 
         # Create new word list
         wordlist = WordList(
@@ -200,9 +204,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         await wordlist.create()
 
         # Only invalidate corpus cache if there were existing wordlists
-        # If this is the first wordlist, there's no corpus to invalidate
         existing_count = await WordList.count()
-        if existing_count > 1:  # More than just the one we just created
+        if existing_count > 1:
             logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
             corpus_manager = await self._get_tree_corpus_manager()
             await corpus_manager.invalidate_corpus("wordlist_names_global")
@@ -213,7 +216,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if data.words:
             await self._create_wordlist_corpus(wordlist)
 
-        return wordlist
+        return wordlist, True
 
     async def _batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
         """Batch get or create Word documents, returning their IDs.
@@ -303,6 +306,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             corpus_name=corpus_name,
             vocabulary=word_texts,
         )
+        corpus.corpus_type = CorpusType.WORDLIST
         corpus = await corpus_manager.save_corpus(corpus=corpus)
         if not corpus:
             raise ValueError(f"Failed to save corpus '{corpus_name}'")

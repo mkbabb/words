@@ -71,6 +71,8 @@ class CacheNamespace(str, Enum):
 
     WOTD = "wotd"
 
+    WORDLIST = "wordlist"
+
 
 class ResourceType(str, Enum):
     """Types of versioned resources in the system.

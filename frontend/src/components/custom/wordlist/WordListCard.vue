@@ -1,5 +1,5 @@
 <template>
-    <HoverCard :open-delay="200" :close-delay="100">
+    <HoverCard :open-delay="300" :close-delay="100">
         <HoverCardTrigger as-child>
             <ThemedCard
                 :variant="word.mastery_level"
@@ -27,7 +27,7 @@
                             <h3
                                 class="themed-title truncate text-base font-semibold transition-colors group-hover:text-primary sm:text-xl"
                             >
-                                {{ word.word.toLowerCase() }}
+                                {{ word.word?.toLowerCase() ?? '' }}
                             </h3>
                         </div>
 
@@ -48,15 +48,23 @@
                             class="flex items-center gap-1 text-xs text-muted-foreground sm:gap-2"
                         >
                             <span>{{ word.frequency }}x</span>
-                            <span>•</span>
-                            <span>{{
-                                getMasteryLabel(word.mastery_level)
-                            }}</span>
+                            <span>·</span>
+                            <span>{{ getMasteryLabel(word.mastery_level) }}</span>
+                            <template v-if="cardStateLabel">
+                                <span>·</span>
+                                <span :class="cardStateColor">{{ cardStateLabel }}</span>
+                            </template>
                             <span
                                 v-if="isDueForReview"
                                 class="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-primary"
                             >
                                 Due
+                            </span>
+                            <span
+                                v-if="word.review_data?.is_leech"
+                                class="ml-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive"
+                            >
+                                Leech
                             </span>
                         </div>
                     </div>
@@ -103,16 +111,16 @@
             </ThemedCard>
         </HoverCardTrigger>
 
-        <HoverCardContent class="themed-hovercard w-80" side="top">
+        <HoverCardContent class="themed-hovercard w-80" side="bottom" :side-offset="8">
             <div class="space-y-4">
                 <!-- Header -->
                 <div class="flex items-center justify-between">
                     <div>
                         <h4 class="text-lg font-semibold">
-                            {{ word.word.toLowerCase() }}
+                            {{ word.word?.toLowerCase() ?? '' }}
                         </h4>
                         <p class="text-sm text-muted-foreground">
-                            {{ getMasteryLabel(word.mastery_level) }} •
+                            {{ getMasteryLabel(word.mastery_level) }} ·
                             {{
                                 word.temperature === Temperature.HOT
                                     ? 'Recently studied'
@@ -130,7 +138,7 @@
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">Reviews</div>
                         <div class="font-semibold">
-                            {{ word.review_data.repetitions }}
+                            {{ word.review_data?.repetitions ?? 0 }}
                         </div>
                     </div>
                     <div class="space-y-1">
@@ -138,7 +146,7 @@
                             Ease Factor
                         </div>
                         <div class="font-semibold">
-                            {{ word.review_data.ease_factor.toFixed(1) }}
+                            {{ (word.review_data?.ease_factor ?? 2.5).toFixed(1) }}
                         </div>
                     </div>
                     <div class="space-y-1">
@@ -146,13 +154,13 @@
                             Interval
                         </div>
                         <div class="font-semibold">
-                            {{ word.review_data.interval }}d
+                            {{ formatInterval(word.review_data?.interval ?? 0) }}
                         </div>
                     </div>
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">Lapses</div>
                         <div class="font-semibold">
-                            {{ word.review_data.lapse_count }}
+                            {{ word.review_data?.lapse_count ?? 0 }}
                         </div>
                     </div>
                 </div>
@@ -189,7 +197,7 @@
                             >
                                 {{
                                     formatRelativeTime(
-                                        word.review_data.next_review_date
+                                        word.review_data?.next_review_date
                                     )
                                 }}
                             </span>
@@ -198,7 +206,7 @@
                 </div>
 
                 <!-- Tags -->
-                <div v-if="word.tags.length > 0" class="space-y-2">
+                <div v-if="word.tags?.length > 0" class="space-y-2">
                     <div class="text-xs font-medium text-muted-foreground">
                         Tags
                     </div>
@@ -260,7 +268,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import type { WordListItem, MasteryLevel } from '@/types';
+import type { WordListItem, MasteryLevel, CardState } from '@/types';
 import { Temperature } from '@/types';
 import { formatRelativeTime } from '@/utils';
 
@@ -274,26 +282,65 @@ const emit = defineEmits<{
     click: [word: WordListItem];
     review: [word: WordListItem, quality: number];
     edit: [word: WordListItem];
+    visited: [word: WordListItem];
+    remove: [word: WordListItem];
 }>();
+
+/**
+ * Format a fractional-day interval into human-readable text.
+ * < 1 hour: Xmin, < 1 day: Xhr, >= 1 day: Xd
+ */
+function formatInterval(days: number): string {
+    if (days <= 0) return 'now';
+    const minutes = days * 24 * 60;
+    if (minutes < 60) return `${Math.round(minutes)}min`;
+    const hours = days * 24;
+    if (hours < 24) return `${Math.round(hours)}hr`;
+    if (days < 365) return `${Math.round(days)}d`;
+    const years = days / 365;
+    return `${years.toFixed(1)}yr`;
+}
+
+// Card state display
+const cardStateLabel = computed((): string | null => {
+    const state = props.word.review_data?.card_state as CardState | undefined;
+    if (!state || state === 'new') return null;
+    return {
+        learning: 'Learning',
+        young: 'Reviewing',
+        mature: 'Mature',
+        relearning: 'Relearning',
+    }[state] ?? null;
+});
+
+const cardStateColor = computed(() => {
+    const state = props.word.review_data?.card_state as CardState | undefined;
+    const colors: Record<string, string> = {
+        new: '',
+        learning: 'text-blue-500',
+        young: 'text-emerald-500',
+        mature: 'text-amber-500',
+        relearning: 'text-orange-500',
+    };
+    return colors[state ?? 'new'] ?? '';
+});
 
 // Computed properties
 const isDueForReview = computed(() => {
-    const now = new Date();
-    const reviewDate = new Date(props.word.review_data.next_review_date);
-    return reviewDate <= now;
+    const reviewDate = props.word.review_data?.next_review_date;
+    if (!reviewDate) return false;
+    return new Date(reviewDate) <= new Date();
 });
 
 const progressPercentage = computed(() => {
-    // Calculate progress based on mastery level and review history
     const baseProgress = {
         default: 0,
         bronze: 25,
         silver: 60,
         gold: 100,
-    }[props.word.mastery_level];
+    }[props.word.mastery_level] ?? 0;
 
-    // Add bonus for successful reviews
-    const reviewBonus = Math.min(props.word.review_data.repetitions * 2, 20);
+    const reviewBonus = Math.min((props.word.review_data?.repetitions ?? 0) * 2, 20);
 
     return Math.min(baseProgress + reviewBonus, 100);
 });
@@ -305,7 +352,7 @@ const getMasteryLabel = (level: MasteryLevel): string => {
         bronze: 'Learning',
         silver: 'Familiar',
         gold: 'Mastered',
-    }[level];
+    }[level] ?? 'New';
 };
 
 const getMasteryEmoji = (level: MasteryLevel): string => {
@@ -314,26 +361,23 @@ const getMasteryEmoji = (level: MasteryLevel): string => {
         bronze: '🥉',
         silver: '🥈',
         gold: '🥇',
-    }[level];
+    }[level] ?? '📝';
 };
 
 const startReview = () => {
-    // For now, simulate a good review (quality 4)
-    // In a real implementation, this would open a review modal
     emit('review', props.word, 4);
 };
 
 const markAsVisited = () => {
-    // Mark word as visited without formal review
+    emit('visited', props.word);
 };
 
 const removeFromList = () => {
-    // Remove word from wordlist
+    emit('remove', props.word);
 };
 </script>
 
 <style scoped>
-/* Custom styling for the themed card in this context */
 .themed-title {
     background: linear-gradient(135deg, currentColor 0%, currentColor 100%);
     background-clip: text;
@@ -351,7 +395,6 @@ const removeFromList = () => {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Apple-style spring easing */
 .ease-apple-spring {
     transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }

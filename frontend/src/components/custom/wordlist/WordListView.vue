@@ -8,20 +8,30 @@
                 </h1>
                 <p
                     v-if="currentWordlist.description"
-                    class="mt-1 text-muted-foreground"
+                    class="mt-1 text-sm text-muted-foreground"
                 >
                     {{ currentWordlist.description }}
                 </p>
             </div>
         </div>
 
-        <!-- Statistics (only when a wordlist is selected) -->
+        <!-- Statistics + Review Button -->
         <WordlistStatsBar
             v-if="currentWordlist"
             :wordlist="currentWordlist"
             :mastered="masteryStats.gold"
             :due-for-review="dueForReview"
-        />
+        >
+            <template #actions>
+                <Button
+                    v-if="dueForReview > 0"
+                    size="sm"
+                    @click="showReviewModal = true"
+                >
+                    Start Review ({{ dueForReview }})
+                </Button>
+            </template>
+        </WordlistStatsBar>
 
         <!-- Loading State -->
         <div
@@ -61,8 +71,10 @@
 
         <!-- Word Cards Grid -->
         <div v-else class="space-y-4">
-            <div
+            <TransitionGroup
                 ref="scrollContainer"
+                tag="div"
+                name="card-grid"
                 class="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
             >
                 <WordListCard
@@ -70,10 +82,12 @@
                     :key="word._uniqueId"
                     :word="word"
                     @click="handleWordClick"
-                    @review="handleReview"
+                    @review="() => showReviewModal = true"
                     @edit="handleEdit"
+                    @visited="handleVisited"
+                    @remove="handleRemove"
                 />
-            </div>
+            </TransitionGroup>
 
             <!-- Load More Button -->
             <div
@@ -129,6 +143,15 @@
             :word="editingWord"
             @save="updateWordNotes"
         />
+
+        <!-- Review Modal -->
+        <ReviewModal
+            v-if="currentWordlist"
+            v-model="showReviewModal"
+            :wordlist-id="currentWordlist.id"
+            :wordlist-name="currentWordlist.name"
+            @session-complete="handleReviewSessionComplete"
+        />
     </div>
 </template>
 
@@ -145,6 +168,7 @@ import WordlistStatsBar from './WordlistStatsBar.vue';
 import WordListUploadModal from './modals/WordListUploadModal.vue';
 import CreateWordListModal from './modals/CreateWordListModal.vue';
 import EditWordNotesModal from './modals/EditWordNotesModal.vue';
+import ReviewModal from './modals/ReviewModal.vue';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
@@ -169,6 +193,7 @@ const isLoadingWords = ref(false);
 const showUploadModal = ref(false);
 const showCreateModal = ref(false);
 const showEditNotesModal = ref(false);
+const showReviewModal = ref(false);
 const editingWord = ref<WordListItem | null>(null);
 const currentWordlistData = ref<WordList | null>(null);
 const currentPage = ref(0);
@@ -221,7 +246,7 @@ const currentWords = computed(() => {
     if (filters.value.showDueOnly) {
         const now = new Date();
         items = items.filter(
-            (word: any) => new Date(word.review_data?.next_review_date) <= now
+            (word: any) => word.review_data?.next_review_date && new Date(word.review_data.next_review_date) <= now
         );
     }
 
@@ -230,10 +255,10 @@ const currentWords = computed(() => {
         items = applySortCriteria(items, sortCriteria.value);
     }
 
-    // Add unique keys for Vue
+    // Add unique keys for Vue (stable keys, no Date.now())
     return items.map((item: any, index: number) => ({
         ...item,
-        _uniqueId: `${item.word}-${index}-${Date.now()}`,
+        _uniqueId: `${item.word}-${index}`,
     }));
 });
 
@@ -271,7 +296,7 @@ const dueForReview = computed(() => {
 
     const now = new Date();
     return currentWords.value.filter(
-        (word) => new Date(word.review_data.next_review_date) <= now
+        (word) => word.review_data?.next_review_date && new Date(word.review_data.next_review_date) <= now
     ).length;
 });
 
@@ -285,46 +310,27 @@ const handleWordClick = (word: WordListItem) => {
     router.push({ name: 'Definition', params: { word: word.word } });
 };
 
-const handleReview = async (word: WordListItem, quality: number) => {
+const handleVisited = async (word: WordListItem) => {
+    if (!currentWordlist.value?.id) return;
     try {
-        if (!currentWordlist.value?.id) {
-            logger.error('No wordlist selected');
-            return;
-        }
-
-        // Submit review to backend
-        const response = await wordlistApi.submitWordReview(
-            currentWordlist.value.id,
-            {
-                word: word.word,
-                quality,
-            }
-        );
-
-        // Update the word in the store results so our computed refreshes
-        if (response.data) {
-            const storeResults = [...wordlistMode.results] as WordListItem[];
-            const wordIndex = storeResults.findIndex(
-                (w) => w.word === word.word
-            );
-            if (wordIndex >= 0) {
-                storeResults[wordIndex] = {
-                    ...storeResults[wordIndex],
-                    mastery_level:
-                        response.data.mastery_level ||
-                        storeResults[wordIndex].mastery_level,
-                    review_data: {
-                        ...storeResults[wordIndex].review_data,
-                        last_review_date:
-                            response.data.last_reviewed ||
-                            new Date().toISOString(),
-                    },
-                } as any;
-                wordlistMode.setResults(storeResults);
-            }
-        }
+        await wordlistApi.markWordVisited(currentWordlist.value.id, word.word);
     } catch (error) {
-        logger.error('Failed to process review:', error);
+        logger.error('Failed to mark visited:', error);
+    }
+};
+
+const handleRemove = async (word: WordListItem) => {
+    if (!currentWordlist.value?.id) return;
+    try {
+        await wordlistApi.removeWord(currentWordlist.value.id, word.word);
+        // Optimistic update
+        const updated = [...wordlistMode.results].filter(
+            (w: any) => w.word !== word.word
+        );
+        wordlistMode.setResults(updated as any);
+        toast({ title: 'Word removed', description: `"${word.word}" removed from list.` });
+    } catch (error) {
+        logger.error('Failed to remove word:', error);
     }
 };
 
@@ -360,8 +366,24 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
     }
 };
 
-const handleWordsUploaded = (_words: string[]) => {
-    // Refresh current wordlist - stub for now
+const handleWordsUploaded = async (_words: string[]) => {
+    // Re-fetch wordlist data after upload
+    if (wordlistMode.selectedWordlist) {
+        await loadWordlistMeta(wordlistMode.selectedWordlist);
+        await triggerWordlistSearch();
+        toast({
+            title: 'Words uploaded',
+            description: 'Your wordlist has been updated.',
+        });
+    }
+};
+
+const handleReviewSessionComplete = async () => {
+    // Refresh wordlist data after review session
+    if (wordlistMode.selectedWordlist) {
+        await loadWordlistMeta(wordlistMode.selectedWordlist);
+        await triggerWordlistSearch();
+    }
 };
 
 const handleWordlistCreated = async (wordlist: any) => {
@@ -491,5 +513,22 @@ watch(
 </script>
 
 <style scoped>
-/* Additional component-specific styles if needed */
+/* Card grid transitions */
+.card-grid-enter-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.card-grid-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.card-grid-enter-from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+}
+.card-grid-leave-to {
+    opacity: 0;
+    transform: scale(0.97);
+}
+.card-grid-move {
+    transition: transform 0.3s ease;
+}
 </style>

@@ -1,24 +1,30 @@
-"""WordLists API - Simplified CRUD operations for word lists."""
+"""WordLists API - CRUD operations for word lists."""
 
 import asyncio
+import csv
+import io
+import json
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ....core.state_tracker import Stages, StateTracker
 from ....core.streaming import create_streaming_response
+from ....models.user import UserRole
 from ....wordlist.models import WordList
 from ....wordlist.parser import parse_file
 from ....wordlist.utils import generate_wordlist_name
 from ...core import (
     CurrentUserDep,
     ListResponse,
+    OptionalUserDep,
+    OptionalUserRoleDep,
     PaginationDep,
     ResourceResponse,
     SortDep,
@@ -36,6 +42,18 @@ router = APIRouter()
 def get_wordlist_repo() -> WordListRepository:
     """Dependency to get word list repository."""
     return WordListRepository()
+
+
+async def verify_wordlist_ownership(
+    wordlist: WordList,
+    user_id: str,
+    user_role: UserRole | None = None,
+) -> None:
+    """Verify user owns the wordlist or is admin."""
+    if user_role == UserRole.ADMIN:
+        return
+    if wordlist.owner_id != user_id:
+        raise HTTPException(403, "Not authorized to access this wordlist")
 
 
 class WordListQueryParams(BaseModel):
@@ -56,23 +74,14 @@ class WordListQueryParams(BaseModel):
 async def list_wordlists(
     pagination: PaginationDep,
     sort: SortDep,
+    user_id: OptionalUserDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
     params: WordListQueryParams = Depends(),
-) -> ListResponse[WordList]:
+) -> ListResponse[dict[str, Any]]:
     """List wordlists with filtering and pagination.
 
-    Query Parameters:
-        - name/name_pattern: Name filters
-        - owner_id: Filter by owner
-        - is_public: Visibility filter
-        - has_tag: Tag filter
-        - min/max_words: Word count range
-        - created_after/before: Date range
-        - Standard pagination params
-
-    Returns:
-        Paginated list of wordlists.
-
+    Returns metadata only (no embedded words) for performance.
+    Use GET /{wordlist_id}/words for word data.
     """
     # Build filter
     filter_params = WordListFilter(
@@ -87,21 +96,29 @@ async def list_wordlists(
         created_before=params.created_before,
     )
 
+    # If no explicit owner filter and user is authenticated, show their lists + public
+    query = filter_params.to_query()
+    if params.owner_id is None and params.is_public is None and user_id:
+        query["$or"] = [{"owner_id": user_id}, {"is_public": True}]
+    elif params.owner_id is None and not user_id:
+        query["is_public"] = True
+
     # Get data
     wordlists, total = await repo.list(
-        filter_dict=filter_params.to_query(),
+        filter_dict=query,
         pagination=pagination,
         sort=sort,
     )
 
-    # Populate word text for each wordlist
-    populated_wordlists = []
+    # Return metadata only (no word population) for performance
+    items = []
     for wordlist in wordlists:
-        populated_data = await repo.populate_words(wordlist)
-        populated_wordlists.append(populated_data)
+        data = wordlist.model_dump(mode="json", exclude={"words"})
+        data["word_count"] = len(wordlist.words)
+        items.append(data)
 
     return ListResponse(
-        items=populated_wordlists,
+        items=items,
         total=total,
         offset=pagination.offset,
         limit=pagination.limit,
@@ -111,26 +128,22 @@ async def list_wordlists(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_wordlist(
     data: WordListCreate,
+    response: Response,
     user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Create a new wordlist.
+    """Create a new wordlist."""
+    # Set owner from authenticated user
+    data.owner_id = user_id
 
-    Body:
-        - name: List name (required)
-        - description: List description
-        - is_public: Visibility (default: false)
-        - tags: List of tags
-        - words: Initial words (optional)
+    wordlist, created = await repo.create(data)
 
-    Returns:
-        Created wordlist with resource links.
-
-    """
-    wordlist = await repo.create(data)
+    if not created:
+        response.status_code = 200
 
     return ResourceResponse(
-        data=wordlist.model_dump(mode="json"),
+        data=wordlist.model_dump(mode="json", exclude={"words"}),
+        metadata={"created": created, "word_count": len(wordlist.words)},
         links={
             "self": f"/wordlists/{wordlist.id}",
             "words": f"/wordlists/{wordlist.id}/words",
@@ -141,38 +154,28 @@ async def create_wordlist(
 
 @router.get("/generate-name", response_model=dict[str, str])
 async def generate_wordlist_slug() -> dict[str, str]:
-    """Generate a random slug name for a wordlist.
-
-    Uses the same algorithm as auto-generated names during wordlist creation.
-
-    Returns:
-        Dictionary with 'name' key containing the generated slug.
-
-    """
+    """Generate a random slug name for a wordlist."""
     try:
-        # Generate slug using existing utility (empty list for words since name is independent)
         slug_name = generate_wordlist_name()
         return {"name": slug_name}
     except Exception:
-        # Fallback to a simple timestamp-based name if generation fails
-
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         return {"name": f"wordlist-{timestamp}"}
 
 
 @router.get("/{wordlist_id}", response_model=ResourceResponse)
 async def get_wordlist(
     wordlist_id: PydanticObjectId,
+    user_id: OptionalUserDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Get wordlist details.
-
-    Returns:
-        Wordlist with metadata and statistics.
-
-    """
+    """Get wordlist details with populated word text."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
+
+    # Check access: public or owner
+    if not wordlist.is_public and wordlist.owner_id and user_id != wordlist.owner_id:
+        raise HTTPException(403, "Not authorized to access this wordlist")
 
     # Calculate statistics
     total_words = len(wordlist.words)
@@ -208,12 +211,7 @@ async def get_wordlist_statistics(
     wordlist_id: PydanticObjectId,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Get detailed wordlist statistics.
-
-    Returns:
-        Comprehensive statistics about the wordlist.
-
-    """
+    """Get detailed wordlist statistics."""
     stats = await repo.get_statistics(wordlist_id)
 
     return ResourceResponse(
@@ -229,24 +227,18 @@ async def update_wordlist(
     wordlist_id: PydanticObjectId,
     data: WordListUpdate,
     user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Update wordlist metadata.
+    """Update wordlist metadata."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
 
-    Body:
-        - name: New name
-        - description: New description
-        - is_public: New visibility
-        - tags: New tags
-
-    Returns:
-        Updated wordlist.
-
-    """
     wordlist = await repo.update(wordlist_id, data)
 
     return ResourceResponse(
-        data=wordlist.model_dump(mode="json"),
+        data=wordlist.model_dump(mode="json", exclude={"words"}),
         metadata={
             "version": wordlist.version,
         },
@@ -261,10 +253,166 @@ async def update_wordlist(
 async def delete_wordlist(
     wordlist_id: PydanticObjectId,
     user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> None:
     """Delete a wordlist."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
     await repo.delete(wordlist_id)
+
+
+@router.post("/{wordlist_id}/clone", response_model=ResourceResponse, status_code=201)
+async def clone_wordlist(
+    wordlist_id: PydanticObjectId,
+    user_id: CurrentUserDep,
+    name: str | None = Query(None, description="Name for cloned list"),
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Clone a wordlist with reset learning stats."""
+    source = await repo.get(wordlist_id, raise_on_missing=True)
+    assert source is not None
+
+    # Get word texts for the clone
+    from ....models import Word
+
+    word_ids = [w.word_id for w in source.words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_texts = [w.text for w in words]
+
+    clone_data = WordListCreate(
+        name=name or f"{source.name} (copy)",
+        description=source.description,
+        words=word_texts,
+        tags=source.tags,
+        is_public=False,
+        owner_id=user_id,
+    )
+
+    cloned, _ = await repo.create(clone_data)
+
+    return ResourceResponse(
+        data=cloned.model_dump(mode="json", exclude={"words"}),
+        metadata={"cloned_from": str(wordlist_id), "word_count": len(cloned.words)},
+        links={
+            "self": f"/wordlists/{cloned.id}",
+            "source": f"/wordlists/{wordlist_id}",
+        },
+    )
+
+
+@router.get("/{wordlist_id}/export")
+async def export_wordlist(
+    wordlist_id: PydanticObjectId,
+    format: str = Query("txt", description="Export format: txt, csv, json"),
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> StreamingResponse:
+    """Export wordlist as a downloadable file."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+
+    # Get word texts
+    from ....models import Word
+
+    word_ids = [w.word_id for w in wordlist.words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(w.id): w.text for w in words}
+
+    safe_name = wordlist.name.replace(" ", "_").replace("/", "_")[:50]
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            ["word", "mastery_level", "ease_factor", "interval", "repetitions", "lapse_count"]
+        )
+        for item in wordlist.words:
+            text = word_text_map.get(str(item.word_id), "")
+            writer.writerow(
+                [
+                    text,
+                    item.mastery_level.value,
+                    item.review_data.ease_factor,
+                    item.review_data.interval,
+                    item.review_data.repetitions,
+                    item.review_data.lapse_count,
+                ]
+            )
+        content = output.getvalue().encode("utf-8")
+        media_type = "text/csv"
+        filename = f"{safe_name}.csv"
+    elif format == "json":
+        populated = await repo.populate_words(wordlist)
+        content = json.dumps(populated, indent=2, default=str).encode("utf-8")
+        media_type = "application/json"
+        filename = f"{safe_name}.json"
+    else:
+        # txt format
+        lines = []
+        for i, item in enumerate(wordlist.words, 1):
+            text = word_text_map.get(str(item.word_id), "")
+            lines.append(f"{i}. {text}")
+        content = "\n".join(lines).encode("utf-8")
+        media_type = "text/plain"
+        filename = f"{safe_name}.txt"
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{wordlist_id}/export/anki")
+async def export_wordlist_anki(
+    wordlist_id: PydanticObjectId,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> StreamingResponse:
+    """Export wordlist as Anki .apkg file."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+
+    # Get word texts and definitions
+    from ....models import Word
+    from ....models.dictionary import Definition
+
+    word_ids = [w.word_id for w in wordlist.words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(w.id): w.text for w in words}
+    word_texts = [w.text for w in words]
+
+    # Get definitions for these words
+    definitions = await Definition.find({"word_id": {"$in": word_ids}}).to_list()
+    word_defs: dict[str, list[str]] = {}
+    for defn in definitions:
+        text = word_text_map.get(str(defn.word_id), "")
+        if text:
+            if text not in word_defs:
+                word_defs[text] = []
+            word_defs[text].append(defn.text)
+
+    try:
+        from ....anki.generator import AnkiDeckGenerator
+
+        generator = AnkiDeckGenerator()
+        apkg_path = generator.generate(
+            deck_name=wordlist.name,
+            words=word_texts,
+            definitions=word_defs,
+        )
+
+        return StreamingResponse(
+            open(apkg_path, "rb"),
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{wordlist.name}.apkg"',
+            },
+        )
+    except ImportError:
+        raise HTTPException(501, "Anki export requires genanki package")
+    except Exception as e:
+        raise HTTPException(500, f"Failed to generate Anki deck: {e!s}")
 
 
 @router.post("/upload", response_model=ResourceResponse, status_code=201)
@@ -276,47 +424,30 @@ async def upload_wordlist(
     is_public: bool = False,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Upload a wordlist from a file.
-
-    Accepts text files with one word per line.
-
-    Form Data:
-        - file: Text file with words
-        - name: List name (auto-generated if not provided)
-        - description: List description
-        - is_public: Visibility
-
-    Returns:
-        Created wordlist.
-
-    """
+    """Upload a wordlist from a file."""
     try:
-        # Read file content
         content = await file.read()
 
-        # Create temporary file for parser
         with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as tmp_file:
             tmp_file.write(content)
             tmp_path = Path(tmp_file.name)
 
         try:
-            # Parse file
             parsed = parse_file(tmp_path)
 
-            # Generate name if not provided
             if not name:
                 name = generate_wordlist_name(parsed.words)
 
-            # Create wordlist
             data = WordListCreate(
                 name=name,
                 description=description or parsed.metadata.get("description", ""),
                 is_public=is_public,
                 tags=parsed.metadata.get("tags", []),
                 words=parsed.words,
+                owner_id=user_id,
             )
 
-            wordlist = await repo.create(data)
+            wordlist, created = await repo.create(data)
 
             return ResourceResponse(
                 data={
@@ -328,6 +459,7 @@ async def upload_wordlist(
                 metadata={
                     "uploaded_filename": file.filename,
                     "parsed_words": len(parsed.words),
+                    "created": created,
                 },
                 links={
                     "self": f"/wordlists/{wordlist.id}",
@@ -336,7 +468,6 @@ async def upload_wordlist(
             )
 
         finally:
-            # Clean up temp file
             tmp_path.unlink(missing_ok=True)
 
     except Exception as e:
@@ -345,60 +476,37 @@ async def upload_wordlist(
 
 @router.post("/upload/stream", status_code=201)
 async def upload_wordlist_stream(
+    user_id: CurrentUserDep,
     file: UploadFile = File(...),
     name: str | None = None,
     description: str | None = None,
     is_public: bool = False,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> StreamingResponse:
-    """Upload a wordlist with streaming progress updates using enhanced system.
-
-    Returns Server-Sent Events (SSE) with progress updates.
-
-    Form Data:
-        - file: Text file with words
-        - name: List name (auto-generated if not provided)
-        - description: List description
-        - is_public: Visibility
-
-    Event Types:
-        - config: Stage definitions for progress visualization
-        - progress: Update on current operation with stage and progress
-        - complete: Final result with wordlist info
-        - error: Error details if something goes wrong
-    """
-    # Read file content before creating the generator
+    """Upload a wordlist with streaming progress updates."""
     content = await file.read()
 
-    # Create state tracker for upload process
     state_tracker = StateTracker(category="upload")
 
     async def upload_process() -> WordList:
-        """Perform the upload process while updating state tracker."""
         try:
-            # Start upload
             await state_tracker.update_stage(Stages.UPLOAD_START)
             await state_tracker.update(stage=Stages.UPLOAD_START, message="Starting upload...")
-            await asyncio.sleep(0.1)  # Small delay for UI update
+            await asyncio.sleep(0.1)
 
-            # File already read - move to parsing
             await state_tracker.update_stage(Stages.UPLOAD_READING)
             await state_tracker.update(
-                stage=Stages.UPLOAD_READING,
-                message="File read successfully",
+                stage=Stages.UPLOAD_READING, message="File read successfully"
             )
 
-            # Create temporary file for parser
             with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as tmp_file:
                 tmp_file.write(content)
                 tmp_path = Path(tmp_file.name)
 
             try:
-                # Parse file
                 await state_tracker.update_stage(Stages.UPLOAD_PARSING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_PARSING,
-                    message="Parsing words from file...",
+                    stage=Stages.UPLOAD_PARSING, message="Parsing words from file..."
                 )
                 parsed = parse_file(tmp_path)
                 total_words = len(parsed.words)
@@ -409,16 +517,13 @@ async def upload_wordlist_stream(
                     message=f"Found {total_words} words",
                 )
 
-                # Generate name if not provided
                 final_name = name
                 if not final_name:
                     final_name = generate_wordlist_name(parsed.words)
 
-                # Create wordlist data
                 await state_tracker.update_stage(Stages.UPLOAD_PROCESSING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_PROCESSING,
-                    message="Creating word entries...",
+                    stage=Stages.UPLOAD_PROCESSING, message="Creating word entries..."
                 )
 
                 data = WordListCreate(
@@ -427,37 +532,30 @@ async def upload_wordlist_stream(
                     is_public=is_public,
                     tags=parsed.metadata.get("tags", []),
                     words=parsed.words,
+                    owner_id=user_id,
                 )
 
-                # Create wordlist with progress updates
                 await state_tracker.update_stage(Stages.UPLOAD_CREATING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_CREATING,
-                    message="Finalizing wordlist creation...",
+                    stage=Stages.UPLOAD_CREATING, message="Finalizing wordlist creation..."
                 )
-                wordlist = await repo.create(data)
+                wordlist, _ = await repo.create(data)
 
                 await state_tracker.update_stage(Stages.UPLOAD_FINALIZING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_FINALIZING,
-                    message="Completing upload...",
+                    stage=Stages.UPLOAD_FINALIZING, message="Completing upload..."
                 )
-
-                # Complete successfully
                 await state_tracker.update_complete(message="Upload completed successfully!")
 
-                # Return the created WordList
                 return wordlist
 
             finally:
-                # Clean up temp file
                 tmp_path.unlink(missing_ok=True)
 
         except Exception as e:
             await state_tracker.update_error(f"Failed to upload wordlist: {e!s}")
             raise
 
-    # Use the generalized streaming system
     return await create_streaming_response(
         state_tracker=state_tracker,
         process_func=upload_process,

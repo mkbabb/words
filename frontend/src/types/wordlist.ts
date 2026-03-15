@@ -11,6 +11,16 @@ export interface WordListItem {
   tags: string[];
 }
 
+export type CardState = 'new' | 'learning' | 'young' | 'mature' | 'relearning';
+
+export const CardState = {
+  NEW: 'new' as const,
+  LEARNING: 'learning' as const,
+  YOUNG: 'young' as const,
+  MATURE: 'mature' as const,
+  RELEARNING: 'relearning' as const,
+} as const;
+
 export interface ReviewData {
   repetitions: number;
   ease_factor: number;
@@ -19,6 +29,10 @@ export interface ReviewData {
   last_review_date: string | null;
   lapse_count: number;
   review_history: ReviewHistoryItem[];
+  card_state: CardState;
+  learning_step: number;
+  is_leech: boolean;
+  graduated_interval: number;
 }
 
 export interface ReviewHistoryItem {
@@ -26,6 +40,67 @@ export interface ReviewHistoryItem {
   quality: number;
   interval: number;
   ease_factor: number;
+  card_state: CardState;
+}
+
+// SM-2 Quality scores
+export type SM2Quality = 0 | 1 | 2 | 3 | 4 | 5;
+
+export const SM2_LABELS: Record<SM2Quality, { label: string; description: string; color: string }> = {
+  0: { label: 'Again', description: 'Complete failure to recall', color: 'destructive' },
+  1: { label: 'Hard', description: 'Incorrect; answer remembered after reveal', color: 'destructive' },
+  2: { label: 'Difficult', description: 'Incorrect but close', color: 'warning' },
+  3: { label: 'Okay', description: 'Correct with significant difficulty', color: 'warning' },
+  4: { label: 'Good', description: 'Correct with minor hesitation', color: 'primary' },
+  5: { label: 'Easy', description: 'Perfect, effortless recall', color: 'success' },
+};
+
+// Review result from backend
+export interface ReviewResult {
+  word: string;
+  card_state: CardState;
+  mastery_level: MasteryLevel;
+  ease_factor: number;
+  interval_days: number;
+  next_review_date: string;
+  repetitions: number;
+  lapse_count: number;
+  is_leech: boolean;
+  mastery_changed: boolean;
+  previous_mastery: MasteryLevel | null;
+  predicted_intervals: Record<number, number>;
+}
+
+// Review session types
+export interface ReviewSession {
+  wordlistId: string;
+  words: DueWordItem[];
+  currentIndex: number;
+  results: ReviewSessionResult[];
+  startedAt: string;
+}
+
+export interface ReviewSessionResult {
+  word: string;
+  quality: SM2Quality;
+  timestamp: string;
+  result: ReviewResult;
+}
+
+// Due word item from backend
+export interface DueWordItem {
+  word: string;
+  mastery_level: MasteryLevel;
+  card_state: CardState;
+  ease_factor: number;
+  interval_days: number;
+  last_reviewed: string | null;
+  review_count: number;
+  lapse_count: number;
+  is_leech: boolean;
+  due_priority: number;
+  predicted_intervals: Record<number, number>;
+  notes: string;
 }
 
 export interface LearningStats {

@@ -94,7 +94,7 @@
                                     'font-semibold text-primary',
                             ]"
                         >
-                            {{ Math.round(result.score * 100) }}%
+                            {{ result.score != null ? Math.round(result.score * 100) + '%' : '' }}
                         </span>
                     </div>
                 </button>
@@ -146,7 +146,7 @@
                                     'font-semibold text-primary',
                             ]"
                         >
-                            {{ Math.round(result.score * 100) }}%
+                            {{ result.score != null ? Math.round(result.score * 100) + '%' : '' }}
                         </span>
                     </div>
                 </button>

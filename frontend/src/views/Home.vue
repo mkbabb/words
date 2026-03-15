@@ -288,6 +288,25 @@ watch(() => route.fullPath, async () => {
         searchBar.setMode('lookup');
         searchBar.setQuery(query);
         await orchestrator.performSearch();
+    } else if (routeName === 'Wordlist' && route.params.wordlistId) {
+        const wordlistId = route.params.wordlistId as string;
+        searchBar.clearQuery();
+        content.clearCurrentEntry();
+        searchBar.setMode('wordlist');
+        const { wordlistMode } = useStores();
+        wordlistMode.setWordlist(wordlistId);
+    } else if (routeName === 'WordlistSearch' && route.params.wordlistId) {
+        const wordlistId = route.params.wordlistId as string;
+        const query = (route.params.query as string) || '';
+        content.clearCurrentEntry();
+        searchBar.setMode('wordlist');
+        const { wordlistMode } = useStores();
+        wordlistMode.setWordlist(wordlistId);
+        if (query) {
+            searchBar.setQuery(query);
+        } else {
+            searchBar.clearQuery();
+        }
     } else if (routeName === 'Home') {
         searchBar.clearQuery();
         content.clearCurrentEntry();

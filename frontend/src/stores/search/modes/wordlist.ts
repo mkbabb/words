@@ -13,7 +13,7 @@ import {
     DEFAULT_VIEW_MODE,
     DEFAULT_WORDLIST_FILTERS,
     type ViewMode,
-    type WordlistFilters,
+    type WordlistPanelFilters,
     type SortCriterion,
 } from '@/stores/types/constants';
 
@@ -31,7 +31,7 @@ export const useWordlistMode = defineStore(
         // ==========================================================================
 
         const selectedWordlist = ref<string | null>(null);
-        const wordlistFilters = shallowRef<WordlistFilters>(
+        const wordlistFilters = shallowRef<WordlistPanelFilters>(
             DEFAULT_WORDLIST_FILTERS
         );
         const wordlistSortCriteria = shallowRef<SortCriterion[]>([]);
@@ -133,7 +133,7 @@ export const useWordlistMode = defineStore(
             wordlistFilters.value = { ...wordlistFilters.value, ...filters };
         };
 
-        const toggleWordlistFilter = (filterName: keyof WordlistFilters) => {
+        const toggleWordlistFilter = (filterName: keyof WordlistPanelFilters) => {
             wordlistFilters.value = {
                 ...wordlistFilters.value,
                 [filterName]: !wordlistFilters.value[filterName],

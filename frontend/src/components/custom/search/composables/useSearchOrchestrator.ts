@@ -407,20 +407,27 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
         }
     };
 
-    const addToWordlist = async (_word: string): Promise<void> => {
+    const addToWordlist = async (word: string): Promise<void> => {
         const wordlistId = wordlistMode.selectedWordlist;
         if (!wordlistId) {
             throw new Error('No wordlist selected');
         }
-        // TODO: implement add word API call
+        await wordlistApi.addWords(wordlistId, [word]);
+        // Refresh results to show the new word
+        await executeWordlistFetch(wordlistId);
     };
 
-    const removeFromWordlist = async (_word: string): Promise<void> => {
+    const removeFromWordlist = async (word: string): Promise<void> => {
         const wordlistId = wordlistMode.selectedWordlist;
         if (!wordlistId) {
             throw new Error('No wordlist selected');
         }
-        // TODO: implement remove word API call
+        await wordlistApi.removeWord(wordlistId, word);
+        // Optimistic update: remove from store results
+        const updated = [...wordlistMode.results].filter(
+            (w: any) => w.word !== word
+        );
+        wordlistMode.setResults(updated as any);
     };
 
     const processBatchWordlist = async (

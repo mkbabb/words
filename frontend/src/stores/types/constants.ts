@@ -93,7 +93,7 @@ export const WordlistFilterTypes = {
 
 export type WordlistFilterType = typeof WordlistFilterTypes[keyof typeof WordlistFilterTypes]
 
-export type WordlistFilters = {
+export type WordlistPanelFilters = {
   showBronze: boolean
   showSilver: boolean
   showGold: boolean
@@ -135,7 +135,7 @@ export const DEFAULT_DEBUG_LEVEL: DebugLevel = DebugLevels.NONE
 export const DEFAULT_SOURCES: DictionarySource[] = [DictionarySources.WIKTIONARY]
 export const DEFAULT_LANGUAGES: Language[] = [Languages.EN]
 
-export const DEFAULT_WORDLIST_FILTERS: WordlistFilters = {
+export const DEFAULT_WORDLIST_FILTERS: WordlistPanelFilters = {
   showBronze: true,
   showSilver: true,
   showGold: true,

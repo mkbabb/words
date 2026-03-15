@@ -11,7 +11,7 @@ import type {
   ViewMode, 
   DictionarySource, 
   Language, 
-  WordlistFilters, 
+  WordlistPanelFilters,
   SortCriterion,
   DebugLevel 
 } from './constants'
@@ -26,7 +26,7 @@ export interface LookupConfig {
 }
 
 export interface WordlistConfig {
-  filters: WordlistFilters
+  filters: WordlistPanelFilters
   sortCriteria: SortCriterion[]
   selectedWordlist: string | null
 }

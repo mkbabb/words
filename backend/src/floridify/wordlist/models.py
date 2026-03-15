@@ -9,7 +9,7 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..models.base import BaseMetadataWithAccess
-from .constants import MasteryLevel, Temperature
+from .constants import COOLING_THRESHOLD_HOURS, CardState, MasteryLevel, Temperature
 from .review import ReviewData
 from .stats import LearningStats
 
@@ -62,25 +62,42 @@ class WordListItem(BaseModel):
         self.last_visited = datetime.now(UTC)
         self.temperature = Temperature.HOT
 
-    def review(self, quality: int) -> None:
-        """Process a review session."""
+    def update_temperature(self) -> None:
+        """Lazy temperature cooling based on time since last visit."""
+        if self.temperature == Temperature.HOT and self.last_visited:
+            # MongoDB strips tzinfo, so re-attach UTC if naive
+            last = self.last_visited
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=UTC)
+            hours_since = (datetime.now(UTC) - last).total_seconds() / 3600
+            if hours_since >= COOLING_THRESHOLD_HOURS:
+                self.temperature = Temperature.COLD
+
+    def review(self, quality: int) -> MasteryLevel:
+        """Process a review session. Returns previous mastery level."""
+        previous_mastery = self.mastery_level
         self.review_data.update_sm2(quality)
         self.last_visited = datetime.now(UTC)
         self.temperature = Temperature.HOT
 
-        # Update mastery based on performance
+        # Update mastery based on card state
         self._update_mastery_level()
+        return previous_mastery
 
     def _update_mastery_level(self) -> None:
-        """Update mastery level based on review performance."""
-        if self.review_data.repetitions >= 10 and self.review_data.ease_factor >= 2.5:
-            self.mastery_level = MasteryLevel.GOLD
-        elif self.review_data.repetitions >= 5:
-            self.mastery_level = MasteryLevel.SILVER
-        elif self.review_data.repetitions > 0:
-            self.mastery_level = MasteryLevel.BRONZE
-        else:
+        """Update mastery level based on card state (Anki-grade)."""
+        state = self.review_data.card_state
+        if state in (CardState.NEW, CardState.LEARNING):
             self.mastery_level = MasteryLevel.DEFAULT
+        elif state == CardState.RELEARNING:
+            self.mastery_level = MasteryLevel.BRONZE  # Demoted on lapse
+        elif state == CardState.YOUNG:
+            if self.review_data.repetitions >= 5 and self.review_data.ease_factor >= 2.3:
+                self.mastery_level = MasteryLevel.SILVER
+            else:
+                self.mastery_level = MasteryLevel.BRONZE
+        elif state == CardState.MATURE:
+            self.mastery_level = MasteryLevel.GOLD
 
     def is_due_for_review(self) -> bool:
         """Check if word is due for review."""

@@ -8,8 +8,9 @@ from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....wordlist.models import WordListItem
-from ...core import ListResponse, ResourceResponse
+from ...core import CurrentUserDep, ListResponse, OptionalUserRoleDep, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
+from .main import verify_wordlist_ownership
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ class WordListQueryParams(BaseModel):
 
     # Pagination
     offset: int = Field(0, ge=0, description="Skip first N results")
-    limit: int = Field(20, ge=1, le=100, description="Maximum results")
+    limit: int = Field(20, ge=1, le=200, description="Maximum results")
 
 
 def _normalize_items(items: list[Any]) -> list[WordListItem]:
@@ -60,10 +61,7 @@ async def apply_wordlist_filters_and_sort(
     words: list[Any],
     params: WordListQueryParams,
 ) -> list[WordListItem]:
-    """Apply filtering and sorting to wordlist items.
-
-    Normalizes all items to WordListItem before filtering/sorting.
-    """
+    """Apply filtering and sorting to wordlist items."""
     filtered = _normalize_items(words)
 
     if params.mastery_levels:
@@ -83,11 +81,9 @@ async def apply_wordlist_filters_and_sort(
     sort_fields = params.sort_by.split(",")
     sort_orders = params.sort_order.split(",")
 
-    # Ensure we have matching sort orders for each field
     while len(sort_orders) < len(sort_fields):
         sort_orders.append(sort_orders[-1] if sort_orders else "asc")
 
-    # Sort by multiple fields
     for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
         reverse = order.lower() == "desc"
         filtered = sorted(
@@ -109,7 +105,6 @@ async def convert_wordlist_items_to_response(
     if paginated:
         items = items[offset : offset + limit]
 
-    # Convert WordListItem models to dicts for JSON serialization
     normalized = _normalize_items(items)
     result = [item.model_dump(mode="json") for item in normalized]
 
@@ -119,13 +114,9 @@ async def convert_wordlist_items_to_response(
 class WordListSearchQueryParams(WordListQueryParams):
     """Query parameters for searching within a wordlist."""
 
-    # Search-specific parameters
     query: str = Field(..., description="Search query")
     max_results: int = Field(
-        100,
-        ge=1,
-        le=500,
-        description="Maximum search results before filtering",
+        100, ge=1, le=500, description="Maximum search results before filtering"
     )
     min_score: float = Field(0.4, ge=0.0, le=1.0, description="Minimum match score")
     semantic: bool | None = Field(
@@ -133,8 +124,6 @@ class WordListSearchQueryParams(WordListQueryParams):
         description="Enable semantic search. If not set, automatically enabled "
         "for wordlists with more than 100 words.",
     )
-
-    # Override default sort to use relevance for search
     sort_by: str = Field(
         "relevance",
         description="Sort field (relevance, added_at, last_viewed, mastery_level)",
@@ -152,33 +141,13 @@ async def list_words(
     params: WordListQueryParams = Depends(),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
-    """List words in a wordlist with filtering and sorting.
-
-    Query Parameters:
-        - mastery_level: Filter by mastery level
-        - min/max_views: View count range
-        - reviewed: Filter by review status
-        - sort_by: Field to sort by
-        - sort_order: Sort direction
-        - Standard pagination params
-
-    Query Parameters:
-        - mastery_levels: Filter by mastery levels (can specify multiple)
-        - hot_only: Show only hot items
-        - due_only: Show only items due for review
-        - min/max_views: View count range
-        - reviewed: Filter by review status
-        - sort_by: Field(s) to sort by (comma-separated for multiple)
-        - sort_order: Sort direction(s) (comma-separated to match sort_by)
-        - Standard pagination params
-
-    Returns:
-        Paginated list of words with metadata.
-
-    """
-    # Get wordlist
+    """List words in a wordlist with filtering and sorting."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
+
+    # Apply lazy temperature cooling
+    for word_item in wordlist.words:
+        word_item.update_temperature()
 
     # Apply shared filtering and sorting logic
     filtered_words = await apply_wordlist_filters_and_sort(wordlist.words, params)
@@ -190,6 +159,18 @@ async def list_words(
         offset=params.offset,
         limit=params.limit,
     )
+
+    # Populate word text from Word documents
+    word_ids = [item.get("word_id") for item in items if item.get("word_id")]
+    if word_ids:
+        from beanie import PydanticObjectId as OID
+
+        oids = [OID(wid) if isinstance(wid, str) else wid for wid in word_ids]
+        word_docs = await Word.find({"_id": {"$in": oids}}).to_list()
+        text_map = {str(w.id): w.text for w in word_docs}
+        for item in items:
+            wid = item.pop("word_id", None)
+            item["word"] = text_map.get(str(wid), "") if wid else ""
 
     return ListResponse(
         items=items,
@@ -203,21 +184,15 @@ async def list_words(
 async def add_word(
     wordlist_id: PydanticObjectId,
     request: WordAddRequest,
+    user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Add a word to the wordlist.
+    """Add a word to the wordlist."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
 
-    Body:
-        - word: Word to add
-        - notes: Optional notes
-
-    Returns:
-        Updated wordlist metadata.
-
-    Errors:
-        409: Word already in list
-
-    """
     updated_list = await repo.add_word(wordlist_id, request)
 
     return ResourceResponse(
@@ -248,22 +223,19 @@ async def update_word(
     wordlist_id: PydanticObjectId,
     word: str,
     request: WordUpdateRequest,
+    user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Update a word's metadata (notes, tags) in a wordlist.
-
-    Errors:
-        404: Wordlist or word not found
-    """
+    """Update a word's metadata (notes, tags) in a wordlist."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
 
-    # Find the word document by text
     word_doc = await Word.find_one({"text": word})
     if not word_doc:
         raise HTTPException(status_code=404, detail=f"Word '{word}' not found")
 
-    # Find the WordListItem in the wordlist
     target_item = None
     for item in wordlist.words:
         if item.word_id == word_doc.id:
@@ -273,13 +245,11 @@ async def update_word(
     if target_item is None:
         raise HTTPException(status_code=404, detail=f"Word '{word}' not in wordlist")
 
-    # Apply updates
     if request.notes is not None:
         target_item.notes = request.notes
     if request.tags is not None:
         target_item.tags = request.tags
 
-    # Save wordlist
     await wordlist.save()
 
     return ResourceResponse(
@@ -296,24 +266,79 @@ async def update_word(
 async def remove_word(
     wordlist_id: PydanticObjectId,
     word: str,
+    user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
     version: int | None = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> None:
-    """Remove a word from the wordlist.
+    """Remove a word from the wordlist."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
 
-    Query Parameters:
-        - version: Expected wordlist version for optimistic locking (optional).
-          If provided, returns 409 Conflict when the wordlist has been
-          concurrently modified.
-
-    Errors:
-        404: Word not in list
-        409: Version mismatch (optimistic locking)
-    """
-    # Find the word document by text
     word_doc = await Word.find_one({"text": word})
     if not word_doc:
         raise HTTPException(status_code=404, detail="Word not found")
 
-    assert word_doc.id is not None  # Word from database should have ID
+    assert word_doc.id is not None
     await repo.remove_word(wordlist_id, word_doc.id, version=version)
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request for bulk word deletion."""
+
+    words: list[str] = Field(..., min_length=1, description="Words to remove")
+
+
+@router.delete("/{wordlist_id}/words", response_model=ResourceResponse)
+async def bulk_delete_words(
+    wordlist_id: PydanticObjectId,
+    request: BulkDeleteRequest,
+    user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Remove multiple words from a wordlist in a single operation."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
+
+    # Find all word docs
+    word_docs = await Word.find({"text": {"$in": request.words}}).to_list()
+    word_id_set = {w.id for w in word_docs}
+
+    original_count = len(wordlist.words)
+    wordlist.words = [w for w in wordlist.words if w.word_id not in word_id_set]
+    removed_count = original_count - len(wordlist.words)
+
+    wordlist.update_stats()
+    wordlist.mark_accessed()
+    await wordlist.save()
+
+    return ResourceResponse(
+        data={
+            "removed": removed_count,
+            "remaining": len(wordlist.words),
+        },
+    )
+
+
+@router.post("/{wordlist_id}/words/{word}/visit", response_model=ResourceResponse)
+async def mark_word_visited(
+    wordlist_id: PydanticObjectId,
+    word: str,
+    user_id: CurrentUserDep,
+    user_role: OptionalUserRoleDep = None,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Mark a word as visited/viewed."""
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+    await verify_wordlist_ownership(wordlist, user_id, user_role)
+
+    updated = await repo.mark_word_visited(wordlist_id, word)
+
+    return ResourceResponse(
+        data={"word": word, "visited": True},
+        metadata={"version": updated.version},
+    )

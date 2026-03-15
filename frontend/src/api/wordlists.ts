@@ -240,7 +240,7 @@ export const wordlistApi = {
     return response.data;
   },
 
-  // Submit word review
+  // Submit word review (returns full computed review state)
   async submitWordReview(wordlistId: string, review: {
     word: string;
     quality: number; // 0-5 for SM-2 algorithm
@@ -249,10 +249,70 @@ export const wordlistApi = {
     return response.data;
   },
 
+  // Submit bulk reviews (single save)
+  async submitBulkReviews(wordlistId: string, reviews: Array<{ word: string; quality: number }>) {
+    const response = await api.post(`/wordlists/${wordlistId}/review/bulk`, { reviews });
+    return response.data;
+  },
+
   // Get due words for review
   async getDueWords(wordlistId: string, limit: number = 20) {
     const response = await api.get(`/wordlists/${wordlistId}/review/due`, {
       params: { limit }
+    });
+    return response.data;
+  },
+
+  // Get review session
+  async getReviewSession(wordlistId: string, limit: number = 20, masteryThreshold?: string) {
+    const params: Record<string, any> = { limit };
+    if (masteryThreshold) params.mastery_threshold = masteryThreshold;
+    const response = await api.get(`/wordlists/${wordlistId}/review/session`, { params });
+    return response.data;
+  },
+
+  // Record study session
+  async recordStudySession(wordlistId: string, data: {
+    duration_minutes: number;
+    words_studied: number;
+    words_mastered: number;
+  }) {
+    const response = await api.post(`/wordlists/${wordlistId}/review/study-session`, data);
+    return response.data;
+  },
+
+  // Mark word as visited
+  async markWordVisited(wordlistId: string, word: string) {
+    const response = await api.post(`/wordlists/${wordlistId}/words/${encodeURIComponent(word)}/visit`);
+    return response.data;
+  },
+
+  // Bulk delete words
+  async bulkDeleteWords(wordlistId: string, words: string[]) {
+    const response = await api.delete(`/wordlists/${wordlistId}/words`, { data: { words } });
+    return response.data;
+  },
+
+  // Clone wordlist
+  async cloneWordlist(wordlistId: string, name?: string) {
+    const params = name ? { name } : {};
+    const response = await api.post(`/wordlists/${wordlistId}/clone`, null, { params });
+    return response.data;
+  },
+
+  // Export wordlist
+  async exportWordlist(wordlistId: string, format: 'txt' | 'csv' | 'json' = 'txt') {
+    const response = await api.get(`/wordlists/${wordlistId}/export`, {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Export as Anki
+  async exportAnki(wordlistId: string) {
+    const response = await api.get(`/wordlists/${wordlistId}/export/anki`, {
+      responseType: 'blob',
     });
     return response.data;
   },

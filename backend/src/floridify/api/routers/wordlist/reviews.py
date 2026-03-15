@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....wordlist.constants import MasteryLevel
-from ...core import ListResponse, ResourceResponse
+from ...core import CurrentUserDep, ListResponse, ResourceResponse
 from ...repositories import StudySessionRequest, WordListRepository, WordReviewRequest
 
 router = APIRouter()
@@ -39,37 +39,39 @@ class BulkReviewRequest(BaseModel):
 @router.get("/{wordlist_id}/review/due", response_model=ListResponse[dict[str, Any]])
 async def get_due_words(
     wordlist_id: PydanticObjectId,
+    user_id: CurrentUserDep,
     limit: int = Query(20, ge=1, le=100, description="Maximum results"),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
-    """Get words due for review based on spaced repetition.
-
-    Query Parameters:
-        - limit: Maximum number of due words
-
-    Returns:
-        List of words that need review.
-
-    """
+    """Get words due for review based on spaced repetition."""
     due_words = await repo.get_due_words(wordlist_id, limit)
 
-    # Fetch Word documents to get text (word_ids are now ObjectIds)
+    # Fetch Word documents to get text
     word_ids = [w.word_id for w in due_words if w.word_id]
-
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
     items = []
     for word_item in due_words:
+        # Get predicted intervals for frontend button labels
+        predicted_intervals = word_item.review_data.get_predicted_intervals()
+
         items.append(
             {
                 "word": word_text_map.get(str(word_item.word_id), ""),
                 "mastery_level": word_item.mastery_level,
+                "card_state": word_item.review_data.card_state,
+                "ease_factor": word_item.review_data.ease_factor,
+                "interval_days": word_item.review_data.interval,
                 "last_reviewed": word_item.review_data.last_review_date.isoformat()
                 if word_item.review_data.last_review_date
                 else None,
                 "review_count": word_item.review_data.repetitions,
+                "lapse_count": word_item.review_data.lapse_count,
+                "is_leech": word_item.review_data.is_leech,
                 "due_priority": word_item.get_overdue_days(),
+                "predicted_intervals": predicted_intervals,
+                "notes": word_item.notes,
             },
         )
 
@@ -84,20 +86,11 @@ async def get_due_words(
 @router.get("/{wordlist_id}/review/session", response_model=ResourceResponse)
 async def get_review_session(
     wordlist_id: PydanticObjectId,
+    user_id: CurrentUserDep,
     params: ReviewSessionParams = Depends(),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Get a new review session with words to study.
-
-    Query Parameters:
-        - limit: Maximum words in session
-        - mastery_threshold: Include words up to this mastery level
-
-    Returns:
-        Review session with selected words.
-
-    """
-    # Get wordlist
+    """Get a new review session with words to study."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
@@ -106,8 +99,8 @@ async def get_review_session(
     now = datetime.now(UTC)
 
     for word in wordlist.words:
-        # Skip if above mastery threshold
-        if word.mastery_level.value > params.mastery_threshold.value:
+        # Skip if above mastery threshold (uses correct ordering now)
+        if word.mastery_level > params.mastery_threshold:
             continue
 
         # Include if due for review
@@ -117,23 +110,33 @@ async def get_review_session(
         if len(review_words) >= params.limit:
             break
 
-    # Fetch Word documents to get text for review words (word_ids are now ObjectIds)
-    word_ids = [w.word_id for w in review_words if w.word_id]
+    # Sort by urgency (most overdue first)
+    review_words.sort(key=lambda w: w.get_overdue_days(), reverse=True)
 
+    # Fetch Word documents to get text
+    word_ids = [w.word_id for w in review_words if w.word_id]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
-    # Convert to response
+    # Convert to response with full review state
     session_words = []
     for word_item in review_words:
+        predicted_intervals = word_item.review_data.get_predicted_intervals()
         session_words.append(
             {
                 "word": word_text_map.get(str(word_item.word_id), ""),
                 "mastery_level": word_item.mastery_level,
+                "card_state": word_item.review_data.card_state,
+                "ease_factor": word_item.review_data.ease_factor,
+                "interval_days": word_item.review_data.interval,
+                "repetitions": word_item.review_data.repetitions,
+                "lapse_count": word_item.review_data.lapse_count,
+                "is_leech": word_item.review_data.is_leech,
                 "last_reviewed": word_item.review_data.last_review_date.isoformat()
                 if word_item.review_data.last_review_date
                 else None,
                 "notes": word_item.notes,
+                "predicted_intervals": predicted_intervals,
             },
         )
 
@@ -160,43 +163,52 @@ async def get_review_session(
 async def submit_review(
     wordlist_id: PydanticObjectId,
     request: WordReviewRequest,
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Submit a single word review result.
 
-    Body:
-        - word: Word that was reviewed
-        - mastery_level: New mastery level
-        - quality_score: Review quality (0-1)
-
-    Returns:
-        Updated word metadata.
-
+    Returns full computed review state so frontend can display
+    without recomputing SM-2 logic.
     """
-    updated_list = await repo.review_word(wordlist_id, request)
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
 
-    # Find the updated word by fetching Word documents (word_ids are now ObjectIds)
-    word_ids = [w.word_id for w in updated_list.words if w.word_id]
+    # Find the word item and capture previous mastery
+    word_item = await wordlist.get_word_item(request.word)
+    if not word_item:
+        from fastapi import HTTPException
 
-    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-    word_text_map = {str(word.id): word.text for word in words}
+        raise HTTPException(404, f"Word '{request.word}' not in wordlist")
 
-    updated_word = None
-    for word_item in updated_list.words:
-        if word_text_map.get(str(word_item.word_id), "") == request.word:
-            updated_word = word_item
-            break
+    previous_mastery = word_item.mastery_level
+
+    # Process review (updates SM-2 state, card state, mastery)
+    word_item.review(request.quality)
+    wordlist.update_stats()
+    wordlist.mark_accessed()
+    await wordlist.save()
+
+    # Get predicted intervals for next review
+    predicted_intervals = word_item.review_data.get_predicted_intervals()
 
     return ResourceResponse(
         data={
             "word": request.word,
-            "mastery_level": updated_word.mastery_level if updated_word else None,
-            "last_reviewed": updated_word.review_data.last_review_date.isoformat()
-            if updated_word and updated_word.review_data.last_review_date
-            else None,
+            "card_state": word_item.review_data.card_state,
+            "mastery_level": word_item.mastery_level,
+            "ease_factor": word_item.review_data.ease_factor,
+            "interval_days": word_item.review_data.interval,
+            "next_review_date": word_item.review_data.next_review_date.isoformat(),
+            "repetitions": word_item.review_data.repetitions,
+            "lapse_count": word_item.review_data.lapse_count,
+            "is_leech": word_item.review_data.is_leech,
+            "mastery_changed": previous_mastery != word_item.mastery_level,
+            "previous_mastery": previous_mastery,
+            "predicted_intervals": predicted_intervals,
         },
         metadata={
-            "wordlist_version": updated_list.version,
+            "wordlist_version": wordlist.version,
         },
         links={
             "wordlist": f"/wordlists/{wordlist_id}",
@@ -209,27 +221,44 @@ async def submit_review(
 async def submit_bulk_reviews(
     wordlist_id: PydanticObjectId,
     request: BulkReviewRequest,
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Submit multiple word reviews at once.
 
-    Body:
-        - reviews: List of review results
-
-    Returns:
-        Summary of review results.
-
+    Loads wordlist once, applies all reviews in memory, saves once.
     """
-    # Process each review
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+
     success_count = 0
     failed_words = []
+    results = []
 
     for review in request.reviews:
-        try:
-            await repo.review_word(wordlist_id, review)
+        word_item = await wordlist.get_word_item(review.word)
+        if word_item:
+            previous_mastery = word_item.mastery_level
+            word_item.review(review.quality)
             success_count += 1
-        except Exception:
+            results.append(
+                {
+                    "word": review.word,
+                    "card_state": word_item.review_data.card_state,
+                    "mastery_level": word_item.mastery_level,
+                    "mastery_changed": previous_mastery != word_item.mastery_level,
+                    "interval_days": word_item.review_data.interval,
+                    "is_leech": word_item.review_data.is_leech,
+                }
+            )
+        else:
             failed_words.append(review.word)
+
+    # Single save for all reviews
+    if success_count > 0:
+        wordlist.update_stats()
+        wordlist.mark_accessed()
+        await wordlist.save()
 
     return ResourceResponse(
         data={
@@ -237,6 +266,7 @@ async def submit_bulk_reviews(
             "successful": success_count,
             "failed": len(failed_words),
             "failed_words": failed_words,
+            "results": results,
         },
         links={
             "wordlist": f"/wordlists/{wordlist_id}",
@@ -249,19 +279,10 @@ async def submit_bulk_reviews(
 async def record_study_session(
     wordlist_id: PydanticObjectId,
     request: StudySessionRequest,
+    user_id: CurrentUserDep,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Record a study session.
-
-    Body:
-        - duration_minutes: Session duration
-        - words_studied: Number of words studied
-        - words_mastered: Number of words mastered
-
-    Returns:
-        Updated statistics.
-
-    """
+    """Record a study session."""
     updated_list = await repo.record_study_session(wordlist_id, request)
 
     return ResourceResponse(
