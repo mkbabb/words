@@ -44,6 +44,7 @@
         <ProviderDataView
           v-if="getLoadedProvider(providerName)"
           :provider="getLoadedProvider(providerName)!"
+          :edit-mode-enabled="editModeEnabled"
         />
         <!-- Loading skeleton while provider data is being fetched -->
         <div v-else class="animate-pulse space-y-3 py-4">
@@ -71,12 +72,14 @@ interface Props {
   availableProviders?: string[];
   showSynthesis?: boolean;
   showVersionHistory?: boolean;
+  editModeEnabled?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   availableProviders: () => [],
   showSynthesis: true,
   showVersionHistory: false,
+  editModeEnabled: false,
 });
 
 const emit = defineEmits<{
