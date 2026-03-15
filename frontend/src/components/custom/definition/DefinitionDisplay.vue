@@ -80,7 +80,13 @@
     <!-- Normal Content -->
     <div v-else-if="entry" class="relative">
         <!-- Main Card -->
-        <ThemedCard :variant="selectedCardVariant" class="relative">
+        <ThemedCard
+            :variant="selectedCardVariant"
+            :class="[
+                'relative transition-all duration-300',
+                editModeEnabled && 'ring-1 ring-inset ring-muted-foreground/15',
+            ]"
+        >
             <!-- Theme Selector (includes edit button) -->
             <ThemeSelector
                 v-model="selectedCardVariant"
@@ -149,6 +155,7 @@
                 :available-providers="usedProviders"
                 :show-synthesis="!!entry?.model_info"
                 :show-version-history="editModeEnabled"
+                :edit-mode-enabled="editModeEnabled"
             >
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
@@ -252,7 +259,7 @@
 
             <!-- Progressive Etymology -->
             <div v-if="normalizedEtymology" data-cluster-id="etymology">
-                <Etymology :etymology="normalizedEtymology" />
+                <Etymology :etymology="normalizedEtymology" :edit-mode-enabled="editModeEnabled" />
             </div>
             <!-- Etymology Skeleton -->
             <div
@@ -652,33 +659,33 @@ const getGlobalDefinitionIndex = (
 </script>
 
 <style scoped>
-/* Mode switch transitions - Apple-style with bounce */
+/* Mode switch transitions — fade + horizontal slide */
 .mode-switch-enter-active {
-    transition: opacity 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
+    transition: opacity 0.25s var(--ease-apple-smooth), transform 0.25s var(--ease-apple-smooth);
 }
 
 .mode-switch-leave-active {
-    transition: opacity 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045), transform 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
+    transition: opacity 0.15s var(--ease-apple-default), transform 0.15s var(--ease-apple-default);
 }
 
 .mode-switch-enter-from {
     opacity: 0;
-    transform: scale(0.9) translateX(30px) rotate(2deg);
+    transform: translateX(16px);
 }
 
 .mode-switch-enter-to {
     opacity: 1;
-    transform: scale(1) translateX(0) rotate(0);
+    transform: translateX(0);
 }
 
 .mode-switch-leave-from {
     opacity: 1;
-    transform: scale(1) translateX(0) rotate(0);
+    transform: translateX(0);
 }
 
 .mode-switch-leave-to {
     opacity: 0;
-    transform: scale(0.9) translateX(-30px) rotate(-2deg);
+    transform: translateX(-16px);
 }
 
 /* Themed gradients and hover effects */
