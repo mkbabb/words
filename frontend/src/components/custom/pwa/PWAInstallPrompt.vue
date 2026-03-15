@@ -6,7 +6,7 @@
         class="fixed bottom-6 left-6 right-6 z-50 max-w-md mx-auto"
       >
         <div
-          class="cartoon-shadow-md rounded-2xl bg-background/95 backdrop-blur-xl 
+          class="cartoon-shadow-md rounded-2xl glass-heavy
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >

@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-0">
         <!-- Cluster Header -->
-        <HoverCard :open-delay="600" :close-delay="100">
+        <HoverCard :open-delay="300" :close-delay="100">
             <HoverCardTrigger as-child>
                 <button
                     @click="$emit('cluster-click')"

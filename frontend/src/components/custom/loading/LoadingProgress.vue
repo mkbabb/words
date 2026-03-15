@@ -11,7 +11,7 @@
                     dark:bg-gray-700"
                 :class="[
                     variant === 'thin' ? 'h-1.5' : 'h-8',
-                    variant === 'thin' ? 'bg-background/80 backdrop-blur-sm shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
+                    variant === 'thin' ? 'bg-muted/60 backdrop-blur-sm shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
                     interactive ? 'cursor-pointer' : '',
                 ]"
                 @mousedown="handleMouseDown"
