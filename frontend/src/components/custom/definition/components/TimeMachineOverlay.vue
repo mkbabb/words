@@ -8,13 +8,14 @@
         >
             <div
                 v-if="isOpen"
-                class="fixed inset-0 z-[9998] flex flex-col"
+                class="fixed inset-0 flex flex-col"
+                style="z-index: 99999"
                 @click="handleBackdropClick"
             >
                 <!-- Backdrop -->
                 <div
                     ref="backdropRef"
-                    class="absolute inset-0 bg-background/60 backdrop-blur-xl"
+                    class="absolute inset-0 bg-background/60 dark:bg-background/70 backdrop-blur-2xl"
                 />
 
                 <!-- Close button -->
@@ -27,15 +28,15 @@
 
                 <!-- Title -->
                 <div class="relative z-10 pt-6 text-center">
-                    <h2 class="text-sm font-semibold text-foreground/80">
+                    <p class="text-[11px] font-medium tracking-widest text-muted-foreground/50 uppercase">
                         Version History
-                    </h2>
-                    <p
+                    </p>
+                    <h2
                         v-if="word"
-                        class="mt-0.5 text-xs text-muted-foreground/60"
+                        class="mt-1 text-2xl font-semibold text-foreground/60 tracking-tight"
                     >
                         {{ word }}
-                    </p>
+                    </h2>
                 </div>
 
                 <!-- Main content area -->
@@ -247,61 +248,49 @@ function overlayEnter(_el: Element, done: () => void) {
             return;
         }
 
-        backdropRef.value.style.transition =
-            'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)';
+        // Backdrop fade — fast
+        backdropRef.value.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)';
         backdropRef.value.style.opacity = '1';
 
+        // Content slide up — no bounce, slightly staggered
         setTimeout(() => {
-            if (!contentRef.value) {
-                done();
-                return;
-            }
-            contentRef.value.style.transition =
-                'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            if (!contentRef.value) { done(); return; }
+            contentRef.value.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 0.2, 1), transform 250ms cubic-bezier(0.4, 0, 0.2, 1)';
             contentRef.value.style.opacity = '1';
             contentRef.value.style.transform = 'scale(1) translateY(0)';
 
             if (timelineRef.value) {
-                timelineRef.value.style.transition =
-                    'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 100ms';
+                timelineRef.value.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1) 80ms, transform 200ms cubic-bezier(0.4, 0, 0.2, 1) 80ms';
                 timelineRef.value.style.opacity = '1';
                 timelineRef.value.style.transform = 'translateY(0)';
             }
 
-            setTimeout(done, 450);
-        }, 50);
+            setTimeout(done, 300);
+        }, 30);
     });
 }
 
 function overlayLeave(el: Element, done: () => void) {
-    const backdrop = el.querySelector(
-        '[class*="backdrop-blur-xl"]'
-    ) as HTMLElement;
+    const backdrop = el.querySelector('[class*="backdrop-blur"]') as HTMLElement;
     const content = contentRef.value || (el.children[2] as HTMLElement);
     const timeline = timelineRef.value || (el.children[3] as HTMLElement);
 
-    if (!backdrop) {
-        done();
-        return;
-    }
+    if (!backdrop) { done(); return; }
 
     requestAnimationFrame(() => {
         if (content) {
-            content.style.transition =
-                'all 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045)';
+            content.style.transition = 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1), transform 150ms cubic-bezier(0.4, 0, 0.2, 1)';
             content.style.opacity = '0';
-            content.style.transform = 'scale(0.95) translateY(10px)';
+            content.style.transform = 'scale(0.97) translateY(8px)';
         }
         if (timeline) {
-            timeline.style.transition = 'all 150ms ease-out';
+            timeline.style.transition = 'opacity 120ms cubic-bezier(0.4, 0, 0.2, 1)';
             timeline.style.opacity = '0';
-            timeline.style.transform = 'translateY(10px)';
         }
-        backdrop.style.transition =
-            'opacity 250ms cubic-bezier(0.4, 0, 1, 1)';
+        backdrop.style.transition = 'opacity 180ms cubic-bezier(0.4, 0, 0.2, 1)';
         backdrop.style.opacity = '0';
 
-        setTimeout(done, 250);
+        setTimeout(done, 200);
     });
 }
 </script>
@@ -309,41 +298,32 @@ function overlayLeave(el: Element, done: () => void) {
 <style scoped>
 /* View switch: compact <-> expanded */
 .view-switch-enter-active {
-    transition:
-        opacity 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
-        transform 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 200ms var(--ease-apple-smooth), transform 200ms var(--ease-apple-smooth);
 }
 .view-switch-leave-active {
-    transition:
-        opacity 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045),
-        transform 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045);
+    transition: opacity 120ms var(--ease-apple-default), transform 120ms var(--ease-apple-default);
 }
 .view-switch-enter-from {
     opacity: 0;
-    transform: scale(0.92);
+    transform: scale(0.96);
 }
 .view-switch-leave-to {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.98);
 }
 
 /* Timeline fade for hide/show */
 .timeline-fade-enter-active {
-    transition:
-        opacity 300ms ease,
-        transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 200ms var(--ease-apple-smooth), transform 200ms var(--ease-apple-smooth);
 }
 .timeline-fade-leave-active {
-    transition:
-        opacity 200ms ease,
-        transform 200ms ease;
+    transition: opacity 120ms var(--ease-apple-default);
 }
 .timeline-fade-enter-from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
 }
 .timeline-fade-leave-to {
     opacity: 0;
-    transform: translateY(10px);
 }
 </style>
