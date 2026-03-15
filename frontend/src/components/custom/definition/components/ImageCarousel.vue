@@ -182,7 +182,7 @@
                 <template v-if="totalCarouselItems > 1">
                     <CarouselPrevious
                         v-show="showControls"
-                        class="absolute top-1/2 left-1 h-8 w-8 -translate-y-1/2 border-none bg-black/50 backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
+                        class="absolute top-1/2 left-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
                         :class="{
                             'opacity-0 group-hover:opacity-100': !showControls,
                         }"
@@ -192,7 +192,7 @@
                     />
                     <CarouselNext
                         v-show="showControls"
-                        class="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 border-none bg-black/50 backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
+                        class="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
                         :class="{
                             'opacity-0 group-hover:opacity-100': !showControls,
                         }"
@@ -204,7 +204,7 @@
                     <!-- Image Counter -->
                     <div
                         v-show="showControls"
-                        class="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-2 py-1 text-xs text-white backdrop-blur-sm transition-all duration-300"
+                        class="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full glass-overlay px-2 py-1 text-xs text-white transition-all duration-300"
                         :class="{
                             'opacity-0 group-hover:opacity-100': !showControls,
                         }"

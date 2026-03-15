@@ -7,7 +7,7 @@
         >
             <!-- Separator between clusters (not before first) -->
             <hr v-if="clusterIndex > 0" class="my-4 border-border/50" />
-            <HoverCard :open-delay="600" :close-delay="100">
+            <HoverCard :open-delay="300" :close-delay="100">
                 <HoverCardTrigger as-child>
                     <EditableField
                         :model-value="cluster.clusterName"

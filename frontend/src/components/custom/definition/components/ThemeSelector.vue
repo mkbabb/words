@@ -1,57 +1,118 @@
 <template>
     <div
         v-if="isMounted && isAdmin"
-        class="absolute top-2 right-2 z-50 flex items-center gap-2"
+        class="absolute top-2 right-2 z-50"
     >
-        <!-- Edit Mode Toggle Button -->
-        <button
-            @click="$emit('toggle-edit-mode')"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
-            :title="editModeEnabled ? 'Exit edit mode' : 'Enter edit mode'"
-        >
-            <Edit2
-                v-if="!editModeEnabled"
-                :size="18"
-                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
-            />
-            <Check
-                v-else
-                :size="18"
-                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
-            />
-        </button>
+        <GlassDock ref="dockRef" manual :start-collapsed="!editModeEnabled">
+            <!-- Collapsed summary: click expands dock AND enters edit mode -->
+            <template #collapsed>
+                <Tooltip>
+                    <TooltipTrigger as-child>
+                        <button class="dock-icon-btn" @click.stop="handleCollapsedClick">
+                            <Edit2 :size="20" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="6">
+                        Enter edit mode
+                    </TooltipContent>
+                </Tooltip>
+            </template>
 
-        <!-- Admin: Version History Button -->
-        <button
-            v-if="editModeEnabled"
-            @click="$emit('toggle-version-history')"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
-            title="Version History"
-        >
-            <History
-                :size="18"
-                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
-            />
-        </button>
+            <!-- Expanded toolbar -->
+            <div class="flex items-center gap-1">
+                <!-- Edit toggle -->
+                <button
+                    class="dock-icon-btn"
+                    :class="editModeEnabled && 'active'"
+                    @click="handleEditToggle"
+                >
+                    <Edit2 v-if="!editModeEnabled" :size="20" />
+                    <Check v-else :size="20" />
+                </button>
 
-        <!-- Admin: Re-synthesize Button (opens version selector) -->
-        <button
-            v-if="editModeEnabled"
-            @click="showVersionSelector = !showVersionSelector"
-            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
-            title="Re-synthesize with AI"
-        >
-            <RefreshCw
-                :size="18"
-                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
-            />
-        </button>
+                <template v-if="editModeEnabled">
+                    <span class="dock-separator" />
+
+                    <!-- Version History -->
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button class="dock-icon-btn" @click="$emit('toggle-version-history')">
+                                <History :size="20" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            Version History
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <!-- Re-synthesize -->
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button class="dock-icon-btn" @click="showVersionSelector = !showVersionSelector">
+                                <RefreshCw :size="20" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            Re-synthesize
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <span class="dock-separator" />
+
+                    <!-- Card Theme -->
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button class="dock-icon-btn" @click="toggleDropdown">
+                                <Layers :size="20" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            Card Theme
+                        </TooltipContent>
+                    </Tooltip>
+                </template>
+            </div>
+        </GlassDock>
+
+        <!-- Theme dropdown -->
+        <Transition name="theme-dropdown">
+            <div
+                v-if="showDropdown && editModeEnabled"
+                class="absolute top-full right-0 z-dropdown mt-2 min-w-[140px] origin-top-right rounded-lg border border-border/30 bg-background/92 backdrop-blur-md text-popover-foreground shadow-lg p-1"
+                @click.stop
+            >
+                <button
+                    v-for="option in themes"
+                    :key="option.value"
+                    @click="selectTheme(option.value)"
+                    :class="[
+                        'flex w-full items-center rounded-md px-2 py-1.5 text-sm',
+                        'transition-colors duration-150 hover:bg-accent hover:text-accent-foreground',
+                        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                        modelValue === option.value &&
+                            'bg-accent text-accent-foreground font-medium',
+                    ]"
+                >
+                    <div class="flex items-center gap-2">
+                        <div
+                            :class="[
+                                'h-2 w-2 rounded-full border',
+                                modelValue === option.value
+                                    ? 'border-primary bg-primary'
+                                    : 'border-muted-foreground',
+                            ]"
+                        ></div>
+                        {{ option.label }}
+                    </div>
+                </button>
+            </div>
+        </Transition>
 
         <!-- Provider Version Selector Modal -->
         <Transition name="theme-dropdown">
             <div
                 v-if="showVersionSelector && word"
-                class="absolute top-full right-0 z-60 mt-2 w-96 rounded-lg border border-border bg-popover p-4 shadow-lg"
+                class="absolute top-full right-0 z-dropdown mt-2 w-96 rounded-lg border border-border/30 bg-background/92 backdrop-blur-md p-4 shadow-lg"
                 @click.stop
             >
                 <ProviderVersionSelector
@@ -62,69 +123,14 @@
                 />
             </div>
         </Transition>
-
-        <!-- Custom dropdown with controlled animations -->
-        <div class="relative">
-            <button
-                @click="toggleDropdown"
-                class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-2 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
-            >
-                <ChevronLeft
-                    :size="18"
-                    :class="[
-                        'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
-                        showDropdown && 'rotate-90',
-                    ]"
-                />
-            </button>
-
-            <Transition name="theme-dropdown">
-
-                <div
-                    v-if="showDropdown"
-                    class="absolute top-full right-0 z-60 mt-4 min-w-[140px] origin-top-right rounded-md border bg-popover text-popover-foreground shadow-md"
-                    @click.stop
-                >
-                    <div class="p-1">
-                        <div class="px-2 py-1.5 text-sm font-semibold">
-                            Card Theme
-                        </div>
-                        <div class="my-1 h-px bg-border"></div>
-
-                        <button
-                            v-for="option in themes"
-                            :key="option.value"
-                            @click="selectTheme(option.value)"
-                            :class="[
-                                'flex w-full items-center rounded-sm px-2 py-1.5 text-sm',
-                                'transition-colors hover:bg-accent hover:text-accent-foreground',
-                                'focus:bg-accent focus:text-accent-foreground focus:outline-none',
-                                modelValue === option.value &&
-                                    'bg-accent text-accent-foreground',
-                            ]"
-                        >
-                            <div class="flex items-center gap-2">
-                                <div
-                                    :class="[
-                                        'h-2 w-2 rounded-full border',
-                                        modelValue === option.value
-                                            ? 'border-primary bg-primary'
-                                            : 'border-muted-foreground',
-                                    ]"
-                                ></div>
-                                {{ option.label }}
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </Transition>
-        </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ChevronLeft, Edit2, Check, History, RefreshCw } from 'lucide-vue-next';
+import { Edit2, Check, History, RefreshCw, Layers } from 'lucide-vue-next';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import GlassDock from '@/components/custom/animation/GlassDock.vue';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';
@@ -138,9 +144,8 @@ interface ThemeSelectorProps {
     currentVersion?: string;
 }
 
-defineProps<ThemeSelectorProps>();
+const props = defineProps<ThemeSelectorProps>();
 
-// Modern Vue 3.4+ pattern - using defineModel for two-way binding
 const modelValue = defineModel<CardVariant>({ required: true });
 
 const auth = useAuthStore();
@@ -153,8 +158,22 @@ const emit = defineEmits<{
     'resynthesize': [];
 }>();
 
+const dockRef = ref<InstanceType<typeof GlassDock>>();
 const showVersionSelector = ref(false);
 const themes = CARD_THEMES;
+
+const handleCollapsedClick = () => {
+    dockRef.value?.expand();
+    emit('toggle-edit-mode');
+};
+
+const handleEditToggle = () => {
+    emit('toggle-edit-mode');
+    // If we're exiting edit mode, collapse the dock
+    if (props.editModeEnabled) {
+        dockRef.value?.collapse();
+    }
+};
 
 const handleSynthesized = () => {
     showVersionSelector.value = false;
@@ -167,38 +186,73 @@ const toggleDropdown = () => {
 
 const selectTheme = (theme: CardVariant) => {
     modelValue.value = theme;
-    emit('toggle-dropdown'); // Close dropdown after selection
+    emit('toggle-dropdown');
 };
 </script>
 
 <style scoped>
+/* Dock button styles (matches Fourier dock-buttons.css) */
+.dock-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: var(--color-muted-foreground);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+.dock-icon-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+    color: var(--color-foreground);
+    transform: scale(1.1);
+}
+.dock-icon-btn:active:not(:disabled) {
+    transform: scale(0.92);
+}
+.dock-icon-btn:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ring) 40%, transparent);
+    outline: none;
+}
+.dock-icon-btn.active {
+    background: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+    color: var(--color-foreground);
+}
+
+.dock-separator {
+    width: 1px;
+    height: 1.5rem;
+    background: color-mix(in srgb, var(--color-foreground) 20%, transparent);
+    flex-shrink: 0;
+}
+
 .theme-dropdown-enter-active {
     transition:
-        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 180ms var(--ease-apple-smooth),
+        transform 350ms var(--ease-apple-spring);
 }
-
 .theme-dropdown-leave-active {
     transition:
-        opacity 150ms cubic-bezier(0.4, 0.0, 1, 1),
-        transform 200ms cubic-bezier(0.4, 0.0, 1, 1);
+        opacity 150ms var(--ease-apple-smooth),
+        transform 200ms var(--ease-apple-smooth);
 }
-
 .theme-dropdown-enter-from {
     opacity: 0;
     transform: scale(0.95) translateY(-8px);
 }
-
 .theme-dropdown-enter-to {
     opacity: 1;
     transform: scale(1) translateY(0);
 }
-
 .theme-dropdown-leave-from {
     opacity: 1;
     transform: scale(1) translateY(0);
 }
-
 .theme-dropdown-leave-to {
     opacity: 0;
     transform: scale(0.95) translateY(-8px);
