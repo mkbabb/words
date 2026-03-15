@@ -34,24 +34,25 @@
             </span>
         </span>
 
-        <!-- Add synonym button -->
-        <button
-            v-if="editMode"
-            @click="addSynonym"
-            class="rounded-md border border-dashed border-border/50 bg-transparent px-2 py-1 text-sm text-muted-foreground transition-all duration-200 hover:border-border hover:bg-muted/50 hover:text-foreground"
-        >
-            <Plus class="h-3 w-3" />
-        </button>
-
-        <!-- Regenerate button -->
-        <button
-            v-if="editMode && canRegenerate"
-            @click="$emit('regenerate')"
-            :disabled="isRegenerating"
-            class="rounded-md border border-dashed border-border/50 bg-transparent px-2 py-1 text-sm text-muted-foreground transition-all duration-200 hover:border-border hover:bg-muted/50 hover:text-foreground disabled:opacity-50"
-        >
-            <RefreshCw :class="['h-3 w-3', isRegenerating && 'animate-spin']" />
-        </button>
+        <!-- Add / Regenerate — inline with synonym pills -->
+        <span v-if="editMode" class="inline-flex items-center gap-1">
+            <button
+                @click="addSynonym"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-all duration-150 hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
+                title="Add synonym"
+            >
+                <Plus class="h-3.5 w-3.5" />
+            </button>
+            <button
+                v-if="canRegenerate"
+                @click="$emit('regenerate')"
+                :disabled="isRegenerating"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-all duration-150 hover:border-border hover:bg-muted hover:text-foreground hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+                title="Regenerate synonyms"
+            >
+                <RefreshCw :class="['h-3.5 w-3.5', isRegenerating && 'animate-spin']" />
+            </button>
+        </span>
     </div>
 
     <!-- Edit dialog -->
