@@ -7,6 +7,7 @@ from typing import Any
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
+from pymongo import ASCENDING, IndexModel
 
 from ..models.base import BaseMetadataWithAccess
 from .constants import COOLING_THRESHOLD_HOURS, CardState, MasteryLevel, Temperature
@@ -108,16 +109,31 @@ class WordListItem(BaseModel):
         return self.review_data.get_overdue_days()
 
 
+class WordListItemDoc(Document, WordListItem):
+    """Persistent WordListItem stored in its own collection."""
+
+    wordlist_id: PydanticObjectId = Field(..., description="FK to WordList document")
+
+    class Settings:
+        name = "word_list_items"
+        indexes = [
+            IndexModel(
+                [("wordlist_id", ASCENDING), ("word_id", ASCENDING)],
+                unique=True,
+            ),
+            [("wordlist_id", 1), ("review_data.next_review_date", 1)],
+            [("wordlist_id", 1), ("mastery_level", 1)],
+            [("wordlist_id", 1), ("added_date", -1)],
+            [("wordlist_id", 1), ("temperature", 1)],
+        ]
+
+
 class WordList(Document, BaseMetadataWithAccess):
     """Word list with learning metadata and statistics."""
 
     name: str = Field(..., description="Human-readable list name")
     description: str = Field(default="", description="List description/purpose")
     hash_id: str = Field(..., description="Content-based hash identifier")
-    words: list[WordListItem] = Field(
-        default_factory=list,
-        description="Words with learning data",
-    )
 
     # Statistics
     total_words: int = Field(default=0, ge=0, description="Total word count")
@@ -151,84 +167,26 @@ class WordList(Document, BaseMetadataWithAccess):
             "owner_id",
         ]
 
-    def add_words(self, word_ids: list[PydanticObjectId]) -> None:
-        """Add words to the list, updating frequencies for duplicates.
+    def set_stats(
+        self,
+        unique_words: int,
+        total_words: int,
+        learning_stats: LearningStats,
+    ) -> None:
+        """Set statistics from externally computed values.
 
         Args:
-            word_ids: List of word ObjectIds to add
+            unique_words: Number of unique words in the list
+            total_words: Total word count (sum of frequencies)
+            learning_stats: Pre-computed learning statistics
 
         """
-        # Create a map of existing word_ids for quick lookup
-        word_map = {w.word_id: w for w in self.words}
-
-        for word_id in word_ids:
-            if word_id in word_map:
-                # Word already exists, increment frequency
-                word_map[word_id].increment()
-            else:
-                # New word, add it
-                new_word_item = WordListItem(word_id=word_id)
-                self.words.append(new_word_item)
-                word_map[word_id] = new_word_item
-
-        self.update_stats()
-
-    def update_stats(self) -> None:
-        """Update all statistics and timestamp."""
-        self.unique_words = len(self.words)
-        self.total_words = sum(w.frequency for w in self.words)
+        self.unique_words = unique_words
+        self.total_words = total_words
+        self.learning_stats = learning_stats
         self.mark_updated()
-
-        # Update learning statistics from words
-        self.learning_stats.update_from_words(self.words)
-
-    def get_most_frequent(self, limit: int = 10) -> list[WordListItem]:
-        """Get most frequent words (highest interest)."""
-        return sorted(self.words, key=lambda w: w.frequency, reverse=True)[:limit]
-
-    def get_due_for_review(self, limit: int | None = None) -> list[WordListItem]:
-        """Get words due for review, ordered by urgency."""
-        due_words = [w for w in self.words if w.is_due_for_review()]
-        # Sort by how overdue they are (most overdue first)
-        due_words.sort(key=lambda w: w.get_overdue_days(), reverse=True)
-        return due_words[:limit] if limit else due_words
-
-    def get_by_mastery(self, level: MasteryLevel) -> list[WordListItem]:
-        """Get words at a specific mastery level."""
-        return [w for w in self.words if w.mastery_level == level]
-
-    def get_hot_words(self, limit: int = 10) -> list[WordListItem]:
-        """Get recently studied 'hot' words."""
-        hot = [w for w in self.words if w.temperature == Temperature.HOT]
-        hot.sort(key=lambda w: w.last_visited or w.added_date, reverse=True)
-        return hot[:limit]
-
-    def get_word_item_by_id(self, word_id: PydanticObjectId) -> WordListItem | None:
-        """Get WordListItem by word ObjectId."""
-        for w in self.words:
-            if w.word_id == word_id:
-                return w
-        return None
-
-    async def get_word_item(self, word_text: str) -> WordListItem | None:
-        """Get WordListItem by word text."""
-        from ..models.dictionary import Word
-
-        # Find the word document by text
-        word_doc = await Word.find_one({"text": word_text})
-        if not word_doc:
-            return None
-
-        # Find the matching word item in this wordlist
-        if word_doc.id is None:
-            return None
-        return self.get_word_item_by_id(word_doc.id)
 
     def record_study_session(self, duration_minutes: int) -> None:
         """Record a study session."""
         self.learning_stats.record_study_session(duration_minutes)
         self.mark_accessed()
-
-    def get_mastery_distribution(self) -> dict[MasteryLevel, int]:
-        """Get distribution of words by mastery level."""
-        return self.learning_stats.get_mastery_distribution(self.words)

@@ -18,6 +18,7 @@ from ...storage.mongodb import _ensure_initialized
 from ...text import normalize
 from ...utils.logging import get_logger
 from ...wordlist import WordList
+from ...wordlist.models import WordListItemDoc
 from ..utils.formatting import console
 
 logger = get_logger(__name__)
@@ -155,11 +156,12 @@ async def _export_async(
         original_word_map: dict[str, str] = {}  # normalized -> first original word seen
 
         # Get word texts for all words in the list
-        word_ids = [w.word_id for w in word_list.words]
+        items = await WordListItemDoc.find({"wordlist_id": word_list.id}).to_list()
+        word_ids = [w.word_id for w in items]
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         word_text_map = {str(word.id): word.text for word in words}
 
-        for word_freq in word_list.words:
+        for word_freq in items:
             word_text = word_text_map.get(str(word_freq.word_id), "")
             normalized = normalize(word_text)
 
@@ -242,13 +244,11 @@ async def _export_async(
 
         if direct:
             # Try direct export to Anki
-            success, apkg_path = asyncio.run(
-                card_generator.export_directly_to_anki(
-                    all_cards,
-                    deck_name,
-                    fallback_to_apkg=apkg_fallback,
-                    output_path=output_path,
-                )
+            success, apkg_path = await card_generator.export_directly_to_anki(
+                all_cards,
+                deck_name,
+                fallback_to_apkg=apkg_fallback,
+                output_path=output_path,
             )
 
             if success and apkg_path is None:

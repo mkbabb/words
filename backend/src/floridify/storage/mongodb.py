@@ -13,7 +13,6 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
 
-# PATHOLOGICAL REMOVAL: Move ALL imports to top level - NO nested imports
 from ..corpus.core import Corpus
 from ..corpus.language.core import LanguageCorpus
 from ..corpus.literature.core import LiteratureCorpus
@@ -38,7 +37,7 @@ from ..search.semantic.models import SemanticIndex
 from ..search.trie_index import TrieIndex
 from ..utils.config import Config
 from ..utils.logging import get_logger
-from ..wordlist.models import WordList
+from ..wordlist.models import WordList, WordListItemDoc
 from .dictionary import _resolve_word_text, save_entry_versioned
 
 logger = get_logger(__name__)
@@ -135,7 +134,6 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
-        # PATHOLOGICAL REMOVAL: No nested imports - all moved to module level
         # Initialize Beanie with all document models
         await init_beanie(
             database=database,
@@ -150,6 +148,7 @@ class MongoDBStorage:
                 ImageMedia,
                 WordRelationship,
                 WordList,
+                WordListItemDoc,
                 # Versioning models - Base class provides collection, subclasses inherit
                 BaseVersionedData,
                 # CRITICAL: All Metadata subclasses must be registered for polymorphic deserialization
@@ -167,7 +166,7 @@ class MongoDBStorage:
                 # User models
                 User,
                 UserHistory,
-                # Legacy models (still used for backward-compatible queries)
+                # Backward-compatible query models
                 DictionaryEntry,
                 BatchOperation,
             ],
@@ -223,8 +222,6 @@ class MongoDBStorage:
         if not self.client:
             return {"status": "disconnected"}
 
-        # PATHOLOGICAL REMOVAL: No hasattr - just return basic stats
-        # Pool stats are not critical - if they don't exist, we don't care
         return {
             "status": "connected",
             "initialized": self._initialized,

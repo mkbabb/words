@@ -10,7 +10,7 @@ from ....corpus.manager import get_tree_corpus_manager
 from ....models import Word
 from ....models.base import Language
 from ....search import Search
-from ....wordlist.models import WordList
+from ....wordlist.models import WordList, WordListItemDoc
 from ..search import SearchResponse
 
 
@@ -70,7 +70,19 @@ async def search_words_in_wordlist(
 
     # Get wordlist
     wordlist = await repository.get(wordlist_id, raise_on_missing=True)
-    if not wordlist or not wordlist.words:
+    if not wordlist:
+        return SearchResponse(
+            query=query,
+            results=[],
+            total_found=0,
+            languages=[Language.ENGLISH],
+            mode="fuzzy",
+            metadata={},
+        )
+
+    # Get items from the items collection
+    items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    if not items:
         return SearchResponse(
             query=query,
             results=[],
@@ -81,7 +93,7 @@ async def search_words_in_wordlist(
         )
 
     # Get word texts for the wordlist - batch query
-    word_ids = [w.word_id for w in wordlist.words if w.word_id]
+    word_ids = [item.word_id for item in items if item.word_id]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_texts = [word.text for word in words]
 

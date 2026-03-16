@@ -1,5 +1,6 @@
 """WordList words management endpoints."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -7,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....wordlist.models import WordListItem
+from ....wordlist.models import WordListItemDoc
 from ...core import CurrentUserDep, ListResponse, OptionalUserRoleDep, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 from .main import verify_wordlist_ownership
@@ -44,73 +45,6 @@ class WordListQueryParams(BaseModel):
     limit: int = Field(20, ge=1, le=200, description="Maximum results")
 
 
-def _normalize_items(items: list[Any]) -> list[WordListItem]:
-    """Normalize all items to WordListItem instances."""
-    normalized = []
-    for item in items:
-        if isinstance(item, WordListItem):
-            normalized.append(item)
-        elif isinstance(item, dict):
-            normalized.append(WordListItem(**item))
-        else:
-            normalized.append(WordListItem(**item.model_dump()))
-    return normalized
-
-
-async def apply_wordlist_filters_and_sort(
-    words: list[Any],
-    params: WordListQueryParams,
-) -> list[WordListItem]:
-    """Apply filtering and sorting to wordlist items."""
-    filtered = _normalize_items(words)
-
-    if params.mastery_levels:
-        filtered = [w for w in filtered if str(w.mastery_level) in params.mastery_levels]
-    if params.hot_only:
-        filtered = [w for w in filtered if w.temperature == "hot"]
-    if params.due_only:
-        filtered = [w for w in filtered if w.is_due_for_review()]
-    if params.min_views is not None:
-        filtered = [w for w in filtered if w.frequency >= params.min_views]
-    if params.max_views is not None:
-        filtered = [w for w in filtered if w.frequency <= params.max_views]
-    if params.reviewed is not None:
-        filtered = [w for w in filtered if (w.last_visited is not None) == params.reviewed]
-
-    # Apply sorting
-    sort_fields = params.sort_by.split(",")
-    sort_orders = params.sort_order.split(",")
-
-    while len(sort_orders) < len(sort_fields):
-        sort_orders.append(sort_orders[-1] if sort_orders else "asc")
-
-    for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
-        reverse = order.lower() == "desc"
-        filtered = sorted(
-            filtered, key=lambda x: getattr(x, field.strip(), "") or "", reverse=reverse
-        )
-
-    return filtered
-
-
-async def convert_wordlist_items_to_response(
-    items: list[Any],
-    paginated: bool = True,
-    offset: int = 0,
-    limit: int = 20,
-) -> tuple[list[dict[str, Any]], int]:
-    """Convert wordlist items to response format with optional pagination."""
-    total = len(items)
-
-    if paginated:
-        items = items[offset : offset + limit]
-
-    normalized = _normalize_items(items)
-    result = [item.model_dump(mode="json") for item in normalized]
-
-    return result, total
-
-
 class WordListSearchQueryParams(WordListQueryParams):
     """Query parameters for searching within a wordlist."""
 
@@ -142,38 +76,83 @@ async def list_words(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
     """List words in a wordlist with filtering and sorting."""
+    # Verify wordlist exists
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
+    # Build MongoDB query
+    query: dict[str, Any] = {"wordlist_id": wordlist_id}
+
+    if params.mastery_levels:
+        query["mastery_level"] = {"$in": params.mastery_levels}
+    if params.hot_only:
+        query["temperature"] = "hot"
+    if params.min_views is not None:
+        query.setdefault("frequency", {})["$gte"] = params.min_views
+    if params.max_views is not None:
+        query.setdefault("frequency", {})["$lte"] = params.max_views
+    if params.reviewed is not None:
+        if params.reviewed:
+            query["last_visited"] = {"$ne": None}
+        else:
+            query["last_visited"] = None
+
+    # Pre-filter due items in MongoDB to reduce the working set
+    if params.due_only:
+        query["review_data.next_review_date"] = {"$lte": datetime.now(UTC)}
+
+    # Get total count for the filtered query
+    total = await WordListItemDoc.find(query).count()
+
+    # Build sort criteria
+    sort_fields = params.sort_by.split(",")
+    sort_orders = params.sort_order.split(",")
+    while len(sort_orders) < len(sort_fields):
+        sort_orders.append(sort_orders[-1] if sort_orders else "asc")
+
+    sort_list = []
+    for field, order in zip(sort_fields, sort_orders, strict=False):
+        field = field.strip()
+        # Map field names
+        if field == "added_at":
+            field = "added_date"
+        direction = -1 if order.strip().lower() == "desc" else 1
+        sort_list.append((field, direction))
+
+    # Query with pagination
+    items_cursor = WordListItemDoc.find(query)
+    if sort_list:
+        items_cursor = items_cursor.sort(sort_list)
+    items = await items_cursor.skip(params.offset).limit(params.limit).to_list()
+
     # Apply lazy temperature cooling
-    for word_item in wordlist.words:
-        word_item.update_temperature()
+    for item in items:
+        item.update_temperature()
 
-    # Apply shared filtering and sorting logic
-    filtered_words = await apply_wordlist_filters_and_sort(wordlist.words, params)
+    # Refine due_only with Python method (handles timezone edge cases)
+    if params.due_only:
+        items = [w for w in items if w.is_due_for_review()]
 
-    # Convert to response format with pagination
-    items, total = await convert_wordlist_items_to_response(
-        filtered_words,
-        paginated=True,
-        offset=params.offset,
-        limit=params.limit,
-    )
+    # Convert to response format
+    result = [item.model_dump(mode="json") for item in items]
 
-    # Populate word text from Word documents
-    word_ids = [item.get("word_id") for item in items if item.get("word_id")]
+    # Populate word text
+    word_ids = [item.get("word_id") for item in result if item.get("word_id")]
     if word_ids:
-        from beanie import PydanticObjectId as OID
-
-        oids = [OID(wid) if isinstance(wid, str) else wid for wid in word_ids]
+        oids = [PydanticObjectId(wid) if isinstance(wid, str) else wid for wid in word_ids]
         word_docs = await Word.find({"_id": {"$in": oids}}).to_list()
         text_map = {str(w.id): w.text for w in word_docs}
-        for item in items:
+        for item in result:
             wid = item.pop("word_id", None)
             item["word"] = text_map.get(str(wid), "") if wid else ""
+            # Remove wordlist_id from response (internal FK)
+            item.pop("wordlist_id", None)
+            # Remove internal document fields
+            item.pop("id", None)
+            item.pop("revision_id", None)
 
     return ListResponse(
-        items=items,
+        items=result,
         total=total,
         offset=params.offset,
         limit=params.limit,
@@ -198,7 +177,7 @@ async def add_word(
     return ResourceResponse(
         data={
             "id": str(updated_list.id),
-            "word_count": len(updated_list.words),
+            "word_count": updated_list.unique_words,
             "added_words": request.words,
         },
         metadata={
@@ -236,12 +215,9 @@ async def update_word(
     if not word_doc:
         raise HTTPException(status_code=404, detail=f"Word '{word}' not found")
 
-    target_item = None
-    for item in wordlist.words:
-        if item.word_id == word_doc.id:
-            target_item = item
-            break
-
+    target_item = await WordListItemDoc.find_one(
+        {"wordlist_id": wordlist_id, "word_id": word_doc.id}
+    )
     if target_item is None:
         raise HTTPException(status_code=404, detail=f"Word '{word}' not in wordlist")
 
@@ -250,7 +226,7 @@ async def update_word(
     if request.tags is not None:
         target_item.tags = request.tags
 
-    await wordlist.save()
+    await target_item.save()
 
     return ResourceResponse(
         data=target_item.model_dump(mode="json"),
@@ -307,18 +283,24 @@ async def bulk_delete_words(
     word_docs = await Word.find({"text": {"$in": request.words}}).to_list()
     word_id_set = {w.id for w in word_docs}
 
-    original_count = len(wordlist.words)
-    wordlist.words = [w for w in wordlist.words if w.word_id not in word_id_set]
-    removed_count = original_count - len(wordlist.words)
+    # Count items to be deleted
+    original_count = await WordListItemDoc.find({"wordlist_id": wordlist_id}).count()
 
-    wordlist.update_stats()
-    wordlist.mark_accessed()
-    await wordlist.save()
+    # Delete matching items from the items collection
+    await WordListItemDoc.find(
+        {"wordlist_id": wordlist_id, "word_id": {"$in": list(word_id_set)}}
+    ).delete()
+
+    remaining_count = await WordListItemDoc.find({"wordlist_id": wordlist_id}).count()
+    removed_count = original_count - remaining_count
+
+    # Recompute denormalized stats via aggregation pipeline
+    await repo.recompute_stats(wordlist_id)
 
     return ResourceResponse(
         data={
             "removed": removed_count,
-            "remaining": len(wordlist.words),
+            "remaining": remaining_count,
         },
     )
 

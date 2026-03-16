@@ -16,8 +16,10 @@ from pydantic import BaseModel, Field
 
 from ....core.state_tracker import Stages, StateTracker
 from ....core.streaming import create_streaming_response
+from ....models import Word
+from ....models.dictionary import Definition
 from ....models.user import UserRole
-from ....wordlist.models import WordList
+from ....wordlist.models import WordList, WordListItemDoc
 from ....wordlist.parser import parse_file
 from ....wordlist.utils import generate_wordlist_name
 from ...core import (
@@ -113,8 +115,8 @@ async def list_wordlists(
     # Return metadata only (no word population) for performance
     items = []
     for wordlist in wordlists:
-        data = wordlist.model_dump(mode="json", exclude={"words"})
-        data["word_count"] = len(wordlist.words)
+        data = wordlist.model_dump(mode="json")
+        data["word_count"] = wordlist.unique_words
         items.append(data)
 
     return ListResponse(
@@ -142,8 +144,8 @@ async def create_wordlist(
         response.status_code = 200
 
     return ResourceResponse(
-        data=wordlist.model_dump(mode="json", exclude={"words"}),
-        metadata={"created": created, "word_count": len(wordlist.words)},
+        data=wordlist.model_dump(mode="json"),
+        metadata={"created": created, "word_count": wordlist.unique_words},
         links={
             "self": f"/wordlists/{wordlist.id}",
             "words": f"/wordlists/{wordlist.id}/words",
@@ -169,7 +171,7 @@ async def get_wordlist(
     user_id: OptionalUserDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
-    """Get wordlist details with populated word text."""
+    """Get wordlist metadata (no embedded words — use /words endpoint for word data)."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
@@ -177,21 +179,23 @@ async def get_wordlist(
     if not wordlist.is_public and wordlist.owner_id and user_id != wordlist.owner_id:
         raise HTTPException(403, "Not authorized to access this wordlist")
 
-    # Calculate statistics
-    total_words = len(wordlist.words)
+    # Mastery distribution via aggregation pipeline (never loads all items)
+    pipeline = [
+        {"$match": {"wordlist_id": wordlist.id}},
+        {"$group": {"_id": "$mastery_level", "count": {"$sum": 1}}},
+    ]
     mastery_distribution: dict[str, int] = {}
-    for word in wordlist.words:
-        level = word.mastery_level.value
-        mastery_distribution[level] = mastery_distribution.get(level, 0) + 1
+    collection = WordListItemDoc.get_pymongo_collection()
+    async for doc in collection.aggregate(pipeline):
+        mastery_distribution[doc["_id"]] = doc["count"]
 
-    # Populate with word text
-    wordlist_data = await repo.populate_words(wordlist)
+    wordlist_data = wordlist.model_dump(mode="json")
 
     return ResourceResponse(
         data=wordlist_data,
         metadata={
             "statistics": {
-                "total_words": total_words,
+                "total_words": wordlist.unique_words,
                 "mastery_distribution": mastery_distribution,
                 "study_sessions": wordlist.learning_stats.total_reviews,
                 "total_study_time": wordlist.learning_stats.study_time_minutes,
@@ -238,7 +242,7 @@ async def update_wordlist(
     wordlist = await repo.update(wordlist_id, data)
 
     return ResourceResponse(
-        data=wordlist.model_dump(mode="json", exclude={"words"}),
+        data=wordlist.model_dump(mode="json"),
         metadata={
             "version": wordlist.version,
         },
@@ -274,10 +278,9 @@ async def clone_wordlist(
     source = await repo.get(wordlist_id, raise_on_missing=True)
     assert source is not None
 
-    # Get word texts for the clone
-    from ....models import Word
-
-    word_ids = [w.word_id for w in source.words]
+    # Get word texts for the clone by querying items collection
+    source_items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    word_ids = [item.word_id for item in source_items]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_texts = [w.text for w in words]
 
@@ -293,8 +296,8 @@ async def clone_wordlist(
     cloned, _ = await repo.create(clone_data)
 
     return ResourceResponse(
-        data=cloned.model_dump(mode="json", exclude={"words"}),
-        metadata={"cloned_from": str(wordlist_id), "word_count": len(cloned.words)},
+        data=cloned.model_dump(mode="json"),
+        metadata={"cloned_from": str(wordlist_id), "word_count": cloned.unique_words},
         links={
             "self": f"/wordlists/{cloned.id}",
             "source": f"/wordlists/{wordlist_id}",
@@ -312,10 +315,11 @@ async def export_wordlist(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
-    # Get word texts
-    from ....models import Word
+    # Get items from items collection
+    items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
 
-    word_ids = [w.word_id for w in wordlist.words]
+    # Get word texts
+    word_ids = [item.word_id for item in items]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(w.id): w.text for w in words}
 
@@ -327,7 +331,7 @@ async def export_wordlist(
         writer.writerow(
             ["word", "mastery_level", "ease_factor", "interval", "repetitions", "lapse_count"]
         )
-        for item in wordlist.words:
+        for item in items:
             text = word_text_map.get(str(item.word_id), "")
             writer.writerow(
                 [
@@ -343,14 +347,28 @@ async def export_wordlist(
         media_type = "text/csv"
         filename = f"{safe_name}.csv"
     elif format == "json":
-        populated = await repo.populate_words(wordlist)
-        content = json.dumps(populated, indent=2, default=str).encode("utf-8")
+        # Build JSON from already-fetched items (no extra DB round-trip)
+        wordlist_dict = wordlist.model_dump(mode="json")
+        wordlist_dict["words"] = [
+            {
+                "word": word_text_map.get(str(item.word_id), ""),
+                "mastery_level": item.mastery_level.value,
+                "ease_factor": item.review_data.ease_factor,
+                "interval": item.review_data.interval,
+                "repetitions": item.review_data.repetitions,
+                "lapse_count": item.review_data.lapse_count,
+                "notes": item.notes,
+                "tags": item.tags,
+            }
+            for item in items
+        ]
+        content = json.dumps(wordlist_dict, indent=2, default=str).encode("utf-8")
         media_type = "application/json"
         filename = f"{safe_name}.json"
     else:
         # txt format
         lines = []
-        for i, item in enumerate(wordlist.words, 1):
+        for i, item in enumerate(items, 1):
             text = word_text_map.get(str(item.word_id), "")
             lines.append(f"{i}. {text}")
         content = "\n".join(lines).encode("utf-8")
@@ -373,11 +391,9 @@ async def export_wordlist_anki(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
-    # Get word texts and definitions
-    from ....models import Word
-    from ....models.dictionary import Definition
-
-    word_ids = [w.word_id for w in wordlist.words]
+    # Get items from items collection, then word texts and definitions
+    anki_items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    word_ids = [item.word_id for item in anki_items]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(w.id): w.text for w in words}
     word_texts = [w.text for w in words]
@@ -453,7 +469,7 @@ async def upload_wordlist(
                 data={
                     "id": str(wordlist.id),
                     "name": wordlist.name,
-                    "word_count": len(wordlist.words),
+                    "word_count": wordlist.unique_words,
                     "created_at": wordlist.created_at.isoformat() if wordlist.created_at else None,
                 },
                 metadata={

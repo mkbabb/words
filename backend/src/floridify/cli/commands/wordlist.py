@@ -15,6 +15,7 @@ from ...models.dictionary import Word
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
 from ...wordlist import WordList
+from ...wordlist.models import WordListItemDoc
 from ...wordlist.parser import parse_file
 from ...wordlist.utils import generate_wordlist_hash, generate_wordlist_name
 from ..utils.formatting import console
@@ -23,9 +24,6 @@ logger = get_logger(__name__)
 
 # Global batch size for dictionary lookup processing
 BATCH_SIZE = 10
-
-
-# Removed: using WordListRepository._batch_get_or_create_words instead
 
 
 @click.group(name="wordlist")
@@ -86,14 +84,18 @@ async def _create_async(
             metadata=parsed.metadata,
         )
 
-    # Convert words to ObjectIds using repository batch method
-    word_ids = await wordlist_repo._batch_get_or_create_words(parsed.words)
-
-    # Add words to the list
-    word_list.add_words(word_ids)
-
-    # Save word list before processing lookups
+    # Save word list first to get an ID
     await word_list.save()
+
+    # Convert words to ObjectIds and bulk-insert as separate docs
+    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.words)
+    items = [WordListItemDoc(wordlist_id=word_list.id, word_id=wid) for wid in word_ids]
+    if items:
+        await WordListItemDoc.insert_many(items)
+
+    # Recompute denormalized stats
+    await wordlist_repo.recompute_stats(word_list.id)
+    await word_list.sync()
 
     console.print(
         f"Word list '[green]{name}[/green]' saved with {word_list.unique_words} unique words",
@@ -140,10 +142,12 @@ async def _show_async(name: str, num: int | None) -> None:
     console.print(f"Updated: {word_list.updated_at.strftime('%Y-%m-%d %H:%M')}")
 
     # Show most frequent words with heat mapping
-    # If num is None, get all words (up to 20 for display), otherwise get the requested number
-    num = num if num is not None and num > 0 else len(word_list.words)
-    most_frequent = word_list.get_most_frequent(num)
-    num = min(num, len(most_frequent))  # Limit to available words
+    # Query items from the separate collection, sorted by frequency
+    display_limit = num if num is not None and num > 0 else word_list.unique_words
+    most_frequent = await WordListItemDoc.find(
+        {"wordlist_id": word_list.id}
+    ).sort([("frequency", -1)]).limit(display_limit).to_list()
+    num = len(most_frequent)
 
     console.print(f"\nMost frequent words (showing {num}):")
 
@@ -243,17 +247,23 @@ async def _update_async(name: str, input_file: Path) -> None:
 
     old_count = word_list.unique_words
 
-    # Convert words to ObjectIds
-    word_ids = await wordlist_repo._batch_get_or_create_words(parsed.words)
+    # Convert words to ObjectIds and upsert into items collection
+    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.words)
+    for wid in word_ids:
+        existing = await WordListItemDoc.find_one({"wordlist_id": word_list.id, "word_id": wid})
+        if existing:
+            existing.increment()
+            await existing.save()
+        else:
+            await WordListItemDoc(wordlist_id=word_list.id, word_id=wid).insert()
 
-    word_list.add_words(word_ids)
+    # Recompute denormalized stats
+    await wordlist_repo.recompute_stats(word_list.id)
+    await word_list.sync()
 
     # Process new words with dictionary lookup
-    # Since we just added parsed.words, we can process those directly
     new_words_to_process = parsed.words
     await _process_words_batch(new_words_to_process)
-
-    await word_list.save()
 
     new_words = word_list.unique_words - old_count
     console.print(f"Added {new_words} new words to '[green]{name}[/green]'")
@@ -280,7 +290,8 @@ async def _delete_async(name: str) -> None:
         console.print(f"Word list '[red]{name}[/red]' not found")
         return
 
-    await word_list.delete()
+    assert word_list.id is not None
+    await wordlist_repo.delete(word_list.id, cascade=True)
     console.print(f"Deleted word list '[red]{name}[/red]'")
 
 

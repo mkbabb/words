@@ -4,11 +4,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....wordlist.constants import MasteryLevel
+from ....wordlist.models import WordListItemDoc
 from ...core import CurrentUserDep, ListResponse, ResourceResponse
 from ...repositories import StudySessionRequest, WordListRepository, WordReviewRequest
 
@@ -94,33 +95,30 @@ async def get_review_session(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
-    # Select words for review
-    review_words = []
     now = datetime.now(UTC)
 
-    for word in wordlist.words:
-        # Skip if above mastery threshold (uses correct ordering now)
-        if word.mastery_level > params.mastery_threshold:
-            continue
+    # Get all mastery levels at or below threshold
+    allowed_levels = [level for level in MasteryLevel if level <= params.mastery_threshold]
+    allowed_level_values = [level.value for level in allowed_levels]
 
-        # Include if due for review
-        if word.is_due_for_review():
-            review_words.append(word)
-
-        if len(review_words) >= params.limit:
-            break
+    # Query items due for review below mastery threshold
+    items = await WordListItemDoc.find({
+        "wordlist_id": wordlist_id,
+        "review_data.next_review_date": {"$lte": now},
+        "mastery_level": {"$in": allowed_level_values},
+    }).sort([("review_data.next_review_date", 1)]).limit(params.limit).to_list()
 
     # Sort by urgency (most overdue first)
-    review_words.sort(key=lambda w: w.get_overdue_days(), reverse=True)
+    items.sort(key=lambda w: w.get_overdue_days(), reverse=True)
 
     # Fetch Word documents to get text
-    word_ids = [w.word_id for w in review_words if w.word_id]
+    word_ids = [w.word_id for w in items if w.word_id]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
     # Convert to response with full review state
     session_words = []
-    for word_item in review_words:
+    for word_item in items:
         predicted_intervals = word_item.review_data.get_predicted_intervals()
         session_words.append(
             {
@@ -150,7 +148,7 @@ async def get_review_session(
         },
         metadata={
             "wordlist_name": wordlist.name,
-            "total_list_words": len(wordlist.words),
+            "total_list_words": wordlist.unique_words,
         },
         links={
             "wordlist": f"/wordlists/{wordlist_id}",
@@ -174,36 +172,40 @@ async def submit_review(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
-    # Find the word item and capture previous mastery
-    word_item = await wordlist.get_word_item(request.word)
-    if not word_item:
-        from fastapi import HTTPException
+    # Find the word item
+    word_doc = await Word.find_one({"text": request.word})
+    if not word_doc:
+        raise HTTPException(404, f"Word '{request.word}' not found")
 
+    item = await WordListItemDoc.find_one({"wordlist_id": wordlist_id, "word_id": word_doc.id})
+    if not item:
         raise HTTPException(404, f"Word '{request.word}' not in wordlist")
 
-    previous_mastery = word_item.mastery_level
+    previous_mastery = item.mastery_level
 
     # Process review (updates SM-2 state, card state, mastery)
-    word_item.review(request.quality)
-    wordlist.update_stats()
+    item.review(request.quality)
+    await item.save()
+
+    # Recompute denormalized stats on the wordlist
     wordlist.mark_accessed()
     await wordlist.save()
 
     # Get predicted intervals for next review
-    predicted_intervals = word_item.review_data.get_predicted_intervals()
+    predicted_intervals = item.review_data.get_predicted_intervals()
 
     return ResourceResponse(
         data={
             "word": request.word,
-            "card_state": word_item.review_data.card_state,
-            "mastery_level": word_item.mastery_level,
-            "ease_factor": word_item.review_data.ease_factor,
-            "interval_days": word_item.review_data.interval,
-            "next_review_date": word_item.review_data.next_review_date.isoformat(),
-            "repetitions": word_item.review_data.repetitions,
-            "lapse_count": word_item.review_data.lapse_count,
-            "is_leech": word_item.review_data.is_leech,
-            "mastery_changed": previous_mastery != word_item.mastery_level,
+            "card_state": item.review_data.card_state,
+            "mastery_level": item.mastery_level,
+            "ease_factor": item.review_data.ease_factor,
+            "interval_days": item.review_data.interval,
+            "next_review_date": item.review_data.next_review_date.isoformat(),
+            "repetitions": item.review_data.repetitions,
+            "lapse_count": item.review_data.lapse_count,
+            "is_leech": item.review_data.is_leech,
+            "mastery_changed": previous_mastery != item.mastery_level,
             "previous_mastery": previous_mastery,
             "predicted_intervals": predicted_intervals,
         },
@@ -226,37 +228,51 @@ async def submit_bulk_reviews(
 ) -> ResourceResponse:
     """Submit multiple word reviews at once.
 
-    Loads wordlist once, applies all reviews in memory, saves once.
+    Looks up each word, finds its item doc, applies review, saves individually.
+    Single stats recompute at the end.
     """
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
+
+    # Batch-fetch all word docs for the review words
+    review_words = [r.word for r in request.reviews]
+    word_docs = await Word.find({"text": {"$in": review_words}}).to_list()
+    word_text_to_doc = {w.text: w for w in word_docs}
 
     success_count = 0
     failed_words = []
     results = []
 
     for review in request.reviews:
-        word_item = await wordlist.get_word_item(review.word)
-        if word_item:
-            previous_mastery = word_item.mastery_level
-            word_item.review(review.quality)
-            success_count += 1
-            results.append(
-                {
-                    "word": review.word,
-                    "card_state": word_item.review_data.card_state,
-                    "mastery_level": word_item.mastery_level,
-                    "mastery_changed": previous_mastery != word_item.mastery_level,
-                    "interval_days": word_item.review_data.interval,
-                    "is_leech": word_item.review_data.is_leech,
-                }
-            )
-        else:
+        word_doc = word_text_to_doc.get(review.word)
+        if not word_doc:
             failed_words.append(review.word)
+            continue
 
-    # Single save for all reviews
+        item = await WordListItemDoc.find_one(
+            {"wordlist_id": wordlist_id, "word_id": word_doc.id}
+        )
+        if not item:
+            failed_words.append(review.word)
+            continue
+
+        previous_mastery = item.mastery_level
+        item.review(review.quality)
+        await item.save()
+        success_count += 1
+        results.append(
+            {
+                "word": review.word,
+                "card_state": item.review_data.card_state,
+                "mastery_level": item.mastery_level,
+                "mastery_changed": previous_mastery != item.mastery_level,
+                "interval_days": item.review_data.interval,
+                "is_leech": item.review_data.is_leech,
+            }
+        )
+
+    # Single stats recompute for the wordlist
     if success_count > 0:
-        wordlist.update_stats()
         wordlist.mark_accessed()
         await wordlist.save()
 

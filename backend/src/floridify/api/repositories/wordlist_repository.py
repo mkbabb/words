@@ -1,6 +1,6 @@
 """Repository for WordList model operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -15,8 +15,9 @@ from ...models import Word
 from ...models.base import Language
 from ...text import normalize
 from ...utils.logging import get_logger
-from ...wordlist.constants import MasteryLevel, Temperature
-from ...wordlist.models import WordList, WordListItem
+from ...wordlist.constants import MasteryLevel
+from ...wordlist.models import WordList, WordListItemDoc
+from ...wordlist.stats import LearningStats
 from ...wordlist.utils import generate_wordlist_hash
 from ..core.base import BaseRepository
 from ..core.exceptions import VersionConflictException
@@ -185,7 +186,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if existing:
             return existing, False
 
-        # Create new word list
+        # Create new word list (without embedded words)
         wordlist = WordList(
             name=data.name,
             description=data.description,
@@ -194,23 +195,19 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             is_public=data.is_public,
             owner_id=data.owner_id,
         )
-
-        # Add words if provided
-        if data.words:
-            # Batch process words for better performance
-            word_ids = await self._batch_get_or_create_words(data.words)
-            wordlist.add_words(word_ids)
-
         await wordlist.create()
 
-        # Only invalidate corpus cache if there were existing wordlists
-        existing_count = await WordList.count()
-        if existing_count > 1:
-            logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
-            corpus_manager = await self._get_tree_corpus_manager()
-            await corpus_manager.invalidate_corpus("wordlist_names_global")
-        else:
-            logger.debug("Skipping corpus invalidation - this is the first wordlist")
+        # Add words as separate documents if provided
+        if data.words:
+            word_ids = await self.batch_get_or_create_words(data.words)
+            items = [WordListItemDoc(wordlist_id=wordlist.id, word_id=wid) for wid in word_ids]
+            await WordListItemDoc.insert_many(items)
+            await self.recompute_stats(wordlist.id)
+            # Re-fetch to get updated stats
+            wordlist = await self.get(wordlist.id, raise_on_missing=True)
+            assert wordlist is not None
+
+        await self._invalidate_names_corpus()
 
         # Create corpus for this wordlist's words immediately
         if data.words:
@@ -218,7 +215,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         return wordlist, True
 
-    async def _batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
+    async def batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
         """Batch get or create Word documents, returning their IDs.
 
         This method optimizes performance by:
@@ -268,10 +265,11 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             result = await Word.insert_many(new_words)
 
             # Add new words to existing map using the returned IDs
-            for i, word in enumerate(new_words):
-                # Use the inserted_id from the result
+            # Key by the comprehensive-normalized form (matching the lookup key),
+            # NOT word.normalized which uses normalize_basic and may differ.
+            for i, norm in enumerate(missing_normalized):
                 word_id = result.inserted_ids[i]
-                existing_map[word.normalized] = word_id
+                existing_map[norm] = word_id
 
         # Return word IDs in the same order as input
         word_ids: list[PydanticObjectId] = []
@@ -288,18 +286,10 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
     async def _create_wordlist_corpus(self, wordlist: WordList) -> None:
         """Create corpus for wordlist words immediately upon creation."""
-        # Get Word documents for this wordlist
-        word_ids = [w.word_id for w in wordlist.words if w.word_id]
-        if not word_ids:
-            return
-
-        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-        word_texts = [word.text for word in words if word.text]
-
+        word_texts = await self._get_word_texts_for_wordlist(wordlist.id)
         if not word_texts:
             return
 
-        # Create unified corpus with automatic semantic embeddings for small corpora
         corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{wordlist.id}"
         corpus = await Corpus.create(
@@ -321,31 +311,22 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         will fail with 409 Conflict if the wordlist has been modified since the
         client last read it.
         """
-        wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        if wordlist is None:
-            raise ValueError(f"WordList with id {wordlist_id} not found")
+        await self._get_wordlist_with_version_check(wordlist_id, request.version)
 
-        # Optimistic locking: verify version if provided
-        if request.version is not None and wordlist.version != request.version:
-            raise VersionConflictException(
-                expected=request.version,
-                actual=wordlist.version,
-                resource="WordList",
+        word_ids = await self.batch_get_or_create_words(request.words)
+
+        for word_id in word_ids:
+            existing_item = await WordListItemDoc.find_one(
+                {"wordlist_id": wordlist_id, "word_id": word_id}
             )
+            if existing_item:
+                existing_item.increment()
+                await existing_item.save()
+            else:
+                new_item = WordListItemDoc(wordlist_id=wordlist_id, word_id=word_id)
+                await new_item.create()
 
-        # Use batch processing for better performance
-        word_ids = await self._batch_get_or_create_words(request.words)
-
-        wordlist.add_words(word_ids)
-        wordlist.mark_accessed()
-        await wordlist.save()
-
-        # Invalidate corpus cache for this wordlist since words changed
-        corpus_manager = await self._get_tree_corpus_manager()
-        corpus_name = f"wordlist_{wordlist_id}"
-        await corpus_manager.invalidate_corpus(corpus_name)
-
-        return wordlist
+        return await self._finalize_word_change(wordlist_id)
 
     async def remove_word(
         self,
@@ -359,30 +340,13 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         will fail with 409 Conflict if the wordlist has been modified since the
         client last read it.
         """
-        wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        if wordlist is None:
-            raise ValueError(f"WordList with id {wordlist_id} not found")
+        await self._get_wordlist_with_version_check(wordlist_id, version)
 
-        # Optimistic locking: verify version if provided
-        if version is not None and wordlist.version != version:
-            raise VersionConflictException(
-                expected=version,
-                actual=wordlist.version,
-                resource="WordList",
-            )
+        await WordListItemDoc.find(
+            {"wordlist_id": wordlist_id, "word_id": word_id}
+        ).delete()
 
-        # Find and remove the word by ID
-        wordlist.words = [w for w in wordlist.words if w.word_id != word_id]
-        wordlist.update_stats()
-        wordlist.mark_accessed()
-        await wordlist.save()
-
-        # Invalidate corpus cache for this wordlist since words changed
-        corpus_manager = await self._get_tree_corpus_manager()
-        corpus_name = f"wordlist_{wordlist_id}"
-        await corpus_manager.invalidate_corpus(corpus_name)
-
-        return wordlist
+        return await self._finalize_word_change(wordlist_id)
 
     async def update(
         self,
@@ -407,7 +371,10 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return updated_wordlist
 
     async def delete(self, id: PydanticObjectId, cascade: bool = False) -> bool:
-        """Delete a wordlist and invalidate corpus caches."""
+        """Delete a wordlist, its items, and invalidate corpus caches."""
+        # Delete all items for this wordlist (always, regardless of cascade flag)
+        await WordListItemDoc.find({"wordlist_id": id}).delete()
+
         # Call parent's delete method
         result = await super().delete(id, cascade)
 
@@ -429,13 +396,24 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
-        # Find the word and process review
-        word_item = await wordlist.get_word_item(request.word)
-        if word_item:
-            word_item.review(request.quality)
-            wordlist.update_stats()
-            wordlist.mark_accessed()
-            await wordlist.save()
+        # Find the word document by text
+        word_doc = await Word.find_one({"text": request.word})
+        if not word_doc or word_doc.id is None:
+            return wordlist
+
+        # Find the item in the items collection
+        item = await WordListItemDoc.find_one(
+            {"wordlist_id": wordlist_id, "word_id": word_doc.id}
+        )
+        if item:
+            item.review(request.quality)
+            await item.save()
+            await self.recompute_stats(wordlist_id)
+
+        wordlist = await self.get(wordlist_id, raise_on_missing=True)
+        assert wordlist is not None
+        wordlist.mark_accessed()
+        await wordlist.save()
 
         return wordlist
 
@@ -445,11 +423,18 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
-        word_item = await wordlist.get_word_item(word)
-        if word_item:
-            word_item.mark_visited()
-            wordlist.mark_accessed()
-            await wordlist.save()
+        # Find the word document by text
+        word_doc = await Word.find_one({"text": word})
+        if word_doc and word_doc.id is not None:
+            item = await WordListItemDoc.find_one(
+                {"wordlist_id": wordlist_id, "word_id": word_doc.id}
+            )
+            if item:
+                item.mark_visited()
+                await item.save()
+
+        wordlist.mark_accessed()
+        await wordlist.save()
 
         return wordlist
 
@@ -471,42 +456,100 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         self,
         wordlist_id: PydanticObjectId,
         limit: int | None = None,
-    ) -> list[WordListItem]:
+    ) -> list[WordListItemDoc]:
         """Get words due for review from a word list."""
-        wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        if wordlist is None:
-            return []
+        query = WordListItemDoc.find(
+            {
+                "wordlist_id": wordlist_id,
+                "review_data.next_review_date": {"$lte": datetime.now(UTC)},
+            }
+        ).sort([("review_data.next_review_date", 1)])
 
-        return wordlist.get_due_for_review(limit)
+        if limit:
+            query = query.limit(limit)
+
+        return await query.to_list()
 
     async def get_by_mastery(
         self,
         wordlist_id: PydanticObjectId,
         level: MasteryLevel,
-    ) -> list[WordListItem]:
+    ) -> list[WordListItemDoc]:
         """Get words at a specific mastery level."""
-        wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        if wordlist is None:
-            return []
-
-        return wordlist.get_by_mastery(level)
+        return await WordListItemDoc.find(
+            {"wordlist_id": wordlist_id, "mastery_level": level}
+        ).to_list()
 
     async def get_statistics(self, wordlist_id: PydanticObjectId) -> dict[str, Any]:
-        """Get detailed statistics for a word list."""
+        """Get detailed statistics for a word list using aggregation pipelines."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             return {}
 
-        # Calculate additional statistics
-        mastery_distribution = wordlist.get_mastery_distribution()
-        mastery_counts = {level.value: count for level, count in mastery_distribution.items()}
+        now = datetime.now(UTC)
+        collection = WordListItemDoc.get_pymongo_collection()
 
-        temperature_counts = {
-            "hot": len([w for w in wordlist.words if w.temperature == Temperature.HOT]),
-            "cold": len([w for w in wordlist.words if w.temperature == Temperature.COLD]),
-        }
+        # Single aggregation using $facet for mastery distribution + summary counts
+        stats_pipeline: list[dict[str, Any]] = [
+            {"$match": {"wordlist_id": wordlist_id}},
+            {
+                "$facet": {
+                    "mastery": [
+                        {"$group": {"_id": "$mastery_level", "count": {"$sum": 1}}},
+                    ],
+                    "summary": [
+                        {
+                            "$group": {
+                                "_id": None,
+                                "hot_count": {
+                                    "$sum": {"$cond": [{"$eq": ["$temperature", "hot"]}, 1, 0]}
+                                },
+                                "cold_count": {
+                                    "$sum": {"$cond": [{"$eq": ["$temperature", "cold"]}, 1, 0]}
+                                },
+                                "due_count": {
+                                    "$sum": {
+                                        "$cond": [
+                                            {"$lte": ["$review_data.next_review_date", now]},
+                                            1,
+                                            0,
+                                        ]
+                                    }
+                                },
+                            }
+                        },
+                    ],
+                }
+            },
+        ]
 
-        due_count = len(wordlist.get_due_for_review())
+        mastery_counts: dict[str, int] = dict.fromkeys([m.value for m in MasteryLevel], 0)
+        temperature_counts = {"hot": 0, "cold": 0}
+        due_count = 0
+
+        async for doc in collection.aggregate(stats_pipeline):
+            for entry in doc.get("mastery", []):
+                level_val = entry["_id"]
+                if level_val in mastery_counts:
+                    mastery_counts[level_val] = entry["count"]
+            summary_list = doc.get("summary", [])
+            if summary_list:
+                summary = summary_list[0]
+                temperature_counts["hot"] = summary.get("hot_count", 0)
+                temperature_counts["cold"] = summary.get("cold_count", 0)
+                due_count = summary.get("due_count", 0)
+
+        # Top 5 most frequent (uses index, returns only 5 docs)
+        top_freq = await WordListItemDoc.find(
+            {"wordlist_id": wordlist_id}
+        ).sort([("frequency", -1)]).limit(5).to_list()
+        most_frequent = [w.model_dump(mode="json") for w in top_freq]
+
+        # Top 5 hot words (uses index, returns only hot docs)
+        hot = await WordListItemDoc.find(
+            {"wordlist_id": wordlist_id, "temperature": "hot"}
+        ).sort([("last_visited", -1)]).limit(5).to_list()
+        hot_words = [w.model_dump(mode="json") for w in hot]
 
         return {
             "basic_stats": wordlist.learning_stats.model_dump(mode="json"),
@@ -517,8 +560,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             },
             "mastery_distribution": mastery_counts,
             "temperature_distribution": temperature_counts,
-            "most_frequent": [w.model_dump(mode="json") for w in wordlist.get_most_frequent(5)],
-            "hot_words": [w.model_dump(mode="json") for w in wordlist.get_hot_words(5)],
+            "most_frequent": most_frequent,
+            "hot_words": hot_words,
         }
 
     async def create_corpus(self, wordlist_id: PydanticObjectId, ttl_hours: float = 2.0) -> str:
@@ -527,19 +570,12 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
-        # Check if corpus already exists for this wordlist
         corpus_name = f"wordlist_{wordlist_id}"
         existing_corpus = await self.corpus_repo.get(corpus_name)
         if existing_corpus:
             return corpus_name
 
-        # Fetch Word documents to get text (word_ids are now ObjectIds)
-        word_ids = [item.word_id for item in wordlist.words if item.word_id]
-
-        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-
-        # Extract word text
-        word_texts = [word.text for word in words]
+        word_texts = await self._get_word_texts_for_wordlist(wordlist_id)
 
         return await self.corpus_repo.create_from_wordlist(
             vocabulary=word_texts,
@@ -565,40 +601,101 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return await self.corpus_repo.search(corpus_id, params)
 
     async def _cascade_delete(self, wordlist: WordList) -> None:
-        """Handle cascade deletion - WordList is self-contained."""
-        # WordList contains all data internally, no cascade needed
+        """Handle cascade deletion - delete all items for this wordlist."""
+        await WordListItemDoc.find({"wordlist_id": wordlist.id}).delete()
 
-    async def populate_words(self, wordlist: WordList) -> dict[str, Any]:
-        """Populate wordlist with actual word text instead of just IDs.
+    # ── Private helpers ────────────────────────────────────────────
 
-        Returns a dictionary representation with word text included.
-        """
-        # Get word IDs from wordlist items (they are now ObjectIds)
-        word_ids = [item.word_id for item in wordlist.words if item.word_id]
+    async def _get_wordlist_with_version_check(
+        self,
+        wordlist_id: PydanticObjectId,
+        version: int | None,
+    ) -> WordList:
+        """Fetch a wordlist and verify optimistic locking version if provided."""
+        wordlist = await self.get(wordlist_id, raise_on_missing=True)
+        if wordlist is None:
+            raise ValueError(f"WordList with id {wordlist_id} not found")
 
+        if version is not None and wordlist.version != version:
+            raise VersionConflictException(
+                expected=version,
+                actual=wordlist.version,
+                resource="WordList",
+            )
+        return wordlist
+
+    async def _finalize_word_change(self, wordlist_id: PydanticObjectId) -> WordList:
+        """Recompute stats, mark accessed, and invalidate corpus after a word change."""
+        await self.recompute_stats(wordlist_id)
+
+        wordlist = await self.get(wordlist_id, raise_on_missing=True)
+        assert wordlist is not None
+        wordlist.mark_accessed()
+        await wordlist.save()
+
+        corpus_manager = await self._get_tree_corpus_manager()
+        await corpus_manager.invalidate_corpus(f"wordlist_{wordlist_id}")
+
+        return wordlist
+
+    async def _invalidate_names_corpus(self) -> None:
+        """Invalidate the global wordlist names corpus."""
+        corpus_manager = await self._get_tree_corpus_manager()
+        await corpus_manager.invalidate_corpus("wordlist_names_global")
+
+    async def _get_word_ids_for_wordlist(
+        self, wordlist_id: PydanticObjectId
+    ) -> list[PydanticObjectId]:
+        """Get word_id values for a wordlist using a projection (avoids loading full documents)."""
+        collection = WordListItemDoc.get_pymongo_collection()
+        cursor = collection.find({"wordlist_id": wordlist_id}, {"word_id": 1, "_id": 0})
+        return [doc["word_id"] async for doc in cursor if doc.get("word_id")]
+
+    async def _get_word_texts_for_wordlist(self, wordlist_id: PydanticObjectId) -> list[str]:
+        """Get word texts for all items in a wordlist via projected lookup."""
+        word_ids = await self._get_word_ids_for_wordlist(wordlist_id)
         if not word_ids:
-            # No words to fetch, return empty wordlist
-            wordlist_dict = wordlist.model_dump(mode="json")
-            for word_item in wordlist_dict["words"]:
-                word_item.pop("word_id", None)
-                word_item["word"] = ""
-            return wordlist_dict
-
-        # Fetch Word documents directly with ObjectIds (no conversion needed!)
+            return []
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+        return [word.text for word in words if word.text]
 
-        # Create word text map using ObjectIds directly
-        word_text_map = {word.id: word.text for word in words if word.id}
+    async def recompute_stats(self, wordlist_id: PydanticObjectId) -> None:
+        """Recompute denormalized stats on WordList via aggregation pipeline."""
+        pipeline = [
+            {"$match": {"wordlist_id": wordlist_id}},
+            {
+                "$group": {
+                    "_id": None,
+                    "unique_words": {"$sum": 1},
+                    "total_words": {"$sum": "$frequency"},
+                    "words_mastered": {
+                        "$sum": {"$cond": [{"$eq": ["$mastery_level", "gold"]}, 1, 0]}
+                    },
+                    "avg_ease": {"$avg": "$review_data.ease_factor"},
+                    "total_reps": {"$sum": "$review_data.repetitions"},
+                    "total_lapses": {"$sum": "$review_data.lapse_count"},
+                }
+            },
+        ]
 
-        # Use JSON mode for proper serialization, but work with ObjectIds directly
-        wordlist_dict = wordlist.model_dump(mode="json")
+        stats = LearningStats()
+        unique_words = 0
+        total_words = 0
 
-        # Create a string-based lookup map for JSON-serialized ObjectIds
-        word_text_map_str = {str(word_id): text for word_id, text in word_text_map.items()}
+        collection = WordListItemDoc.get_pymongo_collection()
+        async for doc in collection.aggregate(pipeline):
+            unique_words = doc.get("unique_words", 0)
+            total_words = doc.get("total_words", 0)
+            stats.words_mastered = doc.get("words_mastered", 0)
+            avg_ease = doc.get("avg_ease")
+            if avg_ease is not None:
+                stats.average_ease_factor = avg_ease
+            total_reps = doc.get("total_reps", 0)
+            total_lapses = doc.get("total_lapses", 0)
+            if total_reps > 0:
+                stats.retention_rate = 1 - (total_lapses / (total_reps + total_lapses))
 
-        # Replace word_id with word text for each word item
-        for word_item in wordlist_dict["words"]:
-            word_id_str = word_item.pop("word_id", None)
-            word_item["word"] = word_text_map_str.get(word_id_str, "") if word_id_str else ""
-
-        return wordlist_dict
+        wordlist = await self.get(wordlist_id, raise_on_missing=True)
+        assert wordlist is not None
+        wordlist.set_stats(unique_words, total_words, stats)
+        await wordlist.save()
