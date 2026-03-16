@@ -189,7 +189,7 @@ class DatabaseStatsResponse(BaseResponse):
         None,
         description="Quality metrics",
     )
-    storage_size: dict[str, str] | None = Field(
+    storage_size: dict[str, Any] | None = Field(
         None,
         description="Storage size estimates",
     )
@@ -381,6 +381,30 @@ class HealthResponse(BaseResponse):
 # ============================================================================
 
 
+class FieldChangeSummary(BaseModel):
+    """A single field-level change within a version."""
+
+    field_path: str = Field(..., description="Dotted path (e.g. 'etymology.text')")
+    change_type: str = Field(default="modified", description="added | removed | modified")
+    old_value: str | None = Field(None, description="Previous value (truncated)")
+    new_value: str | None = Field(None, description="New value (truncated)")
+
+
+class EditMetadataSummary(BaseModel):
+    """Who/when/why metadata surfaced in version summaries."""
+
+    user_id: str | None = Field(None, description="Clerk user ID")
+    username: str | None = Field(None, description="Display name")
+    operation_type: str = Field(default="manual_edit", description="Operation classification")
+    change_reason: str | None = Field(None, description="Free-text edit description")
+    field_changes: list[FieldChangeSummary] = Field(
+        default_factory=list, description="Field-level changes"
+    )
+    synthesis_audit: dict[str, Any] | None = Field(
+        None, description="AI synthesis audit trail (model, tokens, components)"
+    )
+
+
 class VersionSummary(BaseModel):
     """Summary of a single version in the version chain."""
 
@@ -392,6 +416,9 @@ class VersionSummary(BaseModel):
         description="Storage mode: 'snapshot' (full content) or 'delta' (compressed diff)",
     )
     is_latest: bool = Field(default=False, description="Whether this is the current version")
+    edit_metadata: EditMetadataSummary | None = Field(
+        None, description="Who/what/why metadata for this version change"
+    )
 
 
 class VersionHistoryResponse(BaseResponse):

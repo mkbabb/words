@@ -168,6 +168,24 @@ class Etymology(BaseModel):
     model_info: ModelInfo | None = None  # If AI-generated
 
 
+class SynonymChooser(BaseModel):
+    """Comparative synonym essay — MW-style 'Choose the Right Word'."""
+
+    essay: str  # The comparative essay text
+    synonyms_compared: list[dict[str, str]] = Field(default_factory=list)
+    # Each dict: {"word": "...", "distinction": "..."}
+    model_info: ModelInfo | None = None
+
+
+class Phrase(BaseModel):
+    """A phrase or idiom containing the target word."""
+
+    phrase: str
+    meaning: str
+    example: str | None = None
+    usage_register: str | None = None  # formal, informal, literary, archaic
+
+
 class Definition(Document, BaseMetadata):
     """Single definition with examples and comprehensive linguistic data."""
 
@@ -203,6 +221,11 @@ class Definition(Document, BaseMetadata):
         ge=1,
         le=5,
     )  # 1-5, Oxford 3000/5000 style
+    frequency_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+    )  # 0.0-1.0 continuous frequency for temperature visualization
 
     # Media and provenance
     image_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to ImageMedia documents
@@ -225,7 +248,6 @@ class DictionaryEntry(Document, BaseMetadata):
     word_id: PydanticObjectId  # FK to Word document
     definition_ids: list[PydanticObjectId] = Field(
         default_factory=list,
-        max_length=100,
     )  # FK to Definition documents
     pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation document
     fact_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to Fact documents
@@ -238,6 +260,10 @@ class DictionaryEntry(Document, BaseMetadata):
     # Etymology and raw data
     etymology: Etymology | None = None
     raw_data: dict[str, Any] | None = None  # Original API response
+
+    # Enrichment: AI-generated content beyond definitions
+    synonym_chooser: SynonymChooser | None = None  # Comparative synonym essay
+    phrases: list[Phrase] = Field(default_factory=list)  # Phrases & idioms
 
     # Provenance: which provider entries/versions fed this synthesis
     source_entries: list[SourceReference] = Field(default_factory=list)
@@ -263,7 +289,9 @@ __all__ = [
     "Example",
     "Fact",
     "LiteratureSourceExample",
+    "Phrase",
     "Pronunciation",
     "SourceReference",
+    "SynonymChooser",
     "Word",
 ]

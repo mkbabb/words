@@ -100,6 +100,53 @@ class ModelInfo(BaseModel):
     last_generated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class OperationType(str, Enum):
+    """Classification of edit operations for audit trail."""
+
+    AI_SYNTHESIS = "ai_synthesis"
+    MANUAL_EDIT = "manual_edit"
+    PROVIDER_REFRESH = "provider_refresh"
+    ROLLBACK = "rollback"
+    COMPONENT_REGENERATION = "component_regeneration"
+    AUTO_CORRECT = "auto_correct"
+    IMPORT = "import"
+
+
+class FieldChange(BaseModel):
+    """A single field-level change within a version."""
+
+    field_path: str  # e.g., "etymology.text", "definitions[0].text"
+    change_type: Literal["added", "removed", "modified"] = "modified"
+    old_value: str | None = None  # String summary of old value (truncated for large values)
+    new_value: str | None = None  # String summary of new value (truncated for large values)
+
+
+class SynthesisAuditEntry(BaseModel):
+    """Audit trail for AI synthesis operations."""
+
+    model_name: str  # e.g., "gpt-5-mini"
+    model_tier: str | None = None  # "high", "medium", "low"
+    components_enhanced: list[str] = Field(default_factory=list)  # SynthesisComponent values
+    total_tokens: int | None = None
+    response_time_ms: int | None = None
+    source_providers: list[str] = Field(default_factory=list)  # Provider names used
+    definitions_input: int = 0  # Definitions from providers
+    definitions_output: int = 0  # Definitions after synthesis
+    dedup_removed: int = 0  # Duplicates removed
+    clusters_created: int = 0
+
+
+class EditMetadata(BaseModel):
+    """Who/when/why metadata for a version change."""
+
+    user_id: str | None = None  # Clerk user_id from JWT
+    username: str | None = None  # Display name for UI
+    operation_type: OperationType = OperationType.MANUAL_EDIT
+    change_reason: str | None = None  # Free-text commit message
+    field_changes: list[FieldChange] = Field(default_factory=list)
+    synthesis_audit: SynthesisAuditEntry | None = None  # Present for AI operations
+
+
 class ImageMedia(Document, BaseMetadata):
     """Image media storage."""
 
@@ -140,7 +187,11 @@ __all__ = [
     "AIResponseBase",
     "AudioMedia",
     "BaseMetadata",
+    "EditMetadata",
+    "FieldChange",
     "ImageMedia",
     "Language",
     "ModelInfo",
+    "OperationType",
+    "SynthesisAuditEntry",
 ]
