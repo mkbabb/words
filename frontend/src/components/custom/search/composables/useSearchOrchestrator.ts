@@ -300,6 +300,10 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             return items;
         } catch (error: any) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+                wordlistMode.setPagination({
+                    ...wordlistMode.pagination,
+                    hasMore: false,
+                });
                 return [];
             }
 
@@ -347,6 +351,10 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             return items;
         } catch (error: any) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+                wordlistMode.setPagination({
+                    ...wordlistMode.pagination,
+                    hasMore: false,
+                });
                 return [];
             }
 

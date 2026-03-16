@@ -102,7 +102,7 @@
                     ]"
                 >
                     <div
-                        v-for="(provider, i) in providers"
+                        v-for="(provider, i) in orderedProviders"
                         :key="provider"
                         :class="[
                             'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 shadow-sm transition-all duration-200 ease-apple-spring',
@@ -111,7 +111,7 @@
                                 ? 'ring-2 ring-primary/30 bg-muted'
                                 : '',
                         ]"
-                        :style="{ zIndex: providers.length - i }"
+                        :style="{ zIndex: orderedProviders.length - i }"
                     >
                         <component
                             :is="getProviderIcon(provider)"
@@ -202,6 +202,15 @@ const props = withDefaults(defineProps<ProviderIconsProps>(), {
 defineEmits<{
     'select-source': [source: string];
 }>();
+
+// Reorder providers so the active source is always first in the stack
+const orderedProviders = computed(() => {
+    const list = props.providers;
+    if (!list || list.length <= 1) return list;
+    const active = props.activeSource;
+    if (!active || active === 'synthesis' || list[0] === active) return list;
+    return [active, ...list.filter(p => p !== active)];
+});
 
 // Fallback for when sourceEntries is empty but we have provider strings
 const providerFallback = computed(() =>

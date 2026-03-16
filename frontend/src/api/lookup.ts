@@ -37,6 +37,7 @@ export const lookupApi = {
             providers?: DictionaryProvider[];
             languages?: Language[];
             noAI?: boolean;
+            timeout?: number;
         }
     ): Promise<SynthesizedDictionaryEntry> {
         try {
@@ -53,6 +54,7 @@ export const lookupApi = {
                 `/lookup/${encodeURIComponent(word)}`,
                 {
                     params,
+                    ...(options?.timeout ? { timeout: options.timeout } : {}),
                 }
             );
 

@@ -180,7 +180,7 @@
             />
 
             <!-- Dropdowns Container -->
-            <div class="absolute top-full right-0 left-0 z-40 pt-2">
+            <div class="absolute top-full right-0 left-0 z-40 pt-1">
                 <!-- Controls Dropdown — grid-based height transition wrapper -->
                 <div
                     :class="[
@@ -711,7 +711,7 @@ onUnmounted(() => {
 .controls-dropdown-open {
     grid-template-rows: 1fr;
     opacity: 1;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     /* ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1) */
     transition:
         grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),

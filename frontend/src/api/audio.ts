@@ -17,6 +17,7 @@ export interface GenerateAudioResponse {
   accent: string;
   quality: string;
   content_url: string;
+  language?: string; // ISO language code
 }
 
 export const audioApi = {

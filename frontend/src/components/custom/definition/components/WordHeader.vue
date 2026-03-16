@@ -45,9 +45,9 @@
 
         <!-- Pronunciation & Audio Row -->
         <div class="flex items-center gap-3 pt-2">
-            <!-- Language badges — circular icons like providers -->
+            <!-- Language badges — overlapping stack with dropdown select (mirrors ProviderIcons) -->
             <template v-if="languages?.length">
-                <!-- Single language -->
+                <!-- Single language: tooltip only -->
                 <Tooltip v-if="languages.length === 1">
                     <TooltipTrigger as-child>
                         <span
@@ -60,48 +60,76 @@
                         Language: {{ languages[0] }}
                     </TooltipContent>
                 </Tooltip>
-                <!-- Multiple languages: overlapping circles with popover -->
+                <!-- Multiple languages: overlapping stack → popover dropdown on click -->
                 <Popover v-else>
                     <PopoverTrigger as-child>
-                        <button class="group/lang flex items-center cursor-pointer">
-                            <span
-                                v-for="(lang, i) in languages.slice(0, 3)"
+                        <button class="group/lang flex items-center cursor-pointer focus:outline-none focus:ring-0">
+                            <div
+                                v-for="(lang, i) in orderedLanguages.slice(0, 3)"
                                 :key="lang"
                                 :class="[
-                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 text-[10px] font-bold uppercase text-muted-foreground shadow-sm transition-all duration-200 ease-apple-spring',
+                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 text-[10px] font-bold uppercase shadow-sm transition-all duration-200 ease-apple-spring',
                                     i > 0 ? '-ml-2 group-hover/lang:ml-0.5' : '',
+                                    lang === audioLanguage ? 'ring-2 ring-primary/30 bg-muted' : '',
                                 ]"
-                                :style="{ zIndex: languages.length - i }"
+                                :style="{ zIndex: orderedLanguages.length - i }"
                             >
-                                {{ lang }}
-                            </span>
-                            <span
-                                v-if="languages.length > 3"
+                                <span :class="lang === audioLanguage ? 'text-primary' : 'text-muted-foreground'">
+                                    {{ lang }}
+                                </span>
+                            </div>
+                            <div
+                                v-if="orderedLanguages.length > 3"
                                 :class="[
                                     'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/50 text-[10px] font-medium text-muted-foreground/60 transition-all duration-200 ease-apple-spring',
                                     '-ml-2 group-hover/lang:ml-0.5',
                                 ]"
                             >
-                                +{{ languages.length - 3 }}
-                            </span>
+                                +{{ orderedLanguages.length - 3 }}
+                            </div>
                         </button>
                     </PopoverTrigger>
                     <InlinePopoverContent
                         side="bottom"
                         align="start"
-                        :side-offset="6"
-                        class="w-auto min-w-28 rounded-lg border border-border/30 bg-background/92 p-1.5 shadow-lg backdrop-blur-md z-50"
+                        :side-offset="20"
+                        class="w-44 rounded-xl border border-border/30 bg-background/92 p-1.5 shadow-lg backdrop-blur-md"
                     >
                         <div
                             v-for="lang in languages"
                             :key="lang"
-                            class="rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60 transition-colors duration-150 cursor-default"
+                            :class="[
+                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-colors duration-150 hover:bg-muted/60',
+                                lang === audioLanguage
+                                    ? 'bg-primary/10 font-medium text-foreground'
+                                    : 'text-foreground/80',
+                            ]"
+                            @click="selectAudioLanguage(lang)"
                         >
-                            {{ lang }}
+                            <span
+                                :class="[
+                                    'flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold uppercase',
+                                    lang === audioLanguage
+                                        ? 'bg-primary/15 text-primary'
+                                        : 'bg-muted text-muted-foreground',
+                                ]"
+                            >{{ lang }}</span>
+                            <span class="text-sm flex-1">{{ getLanguageDisplayName(lang) }}</span>
+                            <div
+                                v-if="lang === audioLanguage"
+                                class="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"
+                            />
                         </div>
                     </InlinePopoverContent>
                 </Popover>
             </template>
+
+            <!-- Audio Playback Button -->
+            <AudioPlaybackButton
+                :state="audioState"
+                :error-message="audioError"
+                @play="playAudio"
+            />
 
             <!-- Pronunciation text with toggle button -->
             <template v-if="pronunciation && hasPronunciation">
@@ -126,13 +154,6 @@
                     {{ pronunciationMode === 'ipa' || (!pronunciation?.phonetic || pronunciation?.phonetic === 'unknown') ? 'IPA' : 'Ph.' }}
                 </span>
             </template>
-
-            <!-- Audio Playback Button — always visible -->
-            <AudioPlaybackButton
-                :state="audioState"
-                :error-message="audioError"
-                @play="playAudio"
-            />
 
             <!-- Vertical divider between pronunciation area and provider icons -->
             <div
@@ -161,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import {
     HoverCard,
@@ -220,11 +241,49 @@ const handleWordAdded = (_wordlistName: string) => {
     showAddToWordlistModal.value = false;
 };
 
-// Audio playback
+// Audio playback with language selection
 const wordRef = toRef(props, 'word');
 const audioFilesRef = computed(() => props.pronunciation?.audio_files);
-const languageRef = toRef(() => props.languages[0]);
-const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef, languageRef);
+const audioLanguage = ref(props.languages[0] ?? 'en');
+const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef, audioLanguage);
+
+function selectAudioLanguage(lang: string) {
+    audioLanguage.value = lang;
+}
+
+// Reorder languages so the selected one is always first in the stack
+const orderedLanguages = computed(() => {
+    const langs = props.languages;
+    if (!langs || langs.length <= 1) return langs;
+    const selected = audioLanguage.value;
+    if (langs[0] === selected) return langs;
+    return [selected, ...langs.filter(l => l !== selected)];
+});
+
+const LANGUAGE_NAMES: Record<string, string> = {
+    en: 'English',
+    fr: 'French',
+    es: 'Spanish',
+    de: 'German',
+    it: 'Italian',
+    ja: 'Japanese',
+    zh: 'Mandarin',
+    hi: 'Hindi',
+    pt: 'Portuguese',
+    la: 'Latin',
+    grc: 'Greek',
+};
+
+function getLanguageDisplayName(code: string): string {
+    return LANGUAGE_NAMES[code] ?? code.toUpperCase();
+}
+
+// Reset audio language when word changes (new entry might have different languages)
+watch(() => props.languages, (newLangs) => {
+    if (newLangs?.length && !newLangs.includes(audioLanguage.value)) {
+        audioLanguage.value = newLangs[0];
+    }
+});
 
 // Check if we have valid pronunciation data
 const hasPronunciation = computed(() => {

@@ -131,16 +131,83 @@
           </p>
         </div>
       </section>
+
+      <!-- Wordlist Management -->
+      <section>
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Wordlist Management</h2>
+          <div class="flex items-center gap-2">
+            <button
+              @click="loadWordlists"
+              :disabled="loadingWordlists"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm transition-colors hover:bg-accent"
+            >
+              <RefreshCw :class="['h-3.5 w-3.5', loadingWordlists && 'animate-spin']" />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="loadingWordlists && wordlists.length === 0" class="space-y-3">
+          <div v-for="i in 3" :key="i" class="h-16 animate-pulse rounded-lg bg-muted" />
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="wordlists.length === 0" class="rounded-lg border border-border p-8 text-center">
+          <Database :size="40" class="mx-auto mb-3 text-muted-foreground" />
+          <p class="text-muted-foreground">No wordlists found.</p>
+        </div>
+
+        <!-- Wordlist table -->
+        <div v-else class="space-y-2">
+          <div
+            v-for="wl in wordlists"
+            :key="wl.id"
+            class="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-accent/50"
+          >
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="truncate font-medium">{{ wl.name }}</span>
+                <span v-if="wl.is_public" class="rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">Public</span>
+              </div>
+              <div class="text-xs text-muted-foreground truncate">
+                {{ wl.total_words }} words
+                <span class="mx-1">&middot;</span>
+                Owner: {{ wl.owner_id || 'unknown' }}
+                <span class="mx-1">&middot;</span>
+                Created: {{ formatDate(wl.created_at) }}
+              </div>
+            </div>
+            <button
+              @click="deleteWordlist(wl.id)"
+              :disabled="deletingWordlist === wl.id"
+              class="flex-shrink-0 ml-4 inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+            >
+              <Trash2 :size="12" />
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div v-if="wordlists.length > 0" class="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
+          <span>{{ wordlists.length }} wordlists</span>
+          <span>{{ wordlists.reduce((sum, wl) => sum + (wl.total_words || 0), 0) }} total words</span>
+        </div>
+
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, RefreshCw, User, Users } from 'lucide-vue-next';
+import { ArrowLeft, RefreshCw, User, Users, Database, Trash2 } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { lookupApi } from '@/api/lookup';
+import { wordlistApi } from '@/api';
 import { RoleBadge } from '@/components/custom/auth';
 import type { UserProfile, UserRole } from '@/types/api/models';
 import { useRouter } from 'vue-router';
@@ -163,6 +230,12 @@ const reSynthWord = ref('');
 const reSynthesizing = ref(false);
 const reSynthResult = ref('');
 const reSynthError = ref('');
+
+// Wordlist management state
+const wordlists = ref<any[]>([]);
+const loadingWordlists = ref(false);
+const deletingWordlist = ref<string | null>(null);
+
 
 async function loadUsers() {
   loading.value = true;
@@ -213,6 +286,30 @@ async function handleReSynthesize() {
   }
 }
 
+async function loadWordlists() {
+  loadingWordlists.value = true;
+  try {
+    const response = await wordlistApi.getWordlists({ limit: 100 });
+    wordlists.value = response.items || [];
+  } catch (e: any) {
+    console.error('Failed to load wordlists:', e);
+  } finally {
+    loadingWordlists.value = false;
+  }
+}
+
+async function deleteWordlist(id: string) {
+  deletingWordlist.value = id;
+  try {
+    await wordlistApi.deleteWordlist(id);
+    wordlists.value = wordlists.value.filter(wl => wl.id !== id);
+  } catch (e: any) {
+    console.error('Failed to delete wordlist:', e);
+  } finally {
+    deletingWordlist.value = null;
+  }
+}
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Never';
   const date = new Date(dateStr);
@@ -226,5 +323,8 @@ function formatDate(dateStr: string | null): string {
   return date.toLocaleDateString();
 }
 
-onMounted(loadUsers);
+onMounted(() => {
+  loadUsers();
+  loadWordlists();
+});
 </script>

@@ -59,74 +59,41 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
         { immediate: true }
     );
 
-    // Container style with smooth transitions
+    // Container style — uses only transform + opacity (no layout-affecting
+    // properties like maxWidth) so the sticky search bar never causes reflow
+    // feedback loops when content height changes during scroll.
     const containerStyle = computed(() => {
-        // Use the scroll progress directly as it's already normalized (0-1)
         const progress = uiState.scrollProgress;
-
-        // Use different widths for mobile vs desktop
         const isMobile = viewportWidth.value < 640;
-        const mobileMaxWidth = 'calc(100vw - 0.5rem)'; // Nearly full width with minimal padding
-        const desktopMaxWidth = 'min(32rem, calc(100vw - 2rem))';
 
-        // Select appropriate max width based on viewport
-        const responsiveMaxWidth = isMobile ? mobileMaxWidth : desktopMaxWidth;
+        // Constant maxWidth — never changes during scroll to avoid layout shifts
+        const maxWidth = isMobile
+            ? 'calc(100vw - 0.5rem)'
+            : 'min(32rem, calc(100vw - 2rem))';
 
-        // State machine for search bar sizing
-        // Priority order: focused/hovered/dropdowns > unfocused > scroll-based
-
-        // State 1: Interactive states - always full size (uses debounced flag)
+        // Interactive states: always full size
         if (isInteractive.value) {
             return {
-                maxWidth: responsiveMaxWidth,
+                maxWidth,
                 transform: 'scale(1)',
                 opacity: '1',
-                transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                transition: 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
             };
         }
 
-        // State 2: Unfocused - apply baseline shrink regardless of scroll position
-        const baselineShrink = 0.35; // Apply 35% shrink when unfocused
+        // Unfocused: apply visual-only shrink via transform (no layout reflow)
+        const baselineShrink = 0.35;
+        const effectiveProgress = Math.max(baselineShrink, Math.min(progress, 1));
 
-        // State 3: Combine baseline shrink with scroll-based shrink
-        const effectiveProgress = Math.max(
-            baselineShrink,
-            Math.min(progress, 1)
-        );
+        const scale = isMobile ? 1 : 1 - effectiveProgress * 0.15;
+        const opacity = Math.max(0.65, 0.85 - effectiveProgress * 0.2);
 
-        // Continuous scale transition
-        const scale = 1 - effectiveProgress * 0.15;
-
-        // Enhanced opacity transition
-        const baseOpacity = 0.85;
-        const opacityReduction = effectiveProgress * 0.2;
-        const opacity = Math.max(0.65, baseOpacity - opacityReduction);
-
-        // Mobile vs desktop behavior
-        if (isMobile) {
-            // On mobile, maintain consistent full width without scaling
-            return {
-                maxWidth: 'calc(100vw - 0.5rem)',
-                transform: 'scale(1)', // No scaling on mobile
-                opacity: opacity.toString(),
-                transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            };
-        } else {
-            // Desktop behavior: interpolate width
-            const maxWidthStart = 32; // 32rem
-            const maxWidthEnd = 24; // 24rem
-            const interpolatedWidth =
-                maxWidthStart -
-                effectiveProgress * (maxWidthStart - maxWidthEnd);
-            const currentMaxWidth = `min(${interpolatedWidth}rem, calc(100vw - ${2 + effectiveProgress * 2}rem))`;
-
-            return {
-                maxWidth: currentMaxWidth,
-                transform: `scale(${scale})`,
-                opacity: opacity.toString(),
-                transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            };
-        }
+        return {
+            maxWidth,
+            transform: `scale(${scale})`,
+            opacity: opacity.toString(),
+            transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        };
     });
 
     // Update scroll progress from external prop

@@ -203,21 +203,21 @@ defineExpose({
 
 .controls-mode-switch-enter-from {
     opacity: 0;
-    transform: scale(0.96) translateY(8px);
+    transform: translateY(8px);
 }
 
 .controls-mode-switch-enter-to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0);
 }
 
 .controls-mode-switch-leave-from {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0);
 }
 
 .controls-mode-switch-leave-to {
     opacity: 0;
-    transform: scale(0.96) translateY(-6px);
+    transform: translateY(-6px);
 }
 </style>

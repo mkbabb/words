@@ -40,7 +40,8 @@
                             class="sticky w-48"
                             :style="{ top: '5.5rem' /* search bar height + padding */ }"
                         >
-                            <ProgressiveSidebar />
+                            <ProgressiveSidebar v-if="searchBar.searchMode === 'lookup'" />
+                            <WordlistProgressiveSidebar v-else-if="searchBar.searchMode === 'wordlist'" />
                         </div>
                     </div>
 
@@ -149,9 +150,11 @@ import EmptyState from '@/components/custom/definition/components/EmptyState.vue
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import WordListView from '@/components/custom/wordlist/WordListView.vue';
-import { ProgressiveSidebar } from '@/components/custom/navigation';
+import { ProgressiveSidebar, WordlistProgressiveSidebar } from '@/components/custom/navigation';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
 
 const { searchBar, content, ui, loading } = useStores();
+const wordlistMode = useWordlistMode();
 const route = useRoute();
 const router = useRouter();
 
@@ -347,16 +350,18 @@ const shrinkPercentage = computed(() => {
 
 const searchBarClasses = computed(() => [
     'relative top-0 z-40 bg-transparent',
-    'transition-all duration-300 ease-out',
     'sticky',
-    {
-        'py-4 sm:py-8': scrollProgress.value < 0.3,
-        'py-2 sm:py-4': scrollProgress.value >= 0.3 && scrollProgress.value < 0.7,
-        'py-1 sm:py-2': scrollProgress.value >= 0.7,
-    },
+    'py-1 sm:py-1.5',
 ]);
 
 const shouldShowProgressiveSidebar = computed(() => {
+    // Hide when left sidebar is expanded — give main content more room
+    if (!ui.sidebarCollapsed) return false;
+
+    if (searchBar.searchMode === 'wordlist') {
+        return !!wordlistMode.selectedWordlist;
+    }
+
     const hasDefinition = !!currentEntry.value;
     const isLookupMode = searchBar.searchMode === 'lookup';
     const isSuggestionsSubMode = lookupSubMode.value === 'suggestions';
