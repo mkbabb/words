@@ -43,6 +43,8 @@ from .state_tracker import Stages, StateTracker
 
 logger = get_logger(__name__)
 
+_PROVIDER_TIMEOUT_SECONDS = 30.0
+
 
 async def _ensure_primary_audio(entry: DictionaryEntry) -> None:
     """Generate audio for the primary language if pronunciation has none.
@@ -62,9 +64,7 @@ async def _ensure_primary_audio(entry: DictionaryEntry) -> None:
         if not word_obj:
             return
 
-        primary_language = (
-            entry.languages[0] if entry.languages else "en"
-        )
+        primary_language = entry.languages[0] if entry.languages else "en"
 
         from ..ai.synthesis.word_level import _generate_audio_files
 
@@ -352,11 +352,13 @@ async def _get_provider_definition(
             try:
                 result = await asyncio.wait_for(
                     connector.fetch_definition(word_obj, state_tracker),
-                    timeout=30.0,
+                    timeout=_PROVIDER_TIMEOUT_SECONDS,
                 )
             except TimeoutError:
-                logger.warning(f"⏱️ Provider {provider.value} timed out after 30s for '{word}'")
-                raise ProviderTimeoutError(provider.value, 30.0)
+                logger.warning(
+                    f"Provider {provider.value} timed out after {_PROVIDER_TIMEOUT_SECONDS}s for '{word}'"
+                )
+                raise ProviderTimeoutError(provider.value, _PROVIDER_TIMEOUT_SECONDS)
 
             fetch_duration = time.perf_counter() - fetch_start
 

@@ -56,8 +56,18 @@ from .word_level import (
 
 logger = get_logger(__name__)
 
+# Bound concurrent AI API calls to prevent overwhelming the provider
+_MAX_CONCURRENT_AI_CALLS = 20
+_ai_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_AI_CALLS)
+
 # Type alias for synthesis functions
 SynthesisFunc = Callable[..., Any]
+
+
+async def _bounded(coro: Coroutine[Any, Any, Any]) -> Any:
+    """Run a coroutine with the AI concurrency semaphore."""
+    async with _ai_semaphore:
+        return await coro
 
 
 async def cluster_definitions(
@@ -358,15 +368,16 @@ async def enhance_definitions_parallel(
         return
 
     # Execute tasks based on mode
+    bounded_tasks = [_bounded(t) for t in tasks]
     if batch_mode:
         # batch_synthesis patches connector._make_structured_request to collect
         # requests into a batch; the gather triggers collection, not execution.
         # Actual batch execution happens on context manager __aexit__.
         async with batch_synthesis(ai):
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*bounded_tasks, return_exceptions=True)
     else:
         # Execute all tasks in parallel (immediate mode)
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*bounded_tasks, return_exceptions=True)
 
     # Process results and update definitions
     successes = 0
@@ -540,9 +551,8 @@ async def enhance_synthesized_entry(
 
     # Execute word-level tasks
     if word_tasks:
-        # Note: batch_mode would be passed from enhance_synthesized_entry if needed
-        # For now, word-level tasks run in immediate mode
-        results = await asyncio.gather(*word_tasks, return_exceptions=True)
+        bounded_word_tasks = [_bounded(t) for t in word_tasks]
+        results = await asyncio.gather(*bounded_word_tasks, return_exceptions=True)
 
         # Process results based on task type
         for task_type, result in zip(task_types, results, strict=False):

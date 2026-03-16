@@ -298,7 +298,10 @@ class BaseConnector(ABC):
         return self._api_client
 
     async def __aenter__(self) -> Self:
-        """Async context manager entry."""
+        """Async context manager entry — eagerly create HTTP clients."""
+        # Access properties to trigger lazy creation under single-caller context
+        _ = self.scraper_session
+        _ = self.api_client
         return self
 
     async def __aexit__(self, *args: object) -> None:

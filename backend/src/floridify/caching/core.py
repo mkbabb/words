@@ -455,6 +455,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
 
 # Global instance management
 _global_cache: GlobalCacheManager[FilesystemBackend] | None = None
+_global_cache_lock = asyncio.Lock()
 
 
 async def get_global_cache(
@@ -471,14 +472,14 @@ async def get_global_cache(
     """
     global _global_cache
 
-    if _global_cache is None or force_new:
-        # Create filesystem backend
-        l2_backend = FilesystemBackend()
+    if _global_cache is not None and not force_new:
+        return _global_cache
 
-        # Create global cache manager
-        _global_cache = GlobalCacheManager(l2_backend)
-
-        logger.info("Global cache manager initialized")
+    async with _global_cache_lock:
+        if _global_cache is None or force_new:
+            l2_backend = FilesystemBackend()
+            _global_cache = GlobalCacheManager(l2_backend)
+            logger.info("Global cache manager initialized")
 
     return _global_cache
 
