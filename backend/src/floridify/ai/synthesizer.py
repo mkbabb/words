@@ -77,14 +77,13 @@ class DefinitionSynthesizer:
         primary_language = requested_language_codes[0]
 
         # Check for existing synthesized entry
-        if not force_refresh:
-            existing = await DictionaryEntry.find_one(
-                DictionaryEntry.word_id == word_obj.id,
-                DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,
-            )
-            if existing:
-                logger.info(f"Using existing synthesized entry for '{word}'")
-                return existing
+        existing_synthesis = await DictionaryEntry.find_one(
+            DictionaryEntry.word_id == word_obj.id,
+            DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,
+        )
+        if existing_synthesis and not force_refresh:
+            logger.info(f"Using existing synthesized entry for '{word}'")
+            return existing_synthesis
 
         # Extract all definitions from providers
         # Collect all definition IDs for batch query

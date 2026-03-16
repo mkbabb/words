@@ -16,7 +16,15 @@ from typing import Any
 
 from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
-from ..models.dictionary import Definition, DictionaryEntry, Word
+from ..models.base import AudioMedia, ImageMedia
+from ..models.dictionary import (
+    Definition,
+    DictionaryEntry,
+    Example,
+    Fact,
+    Pronunciation,
+    Word,
+)
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +47,54 @@ async def _resolve_word_text(word_id: Any) -> str:
     except Exception:
         pass
     return "<unknown>"
+
+
+async def _cleanup_replaced_children(
+    old_entry: DictionaryEntry,
+    new_entry: DictionaryEntry,
+) -> None:
+    """Delete child documents that are no longer referenced by the updated entry."""
+
+    # --- Definitions (and their Examples) ---
+    old_def_ids = set(old_entry.definition_ids)
+    new_def_ids = set(new_entry.definition_ids)
+    removed_def_ids = old_def_ids - new_def_ids
+
+    if removed_def_ids:
+        for def_id in removed_def_ids:
+            definition = await Definition.get(def_id)
+            if definition and definition.example_ids:
+                await Example.find({"_id": {"$in": definition.example_ids}}).delete()
+            if definition:
+                await definition.delete()
+        logger.debug(f"Cleaned up {len(removed_def_ids)} replaced definitions")
+
+    # --- Pronunciation (and its AudioMedia) ---
+    if old_entry.pronunciation_id and old_entry.pronunciation_id != new_entry.pronunciation_id:
+        old_pron = await Pronunciation.get(old_entry.pronunciation_id)
+        if old_pron:
+            if old_pron.audio_file_ids:
+                await AudioMedia.find({"_id": {"$in": old_pron.audio_file_ids}}).delete()
+            await old_pron.delete()
+        logger.debug(f"Cleaned up replaced pronunciation {old_entry.pronunciation_id}")
+
+    # --- Facts ---
+    old_fact_ids = set(old_entry.fact_ids)
+    new_fact_ids = set(new_entry.fact_ids)
+    removed_fact_ids = old_fact_ids - new_fact_ids
+
+    if removed_fact_ids:
+        await Fact.find({"_id": {"$in": list(removed_fact_ids)}}).delete()
+        logger.debug(f"Cleaned up {len(removed_fact_ids)} replaced facts")
+
+    # --- Images ---
+    old_img_ids = set(old_entry.image_ids)
+    new_img_ids = set(new_entry.image_ids)
+    removed_img_ids = old_img_ids - new_img_ids
+
+    if removed_img_ids:
+        await ImageMedia.find({"_id": {"$in": list(removed_img_ids)}}).delete()
+        logger.debug(f"Cleaned up {len(removed_img_ids)} replaced images")
 
 
 async def save_entry_versioned(
@@ -99,6 +155,7 @@ async def save_entry_versioned(
             DictionaryEntry.provider == entry.provider,
         )
         if existing_live:
+            await _cleanup_replaced_children(existing_live, entry)
             existing_live.definition_ids = entry.definition_ids
             existing_live.pronunciation_id = entry.pronunciation_id
             existing_live.fact_ids = entry.fact_ids
@@ -179,3 +236,43 @@ async def save_definitions_batch_versioned(
     async with asyncio.TaskGroup() as tg:
         for d in definitions:
             tg.create_task(save_definition_versioned(d, word_text))
+
+
+async def save_pronunciation_versioned(
+    pronunciation: Pronunciation,
+    word: str,
+    config: VersionConfig | None = None,
+) -> None:
+    """Save pronunciation with L3 version history."""
+    manager = get_version_manager()
+    resource_id = f"pron:{word}:{pronunciation.id}"
+    pron_dict = pronunciation.model_dump(mode="json")
+
+    await manager.save(
+        resource_id=resource_id,
+        resource_type=ResourceType.DICTIONARY,
+        namespace=CacheNamespace.DICTIONARY,
+        content=pron_dict,
+        config=config or VersionConfig(),
+        metadata={"word": word, "type": "pronunciation"},
+    )
+
+
+async def save_fact_versioned(
+    fact: Fact,
+    word: str,
+    config: VersionConfig | None = None,
+) -> None:
+    """Save fact with L3 version history."""
+    manager = get_version_manager()
+    resource_id = f"fact:{word}:{fact.id}"
+    fact_dict = fact.model_dump(mode="json")
+
+    await manager.save(
+        resource_id=resource_id,
+        resource_type=ResourceType.DICTIONARY,
+        namespace=CacheNamespace.DICTIONARY,
+        content=fact_dict,
+        config=config or VersionConfig(),
+        metadata={"word": word, "type": "fact"},
+    )

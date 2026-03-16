@@ -251,6 +251,10 @@ async def enhance_definitions_parallel(
         if SynthesisComponent.EXAMPLES in components and (
             not definition.example_ids or force_refresh
         ):
+            # If force refreshing, clear old examples first to prevent accumulation
+            if force_refresh and definition.example_ids:
+                await Example.find({"_id": {"$in": definition.example_ids}}).delete()
+                definition.example_ids = []
             tasks.append(
                 generate_examples(
                     word.text, definition, ai, count=counts.examples, state_tracker=state_tracker

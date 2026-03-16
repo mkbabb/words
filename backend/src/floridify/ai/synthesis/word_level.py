@@ -18,6 +18,7 @@ from ...models.relationships import WordForm
 from ...utils.language_precedence import (
     language_code,
 )
+from ...storage.dictionary import save_fact_versioned, save_pronunciation_versioned
 from ...utils.logging import get_logger
 from ..connector import AIConnector
 
@@ -97,6 +98,7 @@ async def _clone_and_enhance_pronunciation(
 
     await pronunciation.save()
     await _generate_audio_files(pronunciation, word, language)
+    await save_pronunciation_versioned(pronunciation, word)
 
     return pronunciation
 
@@ -133,6 +135,7 @@ async def _create_pronunciation(
 
         # Generate audio files
         await _generate_audio_files(pronunciation, word, language)
+        await save_pronunciation_versioned(pronunciation, word)
 
         return pronunciation
 
@@ -300,6 +303,7 @@ async def generate_facts(
                 model_info=ai.last_model_info,  # Use full model info from AI connector
             )
             await fact.save()
+            await save_fact_versioned(fact, word.text)
             facts.append(fact)
 
         return facts
