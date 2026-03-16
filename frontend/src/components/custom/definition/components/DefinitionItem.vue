@@ -3,7 +3,8 @@
         :id="isFirstInGroup ? `${definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}` : `def-${definitionIndex}`"
         :data-definition-index="definitionIndex"
         :data-part-of-speech="`${definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}`"
-        class="space-y-2"
+        class="space-y-2 animate-def-fade-in"
+        :style="{ animationDelay: `${definitionIndex * 40}ms` }"
     >
         <!-- Separator for definitions within same cluster -->
         <hr v-if="isSeparatorNeeded" class="my-2 border-border/50" />
@@ -41,24 +42,30 @@
                 definitionIndex + 1
             }}</sup>
 
-            <!-- Frequency stars (edit mode) — inline with POS -->
-            <div v-if="editModeEnabled && (definition.frequency_band || editModeEnabled)" class="ml-auto flex items-center gap-1">
-                <span class="text-xs text-muted-foreground">Freq:</span>
-                <div class="flex gap-0.5">
-                    <button
-                        v-for="star in 5"
-                        :key="star"
-                        @click="
-                            fields.frequency_band.value = star;
-                            fields.frequency_band.isDirty = true;
-                            save();
-                        "
-                        class="text-sm transition-colors hover:scale-110"
-                        :class="star <= (fields.frequency_band.value || 0) ? 'text-yellow-500' : 'text-muted-foreground/30'"
-                    >
-                        &#9733;
-                    </button>
+            <!-- Frequency temperature slider (edit mode) -->
+            <div v-if="editModeEnabled" class="ml-auto flex items-center gap-2">
+                <span class="text-[10px] text-muted-foreground/60">Freq</span>
+                <div class="relative flex items-center">
+                    <div
+                        class="h-1.5 w-16 rounded-full"
+                        :style="{ background: TEMPERATURE_GRADIENT }"
+                    />
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        :value="(fields.frequency_band.value || 3) * 20"
+                        class="freq-slider absolute inset-0 h-1.5 w-16 cursor-pointer appearance-none bg-transparent"
+                        :style="{ '--thumb-color': temperatureColor((fields.frequency_band.value || 3) / 5) }"
+                        @input="handleFrequencySlider($event)"
+                    />
                 </div>
+                <span
+                    class="min-w-[1ch] text-center text-[10px] font-mono font-medium"
+                    :style="{ color: temperatureColor((fields.frequency_band.value || 3) / 5) }"
+                >
+                    {{ fields.frequency_band.value || '—' }}
+                </span>
             </div>
 
             <!-- Streaming Indicator -->
@@ -73,7 +80,7 @@
             </div>
         </div>
 
-        <div class="border-l-2 border-accent pl-4">
+        <div class="border-l-2 border-accent pl-4 transition-colors duration-300" :style="frequencyTemperatureStyle">
             <!-- Definition Text with Progressive Loading -->
             <div v-if="definition.text">
                 <EditableField
@@ -302,6 +309,7 @@ import ExampleListEditable from './ExampleListEditable.vue';
 import SynonymListEditable from './SynonymListEditable.vue';
 import EditableField from './EditableField.vue';
 import { DictionaryProvider } from '@/types/api';
+import { TEMPERATURE_GRADIENT, temperatureColor } from '@/utils/animations';
 import { logger } from '@/utils/logger';
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -333,6 +341,21 @@ interface DefinitionItemProps {
 const contentStore = useContentStore();
 const notificationStore = useNotificationStore();
 const props = defineProps<DefinitionItemProps>();
+
+// Frequency temperature visualization (continuous 0.0-1.0 → border color)
+const frequencyTemperatureStyle = computed(() => {
+    const score = props.definition.frequency_score;
+    if (score == null) return {};
+    return { borderLeftColor: temperatureColor(score) };
+});
+
+function handleFrequencySlider(e: Event) {
+    const value = Math.round(parseInt((e.target as HTMLInputElement).value) / 20);
+    const clamped = Math.max(1, Math.min(5, value));
+    fields.frequency_band.value = clamped;
+    fields.frequency_band.isDirty = true;
+    save();
+}
 
 // Streaming indicators
 const isStreaming = computed(() => props.isStreaming || false);
@@ -437,3 +460,35 @@ async function handleExampleRegenerate(index: number) {
     }
 }
 </script>
+
+<style scoped>
+@keyframes defFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-def-fade-in {
+    animation: defFadeIn 0.3s ease both;
+}
+
+.freq-slider::-webkit-slider-thumb {
+    appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 9999px;
+    background: var(--thumb-color, hsl(40, 80%, 55%));
+    border: 2px solid hsl(var(--background));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: transform 0.15s ease;
+}
+.freq-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+}
+.freq-slider::-moz-range-thumb {
+    height: 12px;
+    width: 12px;
+    border-radius: 9999px;
+    background: var(--thumb-color, hsl(40, 80%, 55%));
+    border: 2px solid hsl(var(--background));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+</style>
