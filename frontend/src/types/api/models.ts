@@ -94,6 +94,7 @@ export interface SourceReference {
     entry_id: string;
     entry_version: string;
     definition_ids: string[];
+    richness_score?: number;
 }
 
 export interface SourceVersionSpec {
@@ -106,6 +107,26 @@ export interface Etymology {
     text: string;
     language?: string;
     period?: string;
+}
+
+// Synonym Chooser — MW-style comparative essay
+export interface SynonymComparison {
+    word: string;
+    distinction: string;
+}
+
+export interface SynonymChooser {
+    essay: string;
+    synonyms_compared: SynonymComparison[];
+    model_info?: ModelInfo;
+}
+
+// Phrase/Idiom
+export interface Phrase {
+    phrase: string;
+    meaning: string;
+    example?: string;
+    usage_register?: string; // formal, informal, literary, archaic
 }
 
 // Model Info (for AI-generated content)
@@ -197,6 +218,7 @@ export interface Definition extends BaseMetadata {
     transitivity?: 'transitive' | 'intransitive' | 'both';
     cefr_level?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
     frequency_band?: number; // 1-5
+    frequency_score?: number; // 0.0-1.0 continuous, for temperature visualization
     accessed_at?: string;
     created_by?: string;
     updated_by?: string;
@@ -220,10 +242,13 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
     definition_ids: string[];
     definitions?: Definition[]; // Populated in responses
     etymology?: Etymology;
+    synonym_chooser?: SynonymChooser; // Comparative synonym essay
+    phrases?: Phrase[]; // Phrases & idioms
     fact_ids: string[];
     image_ids: string[];
     images?: ImageMedia[]; // Populated in responses
     model_info?: ModelInfo | null;
+    richness_score?: number;
     source_provider_data_ids: string[];
     source_entries?: SourceReference[]; // Provenance: which provider entries fed synthesis
     accessed_at?: string;

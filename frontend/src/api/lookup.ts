@@ -28,7 +28,52 @@ interface SSEChunkEvent {
     [key: string]: unknown;
 }
 
+/** Lightweight preview for inline word lookup popovers. */
+export interface WordPreview {
+    word: string;
+    pronunciation?: { phonetic?: string; ipa?: string };
+    definition?: { text: string; part_of_speech: string };
+    has_full_entry: boolean;
+}
+
 export const lookupApi = {
+    /**
+     * Lightweight word preview for inline lookup popovers.
+     * Uses no_ai=true — triggers provider fetch if uncached, but
+     * skips AI synthesis. Provider fetches typically take 3-8s.
+     */
+    async preview(word: string): Promise<WordPreview | null> {
+        try {
+            const response = await api.get<any>(
+                `/lookup/${encodeURIComponent(word)}`,
+                {
+                    timeout: 15_000,
+                    params: { no_ai: true },
+                },
+            );
+            const data = response.data;
+            const firstDef = data.definitions?.[0];
+            return {
+                word: data.word || word,
+                pronunciation: data.pronunciation
+                    ? {
+                          phonetic: data.pronunciation.phonetic,
+                          ipa: data.pronunciation.ipa,
+                      }
+                    : undefined,
+                definition: firstDef
+                    ? {
+                          text: firstDef.text,
+                          part_of_speech: firstDef.part_of_speech,
+                      }
+                    : undefined,
+                has_full_entry: !!data.definitions?.length,
+            };
+        } catch {
+            return null;
+        }
+    },
+
     // Main word lookup - GET /lookup/{word}
     async lookup(
         word: string,

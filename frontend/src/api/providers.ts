@@ -13,6 +13,9 @@ export interface ProviderEntry {
     antonyms: string[];
     examples: Array<{ text: string; source?: string }>;
   }>;
+  richness_score?: number;
+  definition_count?: number;
+  fetched_at?: string;
 }
 
 export const providersApi = {
