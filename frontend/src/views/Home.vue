@@ -47,25 +47,20 @@
 
                     <!-- Main Content -->
                     <div :class="['flex-1 max-w-5xl mx-auto', (lookupSubMode === 'suggestions' || searchBar.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
-                        <!-- Animated Content Cards -->
+                        <!-- Mode-level transition: lookup ↔ wordlist ↔ suggestions -->
                         <Transition
                     name="content-switch"
                     mode="out-in"
                     :duration="{ enter: 300, leave: 250 }"
                 >
-                    <!-- Definition Content -->
+                    <!-- Definition Content (stays mounted across word changes) -->
                     <div v-if="searchBar.searchMode === 'lookup' && lookupSubMode !== 'suggestions'" key="lookup">
-                        <!-- Loading State -->
-                        <div v-if="loading.isSearching.value && loading.showLoadingModal.value && !content.partialEntry" class="space-y-8">
-                            <DefinitionSkeleton />
-                        </div>
-
-                        <!-- Definition Display -->
-                        <div v-else-if="content.isStreamingData || content.partialEntry || currentEntry || content.definitionError" class="space-y-8">
+                        <!-- Definition Display — mount when we have data OR are actively fetching -->
+                        <div v-if="content.isStreamingData || content.partialEntry || currentEntry || content.definitionError || loading.isSearching.value" class="space-y-8">
                             <DefinitionDisplay />
                         </div>
 
-                        <!-- Empty State / Help Screen -->
+                        <!-- Empty State / Help Screen (no entry, not loading) -->
                         <div v-else class="py-8">
                             <EmptyState
                                 title="Look up anything you're curious about"
@@ -137,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
@@ -149,9 +144,18 @@ import { DefinitionSkeleton } from '@/components/custom/definition';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
-import WordListView from '@/components/custom/wordlist/WordListView.vue';
-import { ProgressiveSidebar, WordlistProgressiveSidebar } from '@/components/custom/navigation';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
+
+// Lazy-loaded: only parsed when the user switches to the relevant mode
+const WordListView = defineAsyncComponent(
+    () => import('@/components/custom/wordlist/WordListView.vue'),
+);
+const ProgressiveSidebar = defineAsyncComponent(
+    () => import('@/components/custom/navigation/ProgressiveSidebar.vue'),
+);
+const WordlistProgressiveSidebar = defineAsyncComponent(
+    () => import('@/components/custom/navigation/WordlistProgressiveSidebar.vue'),
+);
 
 const { searchBar, content, ui, loading } = useStores();
 const wordlistMode = useWordlistMode();
@@ -197,7 +201,9 @@ watch(() => route.fullPath, async () => {
         // Always fetch when the word changes — skip only if we already have this exact word.
         // This is the single source of truth for definition fetches on route changes.
         if (!content.currentEntry || content.currentEntry.word !== word) {
-            // Clear stale content immediately so the old definition never lingers
+            // Clear the old entry so child components (ProviderViewTabs) reset.
+            // The card stays mounted because isStreamingData becomes true when
+            // the SSE starts, before currentEntry is set.
             content.clearCurrentEntry();
             try {
                 const definition = await orchestrator.getDefinition(word, {

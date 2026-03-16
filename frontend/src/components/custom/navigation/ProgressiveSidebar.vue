@@ -5,6 +5,7 @@
     >
         <!-- Navigation Sections -->
         <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0 overflow-y-auto">
+            <TransitionGroup name="sidebar-item" tag="div" class="space-y-0">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
                 <!-- Special handling for etymology -->
                 <template v-if="cluster.clusterId === 'etymology'">
@@ -46,6 +47,7 @@
                     />
                 </template>
             </template>
+            </TransitionGroup>
         </nav>
     </div>
 </template>
@@ -122,3 +124,23 @@ const handlePartOfSpeechClick = (clusterId: string, partOfSpeech: string) => {
     scrollToPartOfSpeech(clusterId, partOfSpeech);
 };
 </script>
+
+<style scoped>
+.sidebar-item-enter-active {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.sidebar-item-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.sidebar-item-enter-from {
+    opacity: 0;
+    transform: translateX(-8px);
+}
+.sidebar-item-leave-to {
+    opacity: 0;
+    transform: translateX(-8px);
+}
+.sidebar-item-move {
+    transition: transform 0.25s ease;
+}
+</style>

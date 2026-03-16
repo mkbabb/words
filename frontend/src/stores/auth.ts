@@ -1,26 +1,42 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, type Ref } from 'vue';
 import { useAuth, useUser } from '@clerk/vue';
 import { usersApi } from '@/api/users';
 import { setAuthTokenGetter } from '@/api/core';
 import type { UserProfile, UserRole } from '@/types/api/models';
 
+// Dev mode: grant admin access without Clerk login
+const DEV_ADMIN = import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN === 'true';
+
 export const useAuthStore = defineStore('auth', () => {
-  // Clerk composables (reactive)
-  const { isSignedIn, getToken } = useAuth();
-  const { user: clerkUser } = useUser();
+  // Default refs — used when Clerk is unavailable
+  let isSignedIn: Ref<boolean> = ref(false);
+  let clerkUser: Ref<any> = ref(null);
+  let getToken: Ref<() => Promise<string | null>> = ref(async () => null);
+
+  // Clerk composables must be called in setup context (here).
+  // When Clerk plugin is not installed (no publishable key), they throw.
+  try {
+    const auth = useAuth();
+    const user = useUser();
+    isSignedIn = auth.isSignedIn as Ref<boolean>;
+    clerkUser = user.user as Ref<any>;
+    getToken = auth.getToken as Ref<() => Promise<string | null>>;
+  } catch {
+    // Clerk not installed — fall through to dev admin or unauthenticated
+  }
 
   // Backend profile state
   const profile = ref<UserProfile | null>(null);
   const profileLoading = ref(false);
   const profileError = ref<string | null>(null);
 
-  // Dev mode: grant admin access without login (dev only)
-  const devAdmin = import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN === 'true';
-
   // Computed auth state
-  const isAuthenticated = computed(() => devAdmin || isSignedIn.value === true);
+  const isAuthenticated = computed(() => DEV_ADMIN || isSignedIn.value === true);
   const user = computed(() => {
+    if (DEV_ADMIN && !clerkUser.value) {
+      return { name: 'Dev Admin', email: '', avatar: undefined };
+    }
     if (!clerkUser.value) return null;
     return {
       name: clerkUser.value.fullName || clerkUser.value.username || '',
@@ -30,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
   });
 
   const role = computed<UserRole>(() => {
-    if (devAdmin) return 'admin';
+    if (DEV_ADMIN) return 'admin';
     return profile.value?.role ?? 'user';
   });
   const isAdmin = computed(() => role.value === 'admin');
@@ -38,7 +54,6 @@ export const useAuthStore = defineStore('auth', () => {
     () => role.value === 'premium' || role.value === 'admin'
   );
 
-  // Token getter for API interceptor
   async function getAuthToken(): Promise<string | null> {
     if (!isSignedIn.value) return null;
     try {
@@ -48,7 +63,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Fetch backend profile (role, preferences)
   async function fetchProfile(): Promise<void> {
     if (!isSignedIn.value) return;
     profileLoading.value = true;
@@ -63,16 +77,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Sign out (Clerk handles the actual sign-out flow)
   function clearProfile(): void {
     profile.value = null;
     profileError.value = null;
   }
 
-  // Wire up token getter for API interceptor
   setAuthTokenGetter(getAuthToken);
 
-  // Auto-fetch profile when sign-in state changes
   watch(isSignedIn, async (signedIn) => {
     if (signedIn) {
       await fetchProfile();
@@ -82,19 +93,14 @@ export const useAuthStore = defineStore('auth', () => {
   }, { immediate: true });
 
   return {
-    // State
     profile,
     profileLoading,
     profileError,
-
-    // Computed
     isAuthenticated,
     isAdmin,
     isPremium,
     role,
     user,
-
-    // Actions
     getAuthToken,
     fetchProfile,
     clearProfile,

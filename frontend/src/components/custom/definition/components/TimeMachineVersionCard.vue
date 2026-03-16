@@ -92,6 +92,13 @@
                         </div>
                     </FieldWithDiff>
 
+                    <!-- Edit metadata (who/what/why) -->
+                    <EditMetadataBlock
+                        v-if="version.edit_metadata"
+                        :metadata="version.edit_metadata"
+                        class="mt-2"
+                    />
+
                     <!-- Storage mode -->
                     <div class="mt-2 text-[10px] text-muted-foreground/40">
                         {{ version.storage_mode === 'snapshot' ? 'Full snapshot' : 'Delta' }}
@@ -160,6 +167,7 @@ import { BookOpen, Maximize2, RotateCcw } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ProviderIcons from './ProviderIcons.vue';
+import EditMetadataBlock from './EditMetadataBlock.vue';
 import { useAuthStore } from '@/stores/auth';
 import type { VersionSummary, VersionDetailResponse } from '@/types/api';
 

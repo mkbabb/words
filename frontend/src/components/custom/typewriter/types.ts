@@ -86,10 +86,10 @@ export const DEFAULTS = {
     correctionSpeedMultiplier: 0.5,
     correctionBaseDelay: 40,
 
-    backspaceBaseDelay: 45,
-    backspaceAcceleration: 0.05,
-    preBackspacePause: 400,
-    postBackspacePause: 250,
+    backspaceBaseDelay: 30,
+    backspaceAcceleration: 0.08,
+    preBackspacePause: 200,
+    postBackspacePause: 150,
 
     cursorVisible: true,
     cursorBlink: true,

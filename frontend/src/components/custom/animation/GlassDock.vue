@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useDockState } from '@/composables/useDockState';
 
 const props = withDefaults(
     defineProps<{
@@ -15,79 +16,103 @@ const props = withDefaults(
     },
 );
 
-const expanded = ref(!props.startCollapsed);
-let collapseTimer: ReturnType<typeof setTimeout> | null = null;
+const rootEl = ref<HTMLElement | null>(null);
 
-function clearTimer() {
-    if (collapseTimer) {
-        clearTimeout(collapseTimer);
-        collapseTimer = null;
+const {
+    expanded,
+    isPinned,
+    onMouseEnter,
+    onMouseLeave,
+    onFocusIn,
+    onFocusOut,
+    onClickCollapsed,
+    keepOpen,
+    release,
+    expand,
+    collapse,
+} = useDockState({
+    collapseDelay: props.manual ? Number.MAX_SAFE_INTEGER : props.collapseDelay,
+    rootEl,
+});
+
+// Handle startCollapsed / manual props
+onMounted(() => {
+    if (!props.startCollapsed || props.manual) {
+        // Force expand immediately, bypassing the ignoreEvents guard
+        expand();
+        // If the ignoreEvents guard blocked it, retry after the guard lifts
+        setTimeout(() => {
+            if (!expanded.value) {
+                expand();
+            }
+        }, 650);
+    }
+});
+
+function toggle() {
+    if (expanded.value) {
+        collapse();
+    } else {
+        expand();
     }
 }
 
-function scheduleCollapse() {
+// In manual mode, wrap mouse/focus handlers to no-op
+function handleMouseEnter() {
     if (props.manual) return;
-    clearTimer();
-    collapseTimer = setTimeout(() => {
-        expanded.value = false;
-    }, props.collapseDelay);
+    onMouseEnter();
 }
 
-function onEnter() {
+function handleMouseLeave(e: MouseEvent) {
     if (props.manual) return;
-    clearTimer();
-    expanded.value = true;
+    onMouseLeave(e);
 }
 
-function onLeave() {
+function handleFocusIn() {
     if (props.manual) return;
-    scheduleCollapse();
+    onFocusIn();
 }
 
-function onFocusOut(e: FocusEvent) {
+function handleFocusOut(e: FocusEvent) {
     if (props.manual) return;
-    const root = e.currentTarget as HTMLElement;
-    if (e.relatedTarget && root.contains(e.relatedTarget as Node)) return;
-    scheduleCollapse();
+    onFocusOut(e);
 }
 
-function toggle() {
-    clearTimer();
-    expanded.value = !expanded.value;
-}
-
-function onClickSummary() {
+function handleClickCollapsed() {
     if (props.manual) {
         toggle();
     } else {
-        clearTimer();
-        expanded.value = true;
-        scheduleCollapse();
+        onClickCollapsed();
     }
 }
 
-defineExpose({ expanded, expand: () => { clearTimer(); expanded.value = true; }, collapse: () => { expanded.value = false; }, toggle });
-onUnmounted(clearTimer);
+defineExpose({ expanded, isPinned, expand, collapse, keepOpen, release, toggle });
 </script>
 
 <template>
     <div
+        ref="rootEl"
         class="glass-dock"
         :class="{ expanded, collapsed: !expanded }"
-        @mouseenter="onEnter"
-        @mouseleave="onLeave"
-        @focusin="onEnter"
-        @focusout="onFocusOut"
+        @mouseenter="handleMouseEnter"
+        @mouseleave="handleMouseLeave"
+        @focusin="handleFocusIn"
+        @focusout="handleFocusOut"
     >
         <!-- Expanded content -->
         <Transition name="dock-fade">
-            <div v-if="expanded" class="dock-layer dock-layer--full">
+            <div v-if="expanded" class="dock-layer dock-layer--full" :inert="!expanded">
                 <slot />
             </div>
         </Transition>
         <!-- Collapsed summary -->
         <Transition name="dock-fade">
-            <div v-if="!expanded" class="dock-layer dock-layer--summary" @click="onClickSummary">
+            <div
+                v-if="!expanded"
+                class="dock-layer dock-layer--summary"
+                :inert="expanded"
+                @click="handleClickCollapsed"
+            >
                 <slot name="collapsed" />
             </div>
         </Transition>

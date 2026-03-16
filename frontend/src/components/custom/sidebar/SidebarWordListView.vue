@@ -175,11 +175,13 @@ import CreateWordListModal from '../wordlist/modals/CreateWordListModal.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
+import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { logger } from '@/utils/logger';
 
 const searchBarStore = useSearchBarStore();
 const wordlistMode = useWordlistMode();
+const auth = useAuthStore();
 const { toast } = useToast();
 
 // Access UI store for sidebar control
@@ -332,10 +334,13 @@ const transformWordlistFromAPI = (apiWordlist: any): WordList => {
 // Load wordlists from API
 const loadWordlists = async () => {
     if (isLoading.value) return;
+    if (!auth.isAuthenticated) {
+        wordlists.value = [];
+        return;
+    }
 
     isLoading.value = true;
     try {
-        // Remove owner_id filter to get all wordlists from DB as requested
         const response = await wordlistApi.getWordlists({
             limit: 50,
         });

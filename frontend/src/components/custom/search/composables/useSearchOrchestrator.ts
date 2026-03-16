@@ -156,7 +156,10 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
         };
 
         loading.startOperation();
-        loading.setShowLoadingModal(true);
+
+        // Delay showing the modal — cached lookups return in <200ms and don't need it.
+        // Only show if the lookup takes longer than 400ms (provider fetch / synthesis).
+        const modalTimer = setTimeout(() => loading.setShowLoadingModal(true), 400);
 
         try {
             if (options?.onProgress) {
@@ -179,6 +182,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
             return await lookupApi.lookup(word, apiOptions);
         } finally {
+            clearTimeout(modalTimer);
             activeStreamController = null;
             loading.setShowLoadingModal(false);
             loading.endOperation();

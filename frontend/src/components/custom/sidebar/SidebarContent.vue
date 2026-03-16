@@ -133,6 +133,7 @@ import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';
 import type { SynthesizedDictionaryEntry, WordList } from '@/types';
 import { wordlistApi } from '@/api';
+import { useAuthStore } from '@/stores/auth';
 import { logger } from '@/utils/logger';
 
 interface Props {
@@ -145,6 +146,7 @@ defineProps<Props>();
 const { history, ui, searchBar, content } = useStores();
 const wordlistMode = useWordlistMode();
 const searchBarStore = useSearchBarStore();
+const auth = useAuthStore();
 const router = useRouter();
 const { recentLookups, aiQueryHistory } = storeToRefs(history);
 
@@ -288,6 +290,10 @@ const handleCollapsedWordlistClick = async (wordlistId: string) => {
 };
 
 const loadRecentWordlists = async () => {
+    if (!auth.isAuthenticated) {
+        recentWordlists.value = [];
+        return;
+    }
     try {
         const response = await wordlistApi.getWordlists({
             limit: 8,

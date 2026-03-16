@@ -25,7 +25,8 @@
         <!-- Modal container with proper height management and scrolling -->
         <div 
           ref="contentRef"
-          class="modal-content relative z-content w-full rounded-2xl glass-medium cartoon-shadow-lg overflow-hidden flex flex-col"
+          class="modal-content relative z-content w-full rounded-2xl bg-background/95 backdrop-blur-md border border-border/30 cartoon-shadow-lg overflow-hidden flex flex-col"
+          :style="{ backgroundImage: 'var(--paper-clean-texture)', backgroundBlendMode: 'multiply' }"
           :class="[
             maxWidthClass,
             maxHeightClass,
