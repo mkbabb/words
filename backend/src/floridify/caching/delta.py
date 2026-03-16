@@ -110,6 +110,95 @@ def compute_diff_between(
     return json.loads(json.dumps(diff.to_dict(), default=str))
 
 
+def compute_field_level_changes(
+    old: dict[str, Any],
+    new: dict[str, Any],
+    max_value_length: int = 200,
+) -> list[dict[str, str | None]]:
+    """Extract structured field-level changes from two content dicts.
+
+    Returns a list of FieldChange-shaped dicts with field_path, change_type,
+    and truncated old/new values suitable for UI display.
+
+    Args:
+        old: Previous version content
+        new: Current version content
+        max_value_length: Truncate values longer than this
+
+    Returns:
+        List of {field_path, change_type, old_value, new_value} dicts
+    """
+    import json as _json
+
+    diff = DeepDiff(old, new, verbose_level=2)
+    if not diff:
+        return []
+
+    def _truncate(val: Any) -> str | None:
+        if val is None:
+            return None
+        s = str(val) if not isinstance(val, str) else val
+        return s[:max_value_length] + "..." if len(s) > max_value_length else s
+
+    def _parse_path(path: str) -> str:
+        """Convert DeepDiff path like "root['etymology']['text']" to "etymology.text"."""
+        import re
+
+        parts = re.findall(r"\['([^']+)'\]|\[(\d+)\]", path)
+        segments = []
+        for key, idx in parts:
+            if key:
+                segments.append(key)
+            elif idx:
+                segments.append(f"[{idx}]")
+        return ".".join(segments) if segments else path
+
+    changes: list[dict[str, str | None]] = []
+    diff_dict = _json.loads(_json.dumps(diff.to_dict(), default=str))
+
+    for path, change in (diff_dict.get("values_changed") or {}).items():
+        changes.append(
+            {
+                "field_path": _parse_path(path),
+                "change_type": "modified",
+                "old_value": _truncate(change.get("old_value")),
+                "new_value": _truncate(change.get("new_value")),
+            }
+        )
+
+    for path, value in (diff_dict.get("dictionary_item_added") or {}).items():
+        changes.append(
+            {
+                "field_path": _parse_path(path),
+                "change_type": "added",
+                "old_value": None,
+                "new_value": _truncate(value),
+            }
+        )
+
+    for path, value in (diff_dict.get("dictionary_item_removed") or {}).items():
+        changes.append(
+            {
+                "field_path": _parse_path(path),
+                "change_type": "removed",
+                "old_value": _truncate(value),
+                "new_value": None,
+            }
+        )
+
+    for path, change in (diff_dict.get("type_changes") or {}).items():
+        changes.append(
+            {
+                "field_path": _parse_path(path),
+                "change_type": "modified",
+                "old_value": _truncate(change.get("old_value")),
+                "new_value": _truncate(change.get("new_value")),
+            }
+        )
+
+    return changes
+
+
 def should_keep_as_snapshot(version_num: int, interval: int = 10) -> bool:
     """Determine if a version should be stored as a full snapshot.
 

@@ -172,6 +172,9 @@ class VersionInfo(BaseModel):
     storage_mode: Literal["snapshot", "delta"] = "snapshot"
     delta_base_id: PydanticObjectId | None = None  # Nearest snapshot this delta reconstructs from
 
+    # Edit metadata: who/when/why for this version change
+    edit_metadata: dict[str, Any] | None = None  # Serialized EditMetadata
+
     @model_validator(mode="after")
     def validate_delta_has_base(self) -> VersionInfo:
         """Ensure delta_base_id is set when storage_mode is 'delta'."""

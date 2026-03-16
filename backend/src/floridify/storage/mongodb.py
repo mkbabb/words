@@ -396,6 +396,39 @@ async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
     )
 
 
+async def get_best_existing_entry(
+    word_text: str,
+) -> tuple[DictionaryEntry | None, bool]:
+    """Find the best existing DictionaryEntry for a word, regardless of provider.
+
+    Sorts by definition count descending — synthesis entries (highest quality)
+    naturally float to the top, followed by wiktionary, then apple_dict.
+
+    Returns:
+        (entry, is_synthesis) — the best entry and whether it's a SYNTHESIS entry.
+        (None, False) if no entry with definitions exists.
+    """
+    await _ensure_initialized()
+
+    word = await Word.find_one(Word.text == word_text)
+    if not word:
+        return None, False
+
+    # Find all entries with definitions for this word (typically 1-3 entries)
+    entries = await DictionaryEntry.find(
+        DictionaryEntry.word_id == word.id,
+        {"definition_ids": {"$exists": True, "$ne": []}},
+    ).to_list()
+
+    if not entries:
+        return None, False
+
+    # Pick the entry with the most definitions (synthesis > wiktionary > apple_dict)
+    best = max(entries, key=lambda e: len(e.definition_ids) if e.definition_ids else 0)
+    is_synthesis = best.provider == DictionaryProvider.SYNTHESIS
+    return best, is_synthesis
+
+
 async def save_synthesized_entry(entry: DictionaryEntry) -> None:
     """Save synthesized dictionary entry with version history."""
     try:

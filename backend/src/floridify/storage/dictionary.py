@@ -103,6 +103,7 @@ async def save_entry_versioned(
     *,
     config: VersionConfig | None = None,
     extra_metadata: dict[str, Any] | None = None,
+    edit_metadata: Any | None = None,
 ) -> None:
     """Save DictionaryEntry with version chain + live document upsert.
 
@@ -111,6 +112,7 @@ async def save_entry_versioned(
         word: Word text for resource ID.
         config: Optional version config override.
         extra_metadata: Additional metadata to include in the version snapshot.
+        edit_metadata: Optional EditMetadata for version audit trail.
 
     """
     manager = get_version_manager()
@@ -138,13 +140,25 @@ async def save_entry_versioned(
     if extra_metadata:
         metadata.update(extra_metadata)
 
+    # Attach edit metadata for version audit trail
+    version_config = config or VersionConfig()
+    if edit_metadata is not None:
+        edit_meta_dict = (
+            edit_metadata.model_dump(mode="json")
+            if hasattr(edit_metadata, "model_dump")
+            else edit_metadata
+        )
+        version_config = version_config.model_copy(
+            update={"metadata": {**version_config.metadata, "edit_metadata": edit_meta_dict}}
+        )
+
     # L3 version snapshot (canonical history)
     await manager.save(
         resource_id=resource_id,
         resource_type=ResourceType.DICTIONARY,
         namespace=CacheNamespace.DICTIONARY,
         content=entry_dict,
-        config=config or VersionConfig(),
+        config=version_config,
         metadata=metadata,
     )
 

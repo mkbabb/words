@@ -255,6 +255,7 @@ class VersionedDataManager:
                 is_latest=True,
                 supersedes=latest.id if latest else None,
                 dependencies=dependencies or [],
+                edit_metadata=config.metadata.get("edit_metadata"),
             ),
             "ttl": config.ttl,
         }

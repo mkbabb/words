@@ -12,6 +12,8 @@ from ....caching.delta import compute_diff_between
 from ....caching.manager import get_version_manager
 from ....caching.models import CacheNamespace, ResourceType, VersionConfig
 from ....models.responses import (
+    EditMetadataSummary,
+    FieldChangeSummary,
     VersionDiffResponse,
     VersionHistoryResponse,
     VersionSummary,
@@ -128,6 +130,35 @@ def _strip_noisy_fields(obj: Any, depth: int = 0) -> None:
             _strip_noisy_fields(item, depth + 1)
 
 
+def _build_edit_metadata_summary(raw: dict[str, Any] | None) -> EditMetadataSummary | None:
+    """Convert raw edit_metadata dict from VersionInfo into a typed summary."""
+    if not raw:
+        return None
+    field_changes = [
+        FieldChangeSummary(**fc) for fc in (raw.get("field_changes") or [])
+    ]
+    return EditMetadataSummary(
+        user_id=raw.get("user_id"),
+        username=raw.get("username"),
+        operation_type=raw.get("operation_type", "manual_edit"),
+        change_reason=raw.get("change_reason"),
+        field_changes=field_changes,
+        synthesis_audit=raw.get("synthesis_audit"),
+    )
+
+
+def _build_version_summary(v: Any) -> VersionSummary:
+    """Build a VersionSummary from a BaseVersionedData document."""
+    return VersionSummary(
+        version=v.version_info.version,
+        created_at=v.version_info.created_at,
+        data_hash=v.version_info.data_hash,
+        storage_mode=v.version_info.storage_mode,
+        is_latest=v.version_info.is_latest,
+        edit_metadata=_build_edit_metadata_summary(v.version_info.edit_metadata),
+    )
+
+
 def _make_resource_id(word: str) -> str:
     """Build the version manager resource_id for a word's synthesized entry."""
     return f"{word}:synthesis"
@@ -153,16 +184,7 @@ async def list_word_versions(word: str) -> VersionHistoryResponse:
     # Sort by version descending (newest first)
     versions.sort(key=lambda v: v.version_info.created_at, reverse=True)
 
-    summaries = [
-        VersionSummary(
-            version=v.version_info.version,
-            created_at=v.version_info.created_at,
-            data_hash=v.version_info.data_hash,
-            storage_mode=v.version_info.storage_mode,
-            is_latest=v.version_info.is_latest,
-        )
-        for v in versions
-    ]
+    summaries = [_build_version_summary(v) for v in versions]
 
     return VersionHistoryResponse(
         resource_id=resource_id,
@@ -300,16 +322,7 @@ async def list_provider_versions(word: str, provider: str) -> VersionHistoryResp
 
     versions.sort(key=lambda v: v.version_info.created_at, reverse=True)
 
-    summaries = [
-        VersionSummary(
-            version=v.version_info.version,
-            created_at=v.version_info.created_at,
-            data_hash=v.version_info.data_hash,
-            storage_mode=v.version_info.storage_mode,
-            is_latest=v.version_info.is_latest,
-        )
-        for v in versions
-    ]
+    summaries = [_build_version_summary(v) for v in versions]
 
     return VersionHistoryResponse(
         resource_id=resource_id,
@@ -423,7 +436,7 @@ async def rollback_word_version(
             detail=f"Version {version} has no inline content to restore",
         )
 
-    # Save as a new version (with rollback metadata)
+    # Save as a new version (with rollback metadata and edit audit trail)
     new_version = await manager.save(
         resource_id=resource_id,
         resource_type=ResourceType.DICTIONARY,
@@ -431,7 +444,13 @@ async def rollback_word_version(
         content=content,
         config=VersionConfig(
             force_rebuild=True,  # Always create new version for rollback
-            metadata={"rollback_from": version},
+            metadata={
+                "rollback_from": version,
+                "edit_metadata": {
+                    "operation_type": "rollback",
+                    "change_reason": f"Rollback to version {version}",
+                },
+            },
         ),
         metadata={"rollback_from": version},
     )
