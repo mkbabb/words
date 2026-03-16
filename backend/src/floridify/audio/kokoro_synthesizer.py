@@ -17,6 +17,8 @@ from .utils import audio_to_mp3
 
 # Language → (kokoro_lang_code, female_voice, male_voice)
 KOKORO_LANG_MAP: dict[str, tuple[str, str, str]] = {
+    "en": ("en-us", "af_heart", "am_michael"),  # English (American)
+    "en-gb": ("en-gb", "bf_emma", "bm_daniel"),  # English (British)
     "fr": ("fr-fr", "ff_siwis", "ff_siwis"),  # Only 1 French voice
     "es": ("es", "ef_dora", "em_alex"),
     "de": (
@@ -131,9 +133,12 @@ class KokoroSynthesizer:
             logger.info("Kokoro-ONNX model loaded")
             return KokoroSynthesizer._model
 
+    # Bump to invalidate cached audio (e.g. after adding fade-out/silence padding)
+    _CACHE_VERSION = 2
+
     def _generate_cache_key(self, text: str, voice: str, lang_code: str) -> str:
         """Generate MD5 cache key."""
-        content = f"kokoro:{text}:{voice}:{lang_code}:{self.config.speaking_rate}"
+        content = f"kokoro:v{self._CACHE_VERSION}:{text}:{voice}:{lang_code}:{self.config.speaking_rate}"
         return hashlib.md5(content.encode()).hexdigest()
 
     def _get_cache_path(self, cache_key: str) -> Path:
@@ -167,7 +172,18 @@ class KokoroSynthesizer:
             text, voice=voice, speed=self.config.speaking_rate, lang=lang_code
         )
 
-        audio_array = np.asarray(samples).squeeze()
+        audio_array = np.asarray(samples, dtype=np.float32).squeeze()
+
+        # Apply a short fade-out (50ms) to prevent click/pop at the end
+        fade_samples = int(sample_rate * 0.05)
+        if len(audio_array) > fade_samples:
+            fade_curve = np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
+            audio_array[-fade_samples:] *= fade_curve
+
+        # Pad with 250ms trailing silence — prevents MP3 encoder truncation
+        pad_samples = int(sample_rate * 0.25)
+        audio_array = np.concatenate([audio_array, np.zeros(pad_samples, dtype=np.float32)])
+
         duration_ms = int(len(audio_array) / sample_rate * 1000)
         mp3_bytes = audio_to_mp3(audio_array, sample_rate)
         return mp3_bytes, duration_ms

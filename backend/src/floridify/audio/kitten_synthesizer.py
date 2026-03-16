@@ -70,9 +70,12 @@ class KittenTTSSynthesizer:
             logger.info("KittenTTS model loaded")
             return KittenTTSSynthesizer._model
 
+    # Bump to invalidate cached audio (e.g. after adding fade-out/silence padding)
+    _CACHE_VERSION = 2
+
     def _generate_cache_key(self, text: str, voice: str) -> str:
         """Generate MD5 cache key."""
-        content = f"kitten:{text}:{voice}:{self.config.speaking_rate}"
+        content = f"kitten:v{self._CACHE_VERSION}:{text}:{voice}:{self.config.speaking_rate}"
         return hashlib.md5(content.encode()).hexdigest()
 
     def _get_cache_path(self, cache_key: str) -> Path:
@@ -99,8 +102,20 @@ class KittenTTSSynthesizer:
         # Lazy: heavyweight module
         import numpy as np
 
-        audio_array = np.asarray(audio_array).squeeze()
+        audio_array = np.asarray(audio_array, dtype=np.float32).squeeze()
         sample_rate = self.config.sample_rate
+
+        # Apply a short fade-out (50ms) to prevent click/pop at the end
+        fade_samples = int(sample_rate * 0.05)
+        if len(audio_array) > fade_samples:
+            fade_curve = np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
+            audio_array[-fade_samples:] *= fade_curve
+
+        # Pad with 250ms trailing silence — prevents MP3 encoder from
+        # truncating the last frame and makes the word sound complete.
+        pad_samples = int(sample_rate * 0.25)
+        audio_array = np.concatenate([audio_array, np.zeros(pad_samples, dtype=np.float32)])
+
         duration_ms = int(len(audio_array) / sample_rate * 1000)
         mp3_bytes = audio_to_mp3(audio_array, sample_rate)
         return mp3_bytes, duration_ms

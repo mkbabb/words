@@ -52,16 +52,46 @@ class TTSGenerateRequest(BaseModel):
 async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
     """Generate TTS audio for a word on demand.
 
-    Body:
-        - word: The word to synthesize
-        - accent: Voice accent (american or british)
-        - voice_gender: Voice gender (male or female)
-
-    Returns:
-        Audio metadata with content URL for playback.
+    Checks MongoDB for an existing cached audio first. If not found,
+    generates via the TTS backend and persists the result to MongoDB
+    for long-term caching.
     """
     from ....audio import get_audio_synthesizer
 
+    # --- 1. Check MongoDB for existing audio ---
+    existing = await AudioMedia.find_one(
+        {"word": body.word, "language": body.language}
+    )
+    if existing:
+        file_path = Path(existing.url)
+        # Resolve relative paths
+        if not file_path.is_absolute():
+            file_path = get_project_root() / file_path
+        if file_path.exists():
+            # Cache hit — return existing
+            subdir = file_path.parent.name
+            filename = file_path.name
+            return ResourceResponse(
+                data={
+                    "id": str(existing.id),
+                    "url": existing.url,
+                    "format": existing.format,
+                    "size_bytes": existing.size_bytes,
+                    "duration_ms": existing.duration_ms,
+                    "accent": existing.accent,
+                    "quality": existing.quality,
+                    "language": existing.language,
+                    "content_url": f"/api/v1/audio/cache/{subdir}/{filename}",
+                },
+                links={
+                    "content": f"/audio/cache/{subdir}/{filename}",
+                },
+            )
+        else:
+            # Stale entry — file missing, delete and regenerate
+            await existing.delete()
+
+    # --- 2. Generate via TTS backend ---
     synthesizer = get_audio_synthesizer()
     audio = await synthesizer.synthesize_word(
         word=body.word,
@@ -73,20 +103,34 @@ async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
     if not audio:
         raise NotFoundException(resource="TTS audio", identifier=body.word)
 
-    # Extract cache path info for content URL
+    # --- 3. Persist to MongoDB for long-term caching ---
+    audio_doc = AudioMedia(
+        url=audio.url,
+        format=audio.format,
+        size_bytes=audio.size_bytes,
+        duration_ms=audio.duration_ms,
+        accent=audio.accent,
+        quality=audio.quality,
+        word=body.word,
+        language=body.language,
+    )
+    await audio_doc.save()
+
+    # --- 4. Return response ---
     file_path = Path(audio.url)
     subdir = file_path.parent.name
     filename = file_path.name
 
     return ResourceResponse(
         data={
-            "id": f"tts-{subdir}-{filename}",
+            "id": str(audio_doc.id),
             "url": audio.url,
             "format": audio.format,
             "size_bytes": audio.size_bytes,
             "duration_ms": audio.duration_ms,
             "accent": audio.accent,
             "quality": audio.quality,
+            "language": body.language,
             "content_url": f"/api/v1/audio/cache/{subdir}/{filename}",
         },
         links={
@@ -165,6 +209,7 @@ async def list_audio_files(
                 "duration_ms": audio.duration_ms,
                 "accent": audio.accent,
                 "quality": audio.quality,
+                "language": audio.language,
                 "content_url": f"/api/v1/audio/{audio.id}/content",
                 "created_at": audio.created_at.isoformat() if audio.created_at else None,
             },
@@ -297,6 +342,7 @@ async def get_audio_metadata(
             "duration_ms": audio.duration_ms,
             "accent": audio.accent,
             "quality": audio.quality,
+            "language": audio.language,
             "created_at": audio.created_at.isoformat() if audio.created_at else None,
             "updated_at": audio.updated_at.isoformat() if audio.updated_at else None,
             "version": audio.version,

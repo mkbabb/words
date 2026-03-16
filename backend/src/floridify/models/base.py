@@ -125,9 +125,14 @@ class AudioMedia(Document, BaseMetadata):
     duration_ms: int = Field(gt=0)
     accent: str | None = None  # us, uk, au
     quality: Literal["low", "standard", "high"] = "standard"
+    word: str | None = None  # The word this audio is for
+    language: str | None = None  # ISO language code (en, fr, es, etc.)
 
     class Settings:
         name = "audio_media"
+        indexes = [
+            [("word", 1), ("language", 1)],
+        ]
 
 
 # Explicit exports
