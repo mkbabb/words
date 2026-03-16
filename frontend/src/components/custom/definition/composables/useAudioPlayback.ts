@@ -60,6 +60,29 @@ export function useAudioPlayback(
     return cachedUrl;
   }
 
+  async function playUrl(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!audioElement) {
+        audioElement = new Audio();
+      }
+
+      audioElement.src = url;
+
+      audioElement.onended = () => {
+        state.value = 'idle';
+        resolve();
+      };
+
+      audioElement.onerror = () => {
+        reject(new Error('Failed to load audio'));
+      };
+
+      audioElement.play().then(() => {
+        state.value = 'playing';
+      }).catch(reject);
+    });
+  }
+
   async function play() {
     if (state.value === 'loading') return;
 
@@ -76,35 +99,38 @@ export function useAudioPlayback(
 
     try {
       const url = await resolveAudioUrl();
-
-      if (!audioElement) {
-        audioElement = new Audio();
-      }
-
-      audioElement.src = url;
-
-      audioElement.onended = () => {
-        state.value = 'idle';
-      };
-
-      audioElement.onerror = () => {
-        state.value = 'error';
-        errorMessage.value = 'Failed to play audio';
-        cachedUrl = null;
-      };
-
-      await audioElement.play();
-      state.value = 'playing';
-    } catch (e) {
-      state.value = 'error';
+      await playUrl(url);
+    } catch {
+      // First attempt failed (stale/missing audio file) — fallback to TTS generation
       cachedUrl = null;
-      errorMessage.value =
-        e instanceof Error ? e.message : 'No pronunciation audio available';
+      try {
+        const result: GenerateAudioResponse = await audioApi.generateAudio({
+          word: word.value,
+          language: language.value,
+        });
+        cachedUrl = audioApi.getAudioContentUrl(result.content_url);
+        await playUrl(cachedUrl);
+      } catch (e) {
+        state.value = 'error';
+        cachedUrl = null;
+        errorMessage.value =
+          e instanceof Error ? e.message : 'No pronunciation audio available';
+      }
     }
   }
 
   // Reset when word changes
   watch(word, () => {
+    if (state.value === 'playing' && audioElement) {
+      audioElement.pause();
+    }
+    state.value = 'idle';
+    cachedUrl = null;
+    triedExistingFiles = false;
+  });
+
+  // Reset when language changes
+  watch(language, () => {
     if (state.value === 'playing' && audioElement) {
       audioElement.pause();
     }
