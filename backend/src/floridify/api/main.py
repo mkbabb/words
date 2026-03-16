@@ -34,6 +34,7 @@ from .routers import (
     search,
     suggestions,
     users,
+    word_enrichment,
     word_versions,
     wordlist_reviews,
     wordlist_search,
@@ -153,6 +154,7 @@ app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["de
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
 app.include_router(word_versions, prefix=f"{API_V1_PREFIX}/words", tags=["word-versions"])
+app.include_router(word_enrichment, prefix=f"{API_V1_PREFIX}/words", tags=["word-enrichment"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 

@@ -175,7 +175,7 @@ class ProviderDataRepository(
             {"$limit": limit},
         ]
 
-        results = await self.model.aggregate(pipeline).to_list()
+        results = await self.model.aggregate(pipeline).to_list(length=None)
         return [r["_id"] for r in results]
 
     async def mark_as_latest(
@@ -262,7 +262,7 @@ class ProviderDataRepository(
             {"$group": {"_id": None, "ids": {"$push": "$to_delete.id"}}},
         ]
 
-        results = await self.model.aggregate(pipeline).to_list()
+        results = await self.model.aggregate(pipeline).to_list(length=None)
         if not results or not results[0].get("ids"):
             return 0
 

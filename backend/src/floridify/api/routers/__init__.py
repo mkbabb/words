@@ -20,6 +20,7 @@ from .wordlist import (
 )
 from .words import (
     definitions_router as definitions,
+    enrichment_router as word_enrichment,
     examples_router as examples,
     main_router as words,
     versions_router as word_versions,
@@ -50,6 +51,7 @@ __all__ = [
     "wordlist_words",
     "users",
     "wordlists",
+    "word_enrichment",
     "word_versions",
     "words",
     # "wotd_main",
