@@ -54,9 +54,15 @@ services:
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
       VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       BASE_PATH: ${VITE_BASE_PATH:-/}
-      CHOKIDAR_USEPOLLING: "true"
     volumes:
-      - ./frontend:/app
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./frontend/components.json:/app/components.json
       - /app/node_modules
     networks:
       - app-network
