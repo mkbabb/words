@@ -1,5 +1,6 @@
 """Lookup endpoints for word definitions."""
 
+import asyncio
 import hashlib
 import time
 from datetime import datetime, timedelta
@@ -13,7 +14,7 @@ from ...api.services.loaders import DictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
 from ...caching.core import get_global_cache
 from ...caching.models import CacheNamespace
-from ...core.lookup_pipeline import lookup_word_pipeline
+from ...core.lookup_pipeline import _ensure_primary_audio, lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
 from ...models.dictionary import (
@@ -269,6 +270,8 @@ async def _lookup_with_tracking(
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(f"📋 DB cache hit for '{word}'")
+                # Ensure audio exists for primary language (fire-and-forget)
+                asyncio.ensure_future(_ensure_primary_audio(existing))
                 response_dict = await DictionaryEntryLoader.load_as_lookup_response(
                     entry=existing,
                 )

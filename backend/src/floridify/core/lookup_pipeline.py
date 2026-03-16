@@ -21,6 +21,7 @@ from ..models.dictionary import (
     Definition,
     DictionaryEntry,
     DictionaryProvider,
+    Pronunciation,
     Word,
 )
 from ..providers.factory import create_connector
@@ -41,6 +42,36 @@ from .search_pipeline import find_best_match
 from .state_tracker import Stages, StateTracker
 
 logger = get_logger(__name__)
+
+
+async def _ensure_primary_audio(entry: DictionaryEntry) -> None:
+    """Generate audio for the primary language if pronunciation has none.
+
+    Runs as a background task — errors are logged but never propagated.
+    """
+    if not entry.pronunciation_id:
+        return
+
+    try:
+        pron = await Pronunciation.get(entry.pronunciation_id)
+        if not pron or pron.audio_file_ids:
+            return  # Already has audio or pronunciation missing
+
+        # Resolve word text for TTS
+        word_obj = await Word.get(entry.word_id)
+        if not word_obj:
+            return
+
+        primary_language = (
+            entry.languages[0] if entry.languages else "en"
+        )
+
+        from ..ai.synthesis.word_level import _generate_audio_files
+
+        await _generate_audio_files(pron, word_obj.text, primary_language)
+        logger.info(f"Background audio generated for '{word_obj.text}' ({primary_language})")
+    except Exception as e:
+        logger.warning(f"Background audio generation failed: {e}")
 
 
 def _resolve_lookup_languages(
@@ -145,6 +176,8 @@ async def lookup_word_pipeline(
             existing = await get_synthesized_entry(best_match)
             if existing:
                 logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
+                # Ensure audio exists for primary language (fire-and-forget)
+                asyncio.ensure_future(_ensure_primary_audio(existing))
                 return existing
 
         # Get definitions from providers in parallel
@@ -247,12 +280,15 @@ async def lookup_word_pipeline(
 
             # In no-AI mode, only use the first provider's data
             if providers_data:
-                return await _create_provider_mapped_entry(
+                result = await _create_provider_mapped_entry(
                     word=best_match,
                     provider_data=providers_data[0],  # Use first provider only
                     state_tracker=state_tracker,
                     no_ai=no_ai,
                 )
+                if result:
+                    asyncio.ensure_future(_ensure_primary_audio(result))
+                return result
             logger.warning("No provider data available for non-AI synthesis")
             return None
 
