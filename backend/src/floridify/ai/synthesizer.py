@@ -9,7 +9,7 @@ from pathlib import Path
 from ..caching.manager import get_version_manager
 from ..caching.models import ResourceType
 from ..core.state_tracker import Stages, StateTracker
-from ..models.base import Language
+from ..models.base import EditMetadata, Language, OperationType, SynthesisAuditEntry
 from ..models.dictionary import (
     Definition,
     DictionaryEntry,
@@ -234,13 +234,25 @@ class DefinitionSynthesizer:
             model_info=self.ai.last_model_info,  # Use full model info from AI
         )
 
-        # Save entry using version manager
+        # Save entry using version manager with synthesis audit trail
         if state_tracker:
             await state_tracker.update_stage(Stages.STORAGE_SAVE)
+
+        provider_names = [_provider_str(pe.provider) for pe in providers_data]
+        edit_metadata = self._build_synthesis_edit_metadata(
+            source_providers=provider_names,
+            definitions_input=len(all_definitions),
+            definitions_output=len(synthesized_definitions),
+            dedup_removed=dedup_response.removed_count,
+            clusters_created=len(
+                {d.meaning_cluster.slug for d in synthesized_definitions if d.meaning_cluster}
+            ),
+        )
 
         await self._save_entry_with_version_manager(
             entry,
             word.text if isinstance(word, Word) else word,
+            edit_metadata=edit_metadata,
         )
         logger.success(
             f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions",
@@ -364,19 +376,49 @@ class DefinitionSynthesizer:
 
         return synthesized_definitions
 
+    def _build_synthesis_edit_metadata(
+        self,
+        *,
+        source_providers: list[str],
+        definitions_input: int,
+        definitions_output: int,
+        dedup_removed: int,
+        clusters_created: int,
+        components_enhanced: list[str] | None = None,
+    ) -> EditMetadata:
+        """Build EditMetadata for a synthesis operation."""
+        model_info = self.ai.last_model_info
+        return EditMetadata(
+            operation_type=OperationType.AI_SYNTHESIS,
+            change_reason=f"AI synthesis from {len(source_providers)} providers",
+            synthesis_audit=SynthesisAuditEntry(
+                model_name=model_info.name if model_info else "unknown",
+                components_enhanced=components_enhanced or [],
+                total_tokens=model_info.total_tokens if model_info else None,
+                response_time_ms=model_info.response_time_ms if model_info else None,
+                source_providers=source_providers,
+                definitions_input=definitions_input,
+                definitions_output=definitions_output,
+                dedup_removed=dedup_removed,
+                clusters_created=clusters_created,
+            ),
+        )
+
     async def _save_entry_with_version_manager(
         self,
         entry: DictionaryEntry,
         word: str,
+        edit_metadata: EditMetadata | None = None,
     ) -> None:
         """Save DictionaryEntry using the version manager.
 
         Args:
             entry: DictionaryEntry to save
             word: Word text for resource ID
+            edit_metadata: Optional edit metadata for version audit trail
 
         """
-        await save_entry_versioned(entry, word)
+        await save_entry_versioned(entry, word, edit_metadata=edit_metadata)
 
     async def resynthesize_from_provenance(
         self,

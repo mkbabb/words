@@ -70,6 +70,8 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "literature_analysis": ModelComplexity.HIGH,
     # Medium complexity — creative generation, pedagogical tasks
     "generate_synonyms": ModelComplexity.MEDIUM,
+    "generate_synonym_chooser": ModelComplexity.MEDIUM,
+    "generate_phrases": ModelComplexity.MEDIUM,
     "generate_facts": ModelComplexity.MEDIUM,
     "generate_examples": ModelComplexity.MEDIUM,
     "generate_anki_best_describes": ModelComplexity.MEDIUM,

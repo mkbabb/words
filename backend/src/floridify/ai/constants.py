@@ -25,6 +25,10 @@ class SynthesisComponent(Enum):
     USAGE_NOTES = "usage_notes"
     REGIONAL_VARIANTS = "regional_variants"
 
+    # Word-level enrichment
+    SYNONYM_CHOOSER = "synonym_chooser"  # MW-style comparative synonym essays
+    PHRASES = "phrases"  # Phrases & idioms containing the word
+
     # Synthesis utilities
     DEFINITION_TEXT = "definition_text"
     CLUSTER_DEFINITIONS = "cluster_definitions"
@@ -58,6 +62,8 @@ class SynthesisComponent(Enum):
             cls.ETYMOLOGY,
             cls.WORD_FORMS,
             cls.FACTS,
+            cls.SYNONYM_CHOOSER,
+            cls.PHRASES,
         }
 
     @classmethod

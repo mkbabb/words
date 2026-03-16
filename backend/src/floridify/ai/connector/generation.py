@@ -18,6 +18,7 @@ from ..models import (
     TextGenerationResponse,
     WordFormResponse,
 )
+from ..prompts.synthesize.models import PhrasesResponse, SynonymChooserResponse
 
 logger = get_logger(__name__)
 
@@ -427,5 +428,78 @@ class GenerationMixin:
         suggestions_count = len(result.suggestions)
         logger.success(
             f"✨ Generated {suggestions_count} suggestions (confidence: {result.confidence:.1%})",
+        )
+        return result
+
+    async def generate_synonym_chooser(
+        self,
+        word: str,
+        synonyms: list[str],
+    ) -> SynonymChooserResponse:
+        """Generate a comparative synonym essay (MW-style 'Choose the Right Synonym').
+
+        Args:
+            word: The target word
+            synonyms: List of near-synonyms to compare
+
+        Returns:
+            SynonymChooserResponse with essay and per-synonym distinctions
+
+        """
+        # Limit to 8 synonyms for focused comparison
+        limited_synonyms = synonyms[:8]
+
+        logger.info(
+            f"Generating synonym chooser essay for '{word}' comparing {len(limited_synonyms)} synonyms",
+        )
+
+        prompt = self.prompt_manager.render(
+            "synthesize/synonym_chooser",
+            word=word,
+            synonyms=limited_synonyms,
+        )
+
+        result = await self._make_structured_request(
+            prompt,
+            SynonymChooserResponse,
+            task_name="generate_synonym_chooser",
+        )
+
+        logger.success(
+            f"Generated synonym chooser for '{word}' with {len(result.synonyms_compared)} comparisons",
+        )
+        return result
+
+    async def generate_phrases(
+        self,
+        word: str,
+        language: str = "English",
+    ) -> PhrasesResponse:
+        """Generate phrases and idioms containing the word.
+
+        Args:
+            word: The target word
+            language: Language for phrase context
+
+        Returns:
+            PhrasesResponse with phrases and idioms
+
+        """
+        logger.info(f"Generating phrases and idioms for '{word}'")
+
+        prompt = self.prompt_manager.render(
+            "synthesize/phrases",
+            word=word,
+            language=language,
+        )
+
+        result = await self._make_structured_request(
+            prompt,
+            PhrasesResponse,
+            task_name="generate_phrases",
+        )
+
+        logger.success(
+            f"Generated {len(result.phrases)} phrases for '{word}'",
         )
         return result

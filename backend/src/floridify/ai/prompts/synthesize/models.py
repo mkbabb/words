@@ -143,5 +143,49 @@ class DefinitionSynthesisResponse(AIResponseBase):
     sources_used: list[str] = Field(description="Provider sources used in synthesis")
 
 
+class SynonymComparison(BaseModel):
+    """A single synonym in the comparative essay."""
+
+    word: str = Field(description="The synonym word")
+    distinction: str = Field(
+        max_length=200,
+        description="What distinguishes this synonym from the others",
+    )
+
+
+class SynonymChooserResponse(AIResponseBase):
+    """Response for 'Choose the Right Synonym' comparative essay."""
+
+    word: str = Field(description="The target word")
+    essay: str = Field(
+        max_length=2000,
+        description="Comparative essay explaining nuanced differences between the word and its near-synonyms",
+    )
+    synonyms_compared: list[SynonymComparison] = Field(
+        max_length=8,
+        description="The synonyms being compared with their distinguishing characteristics",
+    )
+
+
+class PhraseEntry(BaseModel):
+    """A phrase or idiom containing the target word."""
+
+    phrase: str = Field(description="The phrase or idiom (e.g., 'by heart', 'heart of gold')")
+    meaning: str = Field(max_length=300, description="Meaning of the phrase")
+    example: str | None = Field(None, max_length=500, description="Example sentence using the phrase")
+    register: str | None = Field(
+        None, description="Usage register: formal, informal, literary, archaic"
+    )
+
+
+class PhrasesResponse(AIResponseBase):
+    """Response for phrases and idioms containing a word."""
+
+    phrases: list[PhraseEntry] = Field(
+        max_length=30,
+        description="Phrases and idioms containing the word",
+    )
+
+
 # Rebuild models with forward references
 SynthesisResponse.model_rebuild()
