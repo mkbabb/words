@@ -345,9 +345,6 @@ async def regenerate_components(
     # Get definition
     definition = await repo.get(definition_id)
 
-    # Type assertion for mypy - repo.get raises HTTPException if not found
-    assert definition is not None
-
     # Get AI connector
     ai = get_ai_connector()
 
@@ -400,9 +397,6 @@ async def regenerate_components(
                 ],
             ).model_dump(),
         )
-
-    # Type assertion for mypy
-    assert word is not None
 
     # Update components
     updates = {}

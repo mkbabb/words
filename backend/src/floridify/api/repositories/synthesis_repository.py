@@ -127,7 +127,6 @@ class SynthesisRepository(
     ) -> DictionaryEntry:
         """Add a definition to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         if definition_id not in entry.definition_ids:
             entry.definition_ids.append(definition_id)
@@ -143,7 +142,6 @@ class SynthesisRepository(
     ) -> DictionaryEntry:
         """Remove a definition from the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         if definition_id in entry.definition_ids:
             entry.definition_ids.remove(definition_id)
@@ -159,7 +157,6 @@ class SynthesisRepository(
     ) -> DictionaryEntry:
         """Add a fact to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         if fact_id not in entry.fact_ids:
             entry.fact_ids.append(fact_id)
@@ -175,7 +172,6 @@ class SynthesisRepository(
     ) -> DictionaryEntry:
         """Set the pronunciation for the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         entry.pronunciation_id = pronunciation_id
         entry.version += 1
@@ -215,7 +211,6 @@ class SynthesisRepository(
     async def track_access(self, entry_id: PydanticObjectId) -> DictionaryEntry:
         """Track access to an entry."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         entry.accessed_at = datetime.now(UTC)
         entry.access_count += 1
@@ -248,7 +243,6 @@ class SynthesisRepository(
         """
         if entry_id:
             entry = await self.get(entry_id, raise_on_missing=True)
-            assert entry is not None
             entries = [entry]
         elif not entries:
             raise ValueError("Either entry_id or entries must be provided")
@@ -340,7 +334,6 @@ class SynthesisRepository(
     ) -> DictionaryEntry:
         """Add multiple definitions to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
-        assert entry is not None
 
         new_ids = [d_id for d_id in definition_ids if d_id not in entry.definition_ids]
         if new_ids:

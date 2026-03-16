@@ -120,7 +120,6 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
     ) -> AudioMedia:
         """Update audio metadata."""
         audio = await self.get(item_id, raise_on_missing=True)
-        assert audio is not None
 
         # Version check
         if version is not None and audio.version != version:
@@ -140,7 +139,6 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
     async def delete(self, item_id: PydanticObjectId, cascade: bool = True) -> bool:
         """Delete audio with automatic reference cleanup."""
         audio = await self.get(item_id, raise_on_missing=True)
-        assert audio is not None
 
         if cascade:
             from ..services.cleanup_service import CleanupService

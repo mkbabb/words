@@ -196,3 +196,60 @@ class WordSuggestionRequest(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=200)
     count: int = Field(10, ge=1, le=25)
+
+
+# --- Response Models ---
+
+
+class PronunciationResponse(BaseModel):
+    """Response for pronunciation generation."""
+
+    word: str
+    pronunciation: dict[str, Any]
+
+
+class WordFormsResponse(BaseModel):
+    """Response for word forms generation."""
+
+    word: str
+    word_forms: dict[str, Any]
+
+
+class SynonymEntry(BaseModel):
+    """A single synonym with relevance score."""
+
+    word: str
+    score: float
+
+
+class SynonymResponse(BaseModel):
+    """Response for synonym generation."""
+
+    word: str
+    synonyms: list[SynonymEntry]
+    confidence: float
+
+
+class AntonymResponse(BaseModel):
+    """Response for antonym generation."""
+
+    word: str
+    antonyms: list[str]
+    confidence: float
+
+
+class ExampleResponse(BaseModel):
+    """Response for example generation."""
+
+    word: str
+    examples: list[str]
+    confidence: float
+
+
+class FactsResponse(BaseModel):
+    """Response for facts generation."""
+
+    word: str
+    facts: list[dict[str, Any]]
+    confidence: float
+    categories: list[str]

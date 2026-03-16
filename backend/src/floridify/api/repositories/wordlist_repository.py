@@ -205,7 +205,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             await self.recompute_stats(wordlist.id)
             # Re-fetch to get updated stats
             wordlist = await self.get(wordlist.id, raise_on_missing=True)
-            assert wordlist is not None
 
         await self._invalidate_names_corpus()
 
@@ -357,7 +356,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         """Update a wordlist and invalidate name corpus cache if name changed."""
         # Get the original wordlist to check if name changed
         original_wordlist = await self.get(id, raise_on_missing=True)
-        assert original_wordlist is not None
         original_name = original_wordlist.name
 
         # Use parent's update method
@@ -411,7 +409,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             await self.recompute_stats(wordlist_id)
 
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        assert wordlist is not None
         wordlist.mark_accessed()
         await wordlist.save()
 
@@ -629,7 +626,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         await self.recompute_stats(wordlist_id)
 
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        assert wordlist is not None
         wordlist.mark_accessed()
         await wordlist.save()
 
@@ -696,6 +692,5 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
                 stats.retention_rate = 1 - (total_lapses / (total_reps + total_lapses))
 
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
-        assert wordlist is not None
         wordlist.set_stats(unique_words, total_words, stats)
         await wordlist.save()

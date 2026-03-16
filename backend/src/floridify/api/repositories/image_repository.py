@@ -131,7 +131,6 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
     ) -> ImageMedia:
         """Update image metadata."""
         image = await self.get(item_id, raise_on_missing=True)
-        assert image is not None
 
         # Version check
         if version is not None and image.version != version:
@@ -151,7 +150,6 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
     async def delete(self, item_id: PydanticObjectId, cascade: bool = True) -> bool:
         """Delete image with automatic reference cleanup."""
         doc = await self.get(item_id, raise_on_missing=True)
-        assert doc is not None
 
         if cascade:
             from ..services.cleanup_service import CleanupService

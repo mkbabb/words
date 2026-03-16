@@ -78,7 +78,6 @@ async def list_words(
     """List words in a wordlist with filtering and sorting."""
     # Verify wordlist exists
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Build MongoDB query
     query: dict[str, Any] = {"wordlist_id": wordlist_id}
@@ -169,7 +168,6 @@ async def add_word(
 ) -> ResourceResponse:
     """Add a word to the wordlist."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     updated_list = await repo.add_word(wordlist_id, request)
@@ -208,7 +206,6 @@ async def update_word(
 ) -> ResourceResponse:
     """Update a word's metadata (notes, tags) in a wordlist."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     word_doc = await Word.find_one({"text": word})
@@ -249,7 +246,6 @@ async def remove_word(
 ) -> None:
     """Remove a word from the wordlist."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     word_doc = await Word.find_one({"text": word})
@@ -276,7 +272,6 @@ async def bulk_delete_words(
 ) -> ResourceResponse:
     """Remove multiple words from a wordlist in a single operation."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     # Find all word docs
@@ -315,7 +310,6 @@ async def mark_word_visited(
 ) -> ResourceResponse:
     """Mark a word as visited/viewed."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     updated = await repo.mark_word_visited(wordlist_id, word)

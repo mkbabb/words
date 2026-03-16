@@ -8,25 +8,32 @@ from ....ai.connector import get_ai_connector
 from ...middleware.rate_limiting import ai_limiter, get_client_key
 from .base import (
     AntonymRequest,
+    AntonymResponse,
     ExampleRequest,
+    ExampleResponse,
     FactsRequest,
+    FactsResponse,
     PronunciationRequest,
+    PronunciationResponse,
+    SynonymEntry,
     SynonymRequest,
+    SynonymResponse,
     UsageNotesRequest,
     WordFormsRequest,
+    WordFormsResponse,
     handle_ai_errors,
 )
 
 router = APIRouter()
 
 
-@router.post("/synthesize/pronunciation")
+@router.post("/synthesize/pronunciation", response_model=PronunciationResponse)
 @handle_ai_errors
 async def generate_pronunciation(
     request: PronunciationRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> PronunciationResponse:
     """AI-generate phonetic pronunciation.
 
     Body:
@@ -47,16 +54,16 @@ async def generate_pronunciation(
     connector = get_ai_connector()
     result = await connector.pronunciation(request.word)
 
-    return {"word": request.word, "pronunciation": result.model_dump()}
+    return PronunciationResponse(word=request.word, pronunciation=result.model_dump())
 
 
-@router.post("/generate/word-forms")
+@router.post("/generate/word-forms", response_model=WordFormsResponse)
 @handle_ai_errors
 async def generate_word_forms(
     request: WordFormsRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> WordFormsResponse:
     """AI-identify morphological word forms.
 
     Body:
@@ -78,16 +85,16 @@ async def generate_word_forms(
     connector = get_ai_connector()
     result = await connector.identify_word_forms(request.word, request.part_of_speech)
 
-    return {"word": request.word, "word_forms": result.model_dump()}
+    return WordFormsResponse(word=request.word, word_forms=result.model_dump())
 
 
-@router.post("/synthesize/synonyms")
+@router.post("/synthesize/synonyms", response_model=SynonymResponse)
 @handle_ai_errors
 async def generate_synonyms(
     request: SynonymRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> SynonymResponse:
     """AI-generate contextual synonyms.
 
     Body:
@@ -118,20 +125,20 @@ async def generate_synonyms(
         request.count,
     )
 
-    return {
-        "word": request.word,
-        "synonyms": [{"word": syn.word, "score": syn.relevance} for syn in result.synonyms],
-        "confidence": result.confidence,
-    }
+    return SynonymResponse(
+        word=request.word,
+        synonyms=[SynonymEntry(word=syn.word, score=syn.relevance) for syn in result.synonyms],
+        confidence=result.confidence,
+    )
 
 
-@router.post("/synthesize/antonyms")
+@router.post("/synthesize/antonyms", response_model=AntonymResponse)
 @handle_ai_errors
 async def generate_antonyms(
     request: AntonymRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> AntonymResponse:
     """AI-generate contextual antonyms.
 
     Body:
@@ -162,20 +169,20 @@ async def generate_antonyms(
         request.count,
     )
 
-    return {
-        "word": request.word,
-        "antonyms": result.antonyms,
-        "confidence": result.confidence,
-    }
+    return AntonymResponse(
+        word=request.word,
+        antonyms=result.antonyms,
+        confidence=result.confidence,
+    )
 
 
-@router.post("/generate/examples")
+@router.post("/generate/examples", response_model=ExampleResponse)
 @handle_ai_errors
 async def generate_examples(
     request: ExampleRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> ExampleResponse:
     """AI-generate contextual example sentences.
 
     Body:
@@ -204,20 +211,20 @@ async def generate_examples(
         request.count,
     )
 
-    return {
-        "word": request.word,
-        "examples": result.example_sentences,
-        "confidence": result.confidence,
-    }
+    return ExampleResponse(
+        word=request.word,
+        examples=result.example_sentences,
+        confidence=result.confidence,
+    )
 
 
-@router.post("/generate/facts")
+@router.post("/generate/facts", response_model=FactsResponse)
 @handle_ai_errors
 async def generate_facts(
     request: FactsRequest,
     api_request: Request,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> FactsResponse:
     """AI-generate interesting word facts.
 
     Body:
@@ -246,12 +253,12 @@ async def generate_facts(
         request.previous_words,
     )
 
-    return {
-        "word": request.word,
-        "facts": result.facts,
-        "confidence": result.confidence,
-        "categories": result.categories,
-    }
+    return FactsResponse(
+        word=request.word,
+        facts=result.facts,
+        confidence=result.confidence,
+        categories=result.categories,
+    )
 
 
 @router.post("/usage-notes")

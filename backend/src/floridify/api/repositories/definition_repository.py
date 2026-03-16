@@ -180,7 +180,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> Example:
         """Add an example to a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         example = Example(
             definition_id=definition_id,
@@ -204,7 +203,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> bool:
         """Remove an example from a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         if example_id in definition.example_ids:
             definition.example_ids.remove(example_id)
@@ -225,7 +223,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> Definition:
         """Add an image to a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         if image_id not in definition.image_ids:
             definition.image_ids.append(image_id)
@@ -241,7 +238,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> Definition:
         """Remove an image from a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         if image_id in definition.image_ids:
             definition.image_ids.remove(image_id)
@@ -270,7 +266,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         """
         if definition_id:
             definition = await self.get(definition_id, raise_on_missing=True)
-            assert definition is not None
             definitions = [definition]
         elif not definitions:
             raise ValueError("Either definition_id or definitions must be provided")
@@ -338,7 +333,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> list[Example]:
         """Add multiple examples to a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         examples = [
             Example(
@@ -368,7 +362,6 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> Definition:
         """Update linguistic components of a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)
-        assert definition is not None
 
         if word_forms is not None:
             definition.word_forms = word_forms

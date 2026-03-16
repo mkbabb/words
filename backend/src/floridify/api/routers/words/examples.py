@@ -139,7 +139,6 @@ async def get_example(
 ) -> Response | ResourceResponse:
     """Get a single example by ID."""
     example = await repo.get(example_id, raise_on_missing=True)
-    assert example is not None
     example_dict = example.model_dump()
 
     # Apply field selection

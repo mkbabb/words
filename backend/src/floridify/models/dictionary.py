@@ -98,10 +98,10 @@ class Pronunciation(Document, BaseMetadata):
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
     ipa: str | None = None  # American IPA
-    audio_file_ids: list[
-        PydanticObjectId
-    ] = []  # FK to AudioMedia documents - optimized with ObjectIds
-    syllables: list[str] = []
+    audio_file_ids: list[PydanticObjectId] = Field(
+        default_factory=list
+    )  # FK to AudioMedia documents - optimized with ObjectIds
+    syllables: list[str] = Field(default_factory=list)
     stress_pattern: str | None = None  # Primary/secondary stress
     model_info: ModelInfo | None = None  # If AI-generated
 
@@ -176,7 +176,7 @@ class Definition(Document, BaseMetadata):
     text: str = Field(min_length=1, max_length=5000)  # The definition text
     meaning_cluster: MeaningCluster | None = None
     sense_number: str | None = None  # e.g., "1a", "2b"
-    word_forms: list[WordForm] = []  # List of WordForm objects
+    word_forms: list[WordForm] = Field(default_factory=list)  # List of WordForm objects
 
     # Examples and relationships
     example_ids: list[PydanticObjectId] = Field(
@@ -189,11 +189,11 @@ class Definition(Document, BaseMetadata):
     language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
-    usage_notes: list[UsageNote] = []
+    usage_notes: list[UsageNote] = Field(default_factory=list)
 
     # Grammar and patterns
-    grammar_patterns: list[GrammarPattern] = []
-    collocations: list[Collocation] = []
+    grammar_patterns: list[GrammarPattern] = Field(default_factory=list)
+    collocations: list[Collocation] = Field(default_factory=list)
     transitivity: Literal["transitive", "intransitive", "both"] | None = None
 
     # Educational metadata
@@ -205,11 +205,13 @@ class Definition(Document, BaseMetadata):
     )  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
-    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
+    image_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to ImageMedia documents
     dictionary_entry_id: PydanticObjectId | None = (
         None  # FK to DictionaryEntry - optimized with ObjectId
     )
-    providers: list[DictionaryProvider] = []  # List of providers this definition is sourced from
+    providers: list[DictionaryProvider] = Field(
+        default_factory=list
+    )  # Providers this definition is sourced from
     source_definitions: list[SourceReference] = Field(default_factory=list)
     model_info: ModelInfo | None = None  # If AI-generated/synthesized
 

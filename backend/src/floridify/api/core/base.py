@@ -5,7 +5,7 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar, overload
 
 from beanie import Document, PydanticObjectId
 from beanie.odm.enums import SortDirection
@@ -167,7 +167,14 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):  # noqa: UP04
     def __init__(self, model: type[T]):
         self.model = model
 
-    async def get(self, id: PydanticObjectId, raise_on_missing: bool = True) -> T | None:
+    @overload
+    async def get(self, id: PydanticObjectId, *, raise_on_missing: Literal[True]) -> T: ...
+    @overload
+    async def get(self, id: PydanticObjectId, *, raise_on_missing: Literal[False]) -> T | None: ...
+    @overload
+    async def get(self, id: PydanticObjectId, *, raise_on_missing: bool = True) -> T | None: ...
+
+    async def get(self, id: PydanticObjectId, *, raise_on_missing: bool = True) -> T | None:
         """Get a single document by ID."""
         doc = await self.model.get(id)
         if not doc and raise_on_missing:

@@ -93,7 +93,6 @@ async def get_review_session(
 ) -> ResourceResponse:
     """Get a new review session with words to study."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     now = datetime.now(UTC)
 
@@ -170,7 +169,6 @@ async def submit_review(
     without recomputing SM-2 logic.
     """
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Find the word item
     word_doc = await Word.find_one({"text": request.word})
@@ -232,7 +230,6 @@ async def submit_bulk_reviews(
     Single stats recompute at the end.
     """
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Batch-fetch all word docs for the review words
     review_words = [r.word for r in request.reviews]

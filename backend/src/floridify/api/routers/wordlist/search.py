@@ -42,7 +42,6 @@ async def search_wordlist_words(
     """
     # Get the wordlist
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Step 1: Apply search filter to restrict the wordlist items
     search_response = await search_words_in_wordlist(

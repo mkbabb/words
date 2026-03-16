@@ -331,7 +331,6 @@ async def get_audio_metadata(
 
     """
     audio = await repo.get(audio_id, raise_on_missing=True)
-    assert audio is not None
 
     return ResourceResponse(
         data={
@@ -471,7 +470,6 @@ async def delete_audio(
     """
     # Get audio to check file path
     audio = await repo.get(audio_id, raise_on_missing=True)
-    assert audio is not None
 
     # Delete from database
     await repo.delete(audio_id)
