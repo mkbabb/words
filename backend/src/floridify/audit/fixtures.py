@@ -168,17 +168,25 @@ def fake_encode_texts(texts: list[str], *, dimension: int = 32) -> np.ndarray:
 
 def install_fake_semantic_encoder(search: SemanticSearch, *, dimension: int = 32) -> None:
     """Patch a SemanticSearch instance to use deterministic fake embeddings."""
-
-    def _encode(self: SemanticSearch, texts: list[str], use_multiprocessing: bool = True) -> np.ndarray:  # noqa: ARG001
-        return fake_encode_texts(texts, dimension=dimension)
+    from ..search.semantic.encoder import SemanticEncoder
 
     class _FakeSentenceModel:
         def encode(self, sentences: list[str], **_: Any) -> np.ndarray:
             return fake_encode_texts(list(sentences), dimension=dimension)
 
-    search.sentence_model = _FakeSentenceModel()  # type: ignore[assignment]
-    search.device = "cpu"
-    search._encode = types.MethodType(_encode, search)
+    def _fake_encode(
+        self: SemanticEncoder,
+        texts: list[str],
+        model_name: str = "",  # noqa: ARG001
+        batch_size: int = 32,  # noqa: ARG001
+        use_multiprocessing: bool = True,  # noqa: ARG001
+    ) -> np.ndarray:
+        return fake_encode_texts(texts, dimension=dimension)
+
+    encoder = search._encoder
+    encoder.sentence_model = _FakeSentenceModel()  # type: ignore[assignment]
+    encoder.device = "cpu"
+    encoder.encode = types.MethodType(_fake_encode, encoder)  # type: ignore[method-assign]
 
 
 async def build_semantic_fixture(

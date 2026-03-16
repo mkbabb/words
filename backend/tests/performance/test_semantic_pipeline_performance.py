@@ -12,6 +12,7 @@ from floridify.audit import (
     benchmark_sync,
     build_semantic_fixture,
 )
+from floridify.search.semantic.builder import SemanticEmbeddingBuilder
 from floridify.search.semantic.persistence import (
     load_embeddings_from_binary_data,
     load_faiss_index_from_binary_data,
@@ -21,13 +22,23 @@ from floridify.search.semantic.persistence import (
 
 def _disable_flushes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "floridify.search.semantic.core.SemanticSearch._schedule_query_cache_flush",
+        "floridify.search.semantic.query_cache.SemanticQueryCache._schedule_query_cache_flush",
         lambda self: None,
     )
     monkeypatch.setattr(
-        "floridify.search.semantic.core.SemanticSearch._schedule_result_cache_flush",
+        "floridify.search.semantic.query_cache.SemanticQueryCache._schedule_result_cache_flush",
         lambda self: None,
     )
+
+
+def _build_embeddings_sync(semantic_search: Any) -> None:
+    """Build embeddings synchronously via SemanticEmbeddingBuilder."""
+    builder = SemanticEmbeddingBuilder(semantic_search._encoder)
+    (
+        semantic_search.sentence_embeddings,
+        semantic_search.sentence_index,
+        semantic_search._word_embeddings,
+    ) = builder._build_embeddings(semantic_search.corpus, semantic_search.index)
 
 
 @pytest.mark.performance
@@ -50,7 +61,7 @@ async def test_semantic_build_and_cached_inference(
     build_case, _ = benchmark_sync(
         "embedding-build",
         "semantic",
-        semantic_search._build_embeddings,
+        lambda: _build_embeddings_sync(semantic_search),
         iterations=build_iters,
         warmup=0,
         metadata={"corpus_size": size_name},
@@ -79,8 +90,8 @@ async def test_semantic_build_and_cached_inference(
 
     assert cold_results[-1]
     assert warm_results[-1]
-    assert semantic_search.result_cache
-    assert semantic_search.result_cache_order
+    assert semantic_search._query_cache_manager.result_cache
+    assert semantic_search._query_cache_manager.result_cache_order
     assert warm_case.stats.p95_ms <= cold_case.stats.max_ms + 1.0
 
 
@@ -94,7 +105,7 @@ async def test_semantic_persistence_round_trip(monkeypatch: pytest.MonkeyPatch) 
         CORPUS_SIZES["small"],
         dimension=32,
     )
-    semantic_search._build_embeddings()
+    _build_embeddings_sync(semantic_search)
 
     async def fake_save(
         self: Any,
@@ -182,7 +193,7 @@ async def test_query_cache_effectiveness(monkeypatch: pytest.MonkeyPatch) -> Non
     _, _, semantic_search = await build_semantic_fixture(
         "audit-cache-eff", CORPUS_SIZES["small"], dimension=32
     )
-    semantic_search._build_embeddings()
+    _build_embeddings_sync(semantic_search)
 
     # Cold query
     cold_case, _ = await benchmark_async(
@@ -203,6 +214,6 @@ async def test_query_cache_effectiveness(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     # Cache should have exactly 1 entry for this query
-    assert len(semantic_search.result_cache) >= 1
+    assert len(semantic_search._query_cache_manager.result_cache) >= 1
     # Warm should be faster than cold
     assert warm_case.stats.mean_ms <= cold_case.stats.max_ms + 1.0

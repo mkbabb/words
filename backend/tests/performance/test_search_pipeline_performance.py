@@ -120,7 +120,14 @@ async def test_smart_cascade_with_semantic(size_name: str) -> None:
     _, _, semantic_search = await build_semantic_fixture(
         f"audit-semantic-cascade-sem-{size_name}", CORPUS_SIZES[size_name], dimension=32
     )
-    semantic_search._build_embeddings()
+    from floridify.search.semantic.builder import SemanticEmbeddingBuilder
+
+    builder = SemanticEmbeddingBuilder(semantic_search._encoder)
+    (
+        semantic_search.sentence_embeddings,
+        semantic_search.sentence_index,
+        semantic_search._word_embeddings,
+    ) = builder._build_embeddings(semantic_search.corpus, semantic_search.index)
 
     # Wire semantic into the search instance
     search.semantic_search = semantic_search

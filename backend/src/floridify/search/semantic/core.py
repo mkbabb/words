@@ -3,13 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import math
-import multiprocessing as mp
-import os
-import platform
-import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -19,17 +14,13 @@ from ...corpus.manager import get_tree_corpus_manager
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
 from ..result import SearchResult
+from .builder import SemanticEmbeddingBuilder
 from .constants import (
     DEFAULT_SENTENCE_MODEL,
-    ENABLE_GPU_ACCELERATION,
     L2_DISTANCE_NORMALIZATION,
-    MATRYOSHKA_DIM,
-    MATRYOSHKA_DIMENSIONS,
-    QUANTIZATION_PRECISION,
-    USE_QUANTIZATION,
     SemanticModel,
 )
-from .embedding import _encode_chunk_worker, get_cached_model
+from .encoder import SemanticEncoder
 from .index_builder import build_optimized_index, configure_faiss_threading
 from .models import SemanticIndex
 from .persistence import (
@@ -61,11 +52,12 @@ class SemanticSearch:
         self.index = index
         self.corpus = corpus
 
+        # Encoder handles model init, device detection, and text-to-embedding
+        self._encoder = SemanticEncoder()
+
         # Runtime objects (built from index)
-        self.sentence_model: Any | None = None  # SentenceTransformer
         self.sentence_embeddings: np.ndarray | None = None
         self.sentence_index: Any | None = None  # faiss.Index
-        self.device: str = "cpu"
 
         # Per-word embedding cache for incremental updates (<50k words)
         self._word_embeddings: dict[str, np.ndarray] | None = None
@@ -79,6 +71,26 @@ class SemanticSearch:
 
         # Note: _load_from_index is now async, caller must await it after construction
         # This is handled in from_corpus() and from_index() class methods
+
+    # -- Public properties for backward compatibility --
+
+    @property
+    def sentence_model(self) -> Any | None:
+        """SentenceTransformer model (delegated to encoder)."""
+        return self._encoder.sentence_model
+
+    @sentence_model.setter
+    def sentence_model(self, value: Any) -> None:
+        self._encoder.sentence_model = value
+
+    @property
+    def device(self) -> str:
+        """Device for model execution (delegated to encoder)."""
+        return self._encoder.device
+
+    @device.setter
+    def device(self, value: str) -> None:
+        self._encoder.device = value
 
     @classmethod
     async def from_corpus(
@@ -132,12 +144,12 @@ class SemanticSearch:
             # Verify embeddings were built (empty corpora are valid - they just have 0 embeddings)
             if search.sentence_embeddings is not None and search.sentence_embeddings.size > 0:
                 logger.info(
-                    f"✅ Built semantic index: {search.index.num_embeddings:,} embeddings, "
+                    f"Built semantic index: {search.index.num_embeddings:,} embeddings, "
                     f"{search.index.embedding_dimension}D"
                 )
             else:
                 logger.info(
-                    f"✅ Created semantic index for empty corpus '{corpus.corpus_name}' (0 embeddings)"
+                    f"Created semantic index for empty corpus '{corpus.corpus_name}' (0 embeddings)"
                 )
 
         return search
@@ -157,11 +169,15 @@ class SemanticSearch:
             return
 
         # Set device from index
-        self.device = self.index.device
+        self._encoder.device = self.index.device
 
         # Initialize model if needed
-        if not self.sentence_model:
-            self.sentence_model = await self._initialize_optimized_model()
+        if not self._encoder.sentence_model:
+            await self._encoder.initialize_model(
+                model_name=self.index.model_name,
+                device=self.index.device,
+            )
+            self.index.device = self._encoder.device
 
         # FIX: Load from binary_data (external storage) instead of inline fields
         # The embeddings and index_data fields are not populated when loading from cache
@@ -208,201 +224,6 @@ class SemanticSearch:
                 f"Corrupted semantic index for '{self.index.corpus_name}': {e}"
             ) from e
 
-    def _detect_optimal_device(self) -> str:
-        """Detect the optimal device for model execution."""
-        if not ENABLE_GPU_ACCELERATION:
-            return "cpu"
-
-        import torch
-
-        if torch.cuda.is_available():
-            device_name = f"cuda:{torch.cuda.current_device()}"
-            logger.info(f"🚀 GPU acceleration enabled: {torch.cuda.get_device_name()}")
-            return device_name
-        logger.info("💻 Using CPU for embedding generation")
-        return "cpu"
-
-    async def _initialize_optimized_model(self) -> Any:  # Returns SentenceTransformer
-        """Initialize sentence transformer with standard optimizations using cached model."""
-        if not self.index:
-            raise ValueError("Index required to initialize model")
-
-        # Detect optimal device if not set
-        if not self.device or self.device == "cpu":
-            self.device = self._detect_optimal_device()
-            self.index.device = self.device
-
-        # Get cached model (critical performance optimization - avoids reloading)
-        model = await get_cached_model(
-            model_name=self.index.model_name,
-            device=self.device,
-            use_onnx=False,
-        )
-
-        # Log quantization configuration
-        quantization_status = (
-            f"quantization={QUANTIZATION_PRECISION}"
-            if USE_QUANTIZATION
-            else "quantization=disabled"
-        )
-
-        logger.debug(
-            f"Model ready: {self.index.model_name} on {self.device} ({quantization_status})"
-        )
-        return model
-
-    def _encode(self, texts: list[str], use_multiprocessing: bool = True) -> np.ndarray:
-        """Encode texts with optimizations (quantization + GPU acceleration + multiprocessing).
-
-        Quantization significantly reduces memory usage and improves speed:
-        - int8: 75% memory reduction, ~2-3x speedup, <2% quality loss
-        - binary: 97% memory reduction, ~10x speedup, ~5-10% quality loss
-
-        Multiprocessing provides linear speedup with CPU cores for large corpora.
-        Uses sentence-transformers' native multi-process pool (process-based, not threading).
-        """
-        if not self.sentence_model or not self.index:
-            raise ValueError("Model and index required for encoding")
-
-        # Determine precision based on configuration and corpus size
-        # INT8 quantization needs at least 100 embeddings for stable quantization ranges
-        use_quantization = USE_QUANTIZATION and len(texts) >= 100
-
-        # CRITICAL: Multi-process encoding requires float32 precision
-        # Int8 quantization causes shared state issues across processes
-        will_use_multiprocessing = (
-            use_multiprocessing and len(texts) > 5000 and self.device == "cpu"
-        )
-        precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = (
-            "float32"
-            if will_use_multiprocessing
-            # Process-safe precision
-            else (QUANTIZATION_PRECISION if use_quantization else "float32")
-        )
-
-        # Multi-process encoding for large corpora on CPU
-        # Uses custom multiprocessing.Pool for reliable cross-platform support
-        # Each worker loads its own model to avoid shared state and GIL contention
-        if will_use_multiprocessing:
-            # Docker-compatible CPU detection: use sched_getaffinity for container CPU limits
-            # Falls back to cpu_count() if sched_getaffinity unavailable (Windows)
-            try:
-                available_cpus = len(os.sched_getaffinity(0))
-            except AttributeError:
-                available_cpus = os.cpu_count() or 8
-
-            # Use 2 workers to avoid OOM (each worker loads ~600MB model with spawn method)
-            # With spawn, each worker gets its own copy (no memory sharing)
-            # 2 workers x 600MB + main process = ~2GB total (safe under 7GB limit)
-            num_workers = 2
-
-            logger.info(
-                f"Encoding {len(texts)} texts with {num_workers} parallel processes "
-                f"(Docker-aware CPU detection: {available_cpus} cores, precision={precision})"
-            )
-
-            # Split texts into chunks for parallel processing
-            chunk_size = math.ceil(len(texts) / num_workers)
-            chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
-
-            logger.info(
-                f"Split into {len(chunks)} chunks of ~{chunk_size} texts each "
-                f"(batch_size={self.index.batch_size} within each worker)"
-            )
-
-            # Create worker arguments
-            worker_args = [
-                (chunk, self.index.model_name, self.index.batch_size, i)
-                for i, chunk in enumerate(chunks)
-            ]
-
-            # Use spawn on macOS (fork is unsafe with threads/CoreFoundation)
-            # Use fork on Linux (efficient copy-on-write memory sharing)
-            mp_method = "spawn" if platform.system() == "Darwin" else "fork"
-            ctx = mp.get_context(mp_method)
-
-            logger.info(
-                f"Starting multiprocessing.Pool with {num_workers} workers ({mp_method} method)..."
-            )
-            start_time = time.perf_counter()
-
-            with ctx.Pool(processes=num_workers) as pool:
-                logger.info("✅ Pool started, encoding chunks in parallel...")
-
-                # Map chunks to workers and collect results
-                results = pool.starmap(_encode_chunk_worker, worker_args)
-
-            # Concatenate results from all workers
-            embeddings = np.vstack(results)
-            elapsed = time.perf_counter() - start_time
-
-            logger.info(
-                f"✅ Multi-process encoding complete: {embeddings.shape} in {elapsed:.1f}s "
-                f"({len(texts) / elapsed:.0f} words/sec, {num_workers} workers)"
-            )
-
-            return self._truncate_matryoshka(embeddings)
-        else:
-            # Single-process for small batches or GPU
-            if USE_QUANTIZATION and len(texts) > 100:
-                logger.debug(
-                    f"Encoding {len(texts)} texts with {precision} quantization "
-                    f"(~{self._get_compression_ratio(precision):.0%} compression)"
-                )
-
-            embeddings = self.sentence_model.encode(
-                sentences=texts,
-                batch_size=self.index.batch_size,
-                show_progress_bar=len(texts) > 1000,
-                output_value="sentence_embedding",
-                precision=precision,
-                convert_to_numpy=True,
-                convert_to_tensor=False,
-                device=self.device,
-                normalize_embeddings=True,
-            )
-            return self._truncate_matryoshka(embeddings)
-
-    def _get_compression_ratio(self, precision: str) -> float:
-        """Calculate compression ratio for different precisions."""
-        ratios = {
-            "float32": 1.0,
-            "int8": 0.25,
-            "uint8": 0.25,
-            "binary": 0.03125,  # 1/32
-            "ubinary": 0.03125,
-        }
-        return ratios.get(precision, 1.0)
-
-    def _truncate_matryoshka(self, embeddings: np.ndarray) -> np.ndarray:
-        """Truncate embeddings using Matryoshka Representation Learning.
-
-        Only applies to MRL-capable models (Qwen3) when MATRYOSHKA_DIM is set.
-        Truncated embeddings are re-normalized to maintain unit length.
-        """
-        if MATRYOSHKA_DIM is None or not self.index:
-            return embeddings
-
-        model_name = self.index.model_name
-        supported_dims = MATRYOSHKA_DIMENSIONS.get(model_name)
-        if not supported_dims or MATRYOSHKA_DIM not in supported_dims:
-            return embeddings
-
-        if embeddings.ndim == 1:
-            truncated = embeddings[:MATRYOSHKA_DIM]
-        else:
-            truncated = embeddings[:, :MATRYOSHKA_DIM]
-
-        # Re-normalize to unit length after truncation
-        norms = np.linalg.norm(truncated, axis=-1, keepdims=True)
-        norms = np.where(norms == 0, 1, norms)
-        truncated = truncated / norms
-
-        if embeddings.shape[-1] != MATRYOSHKA_DIM:
-            logger.debug(f"Matryoshka truncation: {embeddings.shape[-1]}D → {MATRYOSHKA_DIM}D")
-
-        return truncated
-
     async def initialize(self) -> None:
         """Initialize semantic search by building embeddings."""
         if not self.index:
@@ -436,13 +257,22 @@ class SemanticSearch:
             f"Initializing semantic search for corpus '{self.index.corpus_name}' using {self.index.model_name}",
         )
 
-        # Initialize model if not already done
-        if not self.sentence_model:
-            self.device = self._detect_optimal_device()
-            self.index.device = self.device
-            self.sentence_model = await self._initialize_optimized_model()
+        # Initialize encoder model if not already done
+        if not self._encoder.sentence_model:
+            self._encoder.device = self._encoder.detect_optimal_device()
+            self.index.device = self._encoder.device
+            await self._encoder.initialize_model(
+                model_name=self.index.model_name,
+                device=self._encoder.device,
+            )
 
-        await self._build_embeddings_from_corpus()
+        # Delegate to builder
+        builder = SemanticEmbeddingBuilder(self._encoder)
+        (
+            self.sentence_embeddings,
+            self.sentence_index,
+            self._word_embeddings,
+        ) = await builder.build_embeddings_from_corpus(self.corpus, self.index)
 
     async def update_corpus(self, corpus: Corpus) -> None:
         """Update corpus and reinitialize if vocabulary hash has changed.
@@ -476,7 +306,7 @@ class SemanticSearch:
                 logger.info(
                     f"Incremental update for '{corpus.corpus_name}': "
                     f"+{len(added)} -{len(removed)} words "
-                    f"(total: {len(old_vocab)} → {len(new_vocab)})"
+                    f"(total: {len(old_vocab)} -> {len(new_vocab)})"
                 )
 
                 self.corpus = corpus
@@ -493,7 +323,13 @@ class SemanticSearch:
                 # Encode only new words
                 if added:
                     added_list = sorted(added)
-                    new_embs = self._encode(added_list, use_multiprocessing=False)
+                    # encoder.encode() applies Matryoshka truncation internally
+                    new_embs = self._encoder.encode(
+                        added_list,
+                        model_name=self.index.model_name,
+                        batch_size=self.index.batch_size,
+                        use_multiprocessing=False,
+                    )
                     for word, emb in zip(added_list, new_embs):
                         self._word_embeddings[word] = emb
 
@@ -542,220 +378,16 @@ class SemanticSearch:
                 self.sentence_index = None
                 self._word_embeddings = None
                 self._query_cache_manager.clear_result_cache()
-                await self._build_embeddings_from_corpus()
+
+                # Delegate full rebuild to builder
+                builder = SemanticEmbeddingBuilder(self._encoder)
+                (
+                    self.sentence_embeddings,
+                    self.sentence_index,
+                    self._word_embeddings,
+                ) = await builder.build_embeddings_from_corpus(self.corpus, self.index)
         else:
             self.corpus = corpus
-
-    async def _build_embeddings_from_corpus(self) -> None:
-        """Build or load embeddings using corpus instance."""
-        if not self.corpus or not self.index:
-            raise ValueError("Corpus and index required")
-
-        vocabulary_hash = self.corpus.vocabulary_hash
-
-        # Check if vocabulary has changed to avoid unnecessary rebuilding
-        if (
-            self.index.vocabulary_hash == vocabulary_hash
-            and self.sentence_embeddings is not None
-            and self.sentence_embeddings.size > 0
-        ):
-            logger.debug("Vocabulary unchanged and embeddings exist, skipping rebuild")
-            return
-
-        self.index.vocabulary_hash = vocabulary_hash
-
-        # Build embeddings using pre-computed lemma mappings from Corpus
-        logger.info("Building new semantic embeddings using pre-computed lemmas")
-
-        start_time = time.perf_counter()
-        # CRITICAL FIX: Use dedicated executor so embedding work (potentially
-        # minutes-long) doesn't saturate the default thread pool and starve
-        # HTTP request handlers.
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="embed-build") as executor:
-            await loop.run_in_executor(executor, self._build_embeddings)
-        build_time_seconds = time.perf_counter() - start_time
-
-        logger.info(f"Built semantic embeddings in {build_time_seconds * 1000:.1f}ms")
-
-        # Save embeddings to index
-        await save_embeddings_and_index(
-            index=self.index,
-            sentence_embeddings=self.sentence_embeddings,
-            sentence_index=self.sentence_index,
-            build_time=build_time_seconds,
-            corpus_uuid=self.corpus.corpus_uuid if self.corpus else self.index.corpus_uuid,
-        )
-
-    def _build_embeddings(self) -> None:
-        """Build streamlined semantic embeddings - sentence transformers only."""
-        if not self.corpus or not self.index:
-            raise ValueError("Corpus and index required")
-
-        # Check if lemmatized vocabulary is available
-        if not self.corpus.lemmatized_vocabulary:
-            logger.warning(
-                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary - no embeddings to build"
-            )
-            # Set empty embeddings and index for consistency
-            self.sentence_embeddings = np.array([], dtype=np.float32).reshape(
-                0, 1024
-            )  # BGE-M3 dimension
-            self.index.variant_mapping = {}
-            return
-
-        # Process entire vocabulary at once for better performance
-        vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas")
-
-        embedding_start = time.time()
-
-        # Use lemmatized vocabulary directly - it's already normalized/processed
-        embedding_vocabulary = self.corpus.lemmatized_vocabulary
-
-        # Create trivial identity mapping since we're using lemmas directly
-        variant_mapping = {i: i for i in range(len(embedding_vocabulary))}
-
-        # Store int→int variant mapping directly (no str conversion)
-        self.index.variant_mapping = variant_mapping
-
-        logger.info(
-            f"🔄 Using {len(embedding_vocabulary)} lemmatized embeddings directly (no re-normalization)",
-        )
-
-        # Process in batches for large vocabularies with progress tracking
-        # Batching provides visibility into progress while multiprocessing provides speed
-        # CRITICAL: Batch size must exceed 5000 to trigger multiprocessing in _encode()
-        # Larger batches = better throughput with cpu_count()-1 workers
-        if len(embedding_vocabulary) > 100000:
-            batch_size = 15000  # Massive corpora: maximize throughput
-        elif len(embedding_vocabulary) > 50000:
-            batch_size = 12000  # Large corpora: balance speed & memory
-        else:
-            batch_size = 8000  # Medium corpora: conservative
-
-        if len(embedding_vocabulary) > batch_size:
-            logger.info(
-                f"🔄 Processing {len(embedding_vocabulary):,} lemmas in batches of {batch_size:,}"
-            )
-            embeddings_list = []
-            total_batches = (len(embedding_vocabulary) + batch_size - 1) // batch_size
-
-            for i in range(0, len(embedding_vocabulary), batch_size):
-                batch = embedding_vocabulary[i : i + batch_size]
-                batch_num = i // batch_size + 1
-                progress_pct = (batch_num / total_batches) * 100
-
-                # Log every 5th batch or first/last batch (reduces 36+ logs to ~8 logs)
-                if batch_num % 5 == 0 or batch_num == 1 or batch_num == total_batches:
-                    logger.info(
-                        f"  📊 Batch {batch_num}/{total_batches} ({progress_pct:.0f}% complete)"
-                    )
-                else:
-                    logger.debug(
-                        f"  📊 Batch {batch_num}/{total_batches} ({progress_pct:.0f}% complete)"
-                    )
-
-                batch_start = time.time()
-                try:
-                    # Use thread-based parallel encoding (implemented in _encode)
-                    batch_embeddings = self._encode(batch, use_multiprocessing=True)
-                    batch_time = time.time() - batch_start
-
-                    # Log completion only for logged start batches
-                    if batch_num % 5 == 0 or batch_num == 1 or batch_num == total_batches:
-                        logger.debug(
-                            f"    ✅ Batch {batch_num} complete in {batch_time:.1f}s "
-                            f"({len(batch) / batch_time:.0f} words/sec)"
-                        )
-
-                    embeddings_list.append(batch_embeddings)
-
-                except Exception as e:
-                    logger.error(f"Failed to encode batch {batch_num}: {e}")
-                    raise
-
-            # Concatenate all batches
-            self.sentence_embeddings = np.vstack(embeddings_list)
-            logger.info(
-                f"✅ Completed {len(embeddings_list)} batches - {len(embedding_vocabulary):,} lemmas encoded"
-            )
-        else:
-            # Small vocabulary - use thread-based parallel encoding
-            logger.info(
-                f"🔄 Processing {len(embedding_vocabulary):,} lemmas (small corpus, no batching)"
-            )
-            self.sentence_embeddings = self._encode(embedding_vocabulary, use_multiprocessing=True)
-
-        # Safety check for empty embeddings
-        if self.sentence_embeddings.size == 0:
-            raise ValueError("No valid embeddings generated from vocabulary")
-
-        # CRITICAL FIX: Explicitly normalize embeddings to unit length
-        # Some models (e.g., GTE-Qwen2) don't normalize despite normalize_embeddings=True
-        norms_before = np.linalg.norm(self.sentence_embeddings, axis=1, keepdims=True)
-        logger.info(
-            f"Embedding norms before normalization - min: {norms_before.min():.6f}, max: {norms_before.max():.6f}, mean: {norms_before.mean():.6f}"
-        )
-
-        # Normalize to unit length (L2 norm = 1.0)
-        self.sentence_embeddings = self.sentence_embeddings / norms_before
-
-        # Verify normalization
-        norms_after = np.linalg.norm(self.sentence_embeddings, axis=1)
-        is_normalized = np.allclose(norms_after, 1.0, atol=0.01)
-        logger.info(
-            f"Embedding norms after normalization - min: {norms_after.min():.6f}, max: {norms_after.max():.6f}, mean: {norms_after.mean():.6f}"
-        )
-        logger.info(f"✅ Embeddings normalized: {is_normalized}")
-
-        if not is_normalized:
-            logger.warning(
-                "⚠️ Embeddings not properly normalized after normalization step - L2 distances may be inaccurate"
-            )
-
-        # Ensure C-contiguous memory layout for optimal FAISS performance
-        if not self.sentence_embeddings.flags.c_contiguous:
-            self.sentence_embeddings = np.ascontiguousarray(self.sentence_embeddings)
-            logger.debug("✅ Memory layout optimized: C-contiguous array")
-
-        # Log memory usage
-        memory_mb = self.sentence_embeddings.nbytes / (1024 * 1024)
-        logger.info(f"✅ Embeddings optimized: {memory_mb:.1f}MB")
-
-        # Build per-word embedding cache for incremental updates (<50k words)
-        if vocab_count < 50000:
-            self._word_embeddings = {
-                word: self.sentence_embeddings[i] for i, word in enumerate(embedding_vocabulary)
-            }
-            logger.debug(f"Built per-word embedding cache: {vocab_count} entries")
-        else:
-            self._word_embeddings = None
-
-        # Build FAISS index for sentence embeddings with dynamic optimization
-        dimension = self.sentence_embeddings.shape[1]
-        vocab_size = len(self.corpus.lemmatized_vocabulary)
-
-        logger.info(
-            f"🔄 Building FAISS index (dimension: {dimension}, vocab_size: {vocab_size:,})...",
-        )
-
-        # Configure FAISS threading before building index
-        configure_faiss_threading()
-
-        # Model-aware optimized quantization strategy
-        self.sentence_index = build_optimized_index(dimension, vocab_size, self.sentence_embeddings)
-
-        total_time = time.time() - embedding_start
-        embeddings_per_sec = vocab_count / total_time if total_time > 0 else 0
-
-        # Update index statistics
-        self.index.num_embeddings = vocab_count
-        self.index.embedding_dimension = dimension
-
-        logger.info(
-            f"✅ Semantic embeddings complete: {vocab_count:,} embeddings, dim={dimension} ({total_time:.1f}s, {embeddings_per_sec:.0f} emb/s)",
-        )
 
     def _load_index_from_data(self, index_data: SemanticIndex) -> None:
         """Load index from data object - current format only."""
@@ -775,31 +407,31 @@ class SemanticSearch:
     def _lookup_vocab_embedding(self, normalized_query: str) -> np.ndarray | None:
         """Look up pre-computed embedding for in-vocabulary queries.
 
-        Three O(1) lookups: vocabulary_to_index → word_to_lemma_indices → sentence_embeddings.
+        Three O(1) lookups: vocabulary_to_index -> word_to_lemma_indices -> sentence_embeddings.
         Returns None for out-of-vocabulary queries (which fall through to transformer encoding).
         """
         if self.corpus is None or self.sentence_embeddings is None:
             return None
 
-        # Corpus vocabulary_to_index uses batch_normalize → normalize_comprehensive
+        # Corpus vocabulary_to_index uses batch_normalize -> normalize_comprehensive
         # (lowercased + diacritics stripped + contractions expanded). Apply the same
-        # normalization here so "café", "CAFÉ", "Café" all match the "cafe" key.
+        # normalization here so "cafe", "CAFE", "Cafe" all match the "cafe" key.
         from floridify.text.normalize import normalize
 
         lookup_key = normalize(normalized_query)
 
-        # O(1) dict lookup: normalized word → vocabulary index
+        # O(1) dict lookup: normalized word -> vocabulary index
         word_idx = self.corpus.vocabulary_to_index.get(lookup_key)
         if word_idx is None:
             return None
 
-        # O(1) dict lookup: word index → lemma index
+        # O(1) dict lookup: word index -> lemma index
         lemma_idx = self.corpus.word_to_lemma_indices.get(word_idx)
         if lemma_idx is None:
             return None
 
-        # O(1) array access: lemma index → pre-computed embedding
-        # variant_mapping is embedding_idx→lemma_idx, but currently always identity.
+        # O(1) array access: lemma index -> pre-computed embedding
+        # variant_mapping is embedding_idx->lemma_idx, but currently always identity.
         # Use lemma_idx directly as embedding index (embeddings are stored in lemma order).
         if lemma_idx < 0 or lemma_idx >= len(self.sentence_embeddings):
             return None
@@ -859,7 +491,14 @@ class SemanticSearch:
 
             if query_embedding is None:
                 # Cache miss - generate embedding asynchronously (releases GIL)
-                query_embedding = await asyncio.to_thread(self._encode, [normalized_query])
+                # encoder.encode() applies Matryoshka truncation internally
+                query_embedding = await asyncio.to_thread(
+                    self._encoder.encode,
+                    [normalized_query],
+                    self.index.model_name,
+                    self.index.batch_size,
+                    False,  # use_multiprocessing
+                )
                 query_embedding = query_embedding[0]
 
                 if query_embedding is None:
@@ -893,7 +532,7 @@ class SemanticSearch:
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
 
-            # Get variant mapping from index if available (already int→int)
+            # Get variant mapping from index if available (already int->int)
             variant_mapping = self.index.variant_mapping if self.index else {}
 
             for embedding_idx, similarity in zip(
