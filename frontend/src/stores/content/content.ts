@@ -210,6 +210,7 @@ export const useContentStore = defineStore('content', () => {
     }
     currentWord.value = null
     definitionError.value = null
+    activeSourceTab.value = 'synthesis'
   }
   
   const clearWordSuggestions = () => {
@@ -252,9 +253,19 @@ export const useContentStore = defineStore('content', () => {
   }
   
   // ==========================================================================
+  // ACTIVE SOURCE TAB (provider filtering)
+  // ==========================================================================
+
+  const activeSourceTab = ref<string>('synthesis')
+
+  const setActiveSourceTab = (tab: string) => {
+    activeSourceTab.value = tab
+  }
+
+  // ==========================================================================
   // PROGRESSIVE SIDEBAR MANAGEMENT (Mode-specific)
   // ==========================================================================
-  
+
   const setSidebarActiveCluster = (cluster: string | null) => {
     if (searchBarStore.searchMode === 'lookup') {
       lookupContent.setSidebarActiveCluster(cluster)
@@ -314,8 +325,11 @@ export const useContentStore = defineStore('content', () => {
     
     // Progressive sidebar
     setSidebarActiveCluster,
-    setSidebarActivePartOfSpeech
-    
+    setSidebarActivePartOfSpeech,
+
+    // Active source tab
+    activeSourceTab,
+    setActiveSourceTab,
   }
 }, {
   persist: {

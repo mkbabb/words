@@ -78,7 +78,7 @@
     </div>
 
     <!-- Normal Content -->
-    <div v-else-if="entry" class="relative">
+    <div v-else-if="entry" ref="definitionCardRef" class="relative">
         <!-- Main Card -->
         <ThemedCard
             :variant="selectedCardVariant"
@@ -177,9 +177,11 @@
 
                             <!-- Render only visible definition clusters -->
                             <DefinitionCluster
-                                v-for="item in visibleItems"
+                                v-for="(item, visIdx) in visibleItems"
                                 :key="item.cluster.clusterId"
                                 :ref="(el: any) => measureSection(item.id, el?.$el)"
+                                :class="clusterAnimReady ? 'animate-cluster-in' : ''"
+                                :style="clusterAnimReady ? { animationDelay: `${visIdx * 60}ms` } : undefined"
                                 :cluster="item.cluster"
                                 :clusterIndex="item.index"
                                 :totalClusters="groupedDefinitions.length"
@@ -280,6 +282,19 @@
                 </div>
             </div>
 
+            <!-- Synonym Chooser (comparative essay) -->
+            <SynonymChooserComponent
+                v-if="entry.synonym_chooser"
+                :synonym-chooser="entry.synonym_chooser"
+                @search-word="actions.handleWordSearch"
+            />
+
+            <!-- Phrases & Idioms -->
+            <PhrasesSection
+                v-if="entry.phrases?.length"
+                :phrases="entry.phrases"
+            />
+
             <!-- Debug Info with Streaming Status -->
             <div v-if="entry.id" class="mt-4 flex justify-center">
                 <div
@@ -323,6 +338,18 @@
             @navigate-prev="timeMachine.navigatePrev"
             @rollback="handleTimeMachineRollback"
             @toggle-expanded="timeMachine.toggleExpanded"
+        />
+
+        <!-- Inline Word Lookup Popover -->
+        <WordLookupPopover
+            :selected-word="inlineLookup.selectedWord.value"
+            :is-pill-visible="inlineLookup.isPillVisible.value"
+            :is-popover-visible="inlineLookup.isPopoverVisible.value"
+            :position="inlineLookup.position.value"
+            @show-popover="inlineLookup.showPopover"
+            @dismiss="inlineLookup.dismiss"
+            @lookup="handleInlineLookup"
+            @add-to-wordlist="handleInlineAddToWordlist"
         />
 
         <!-- Add to Wordlist Modal -->
@@ -374,6 +401,11 @@ import {
 } from './utils/stateMessages';
 import { normalizeEtymology } from '@/utils/guards';
 import { useAuthStore } from '@/stores/auth';
+import { useRouter } from 'vue-router';
+import { useInlineWordLookup } from '@/composables/useInlineWordLookup';
+import WordLookupPopover from './components/WordLookupPopover.vue';
+import SynonymChooserComponent from './components/SynonymChooser.vue';
+import PhrasesSection from './components/PhrasesSection.vue';
 
 // Stores
 const contentStore = useContentStore();
@@ -404,7 +436,12 @@ watch(() => searchBar.getSubMode('lookup'), async (newSubMode) => {
 // Reactive state
 const isMounted = ref(true);
 const editModeEnabled = ref(false);
-const activeSourceTab = ref('synthesis');
+
+// Backed by content store so sidebar can read it
+const activeSourceTab = computed({
+    get: () => contentStore.activeSourceTab,
+    set: (v: string) => contentStore.setActiveSourceTab(v),
+});
 
 // In dev mode, treat user as premium (matching backend's admin passthrough)
 const effectivelyPremium = computed(() =>
@@ -602,6 +639,25 @@ const { allImages, handleImageClick, handleImageError } =
 const actions = useDefinitionActions({ entry, editModeEnabled });
 const timeMachine = useTimeMachine(computed(() => entry.value?.word));
 
+// Inline word lookup — uses the entire definition card as container
+// so it works for both synthesized (cluster view) and raw provider entries
+const definitionCardRef = ref<HTMLElement | null>(null);
+const inlineLookup = useInlineWordLookup(definitionCardRef);
+
+// Router captured in setup context — safe to use from event handlers
+const router = useRouter();
+
+function handleInlineLookup(word: string) {
+    inlineLookup.dismiss();
+    // Navigate directly — don't go through useRouterSync which calls inject() lazily
+    router.push({ name: 'Definition', params: { word } });
+}
+
+function handleInlineAddToWordlist(word: string) {
+    inlineLookup.dismiss();
+    actions.handleAddToWordlist(word);
+}
+
 // Wire up the toggle: open Time Machine instead of old panel
 watch(() => actions.showVersionHistory.value, (show) => {
     if (show) {
@@ -675,6 +731,22 @@ const handleTimeMachineRollback = async () => {
     }
 };
 
+// --- Staggered cluster entrance animation (CSS class toggle) ---
+// Tracks whether the current clusters should animate in (after word change, not initial load)
+const clusterAnimReady = ref(false);
+
+// When the word changes, enable animation for the incoming clusters
+watch(
+    () => entry.value?.word,
+    (newWord, oldWord) => {
+        if (newWord && oldWord && newWord !== oldWord) {
+            clusterAnimReady.value = true;
+            // Disable after the animation plays so scroll-virtualized items don't re-animate
+            setTimeout(() => { clusterAnimReady.value = false; }, 600);
+        }
+    },
+);
+
 // Helpers
 const getGlobalDefinitionIndex = (
     clusterIndex: number,
@@ -732,5 +804,14 @@ const getGlobalDefinitionIndex = (
 /* Ensure proper stacking context */
 .sticky {
     will-change: transform;
+}
+
+/* Staggered cluster entrance on word change */
+@keyframes clusterSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-cluster-in {
+    animation: clusterSlideIn 0.3s ease both;
 }
 </style>

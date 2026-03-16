@@ -58,8 +58,8 @@
         </Tooltip>
     </div>
 
-    <!-- Multiple providers: overlapping stack + inline popover (no portal — stays in card DOM) -->
-    <Popover v-else-if="showSynthesis || providers.length > 0">
+    <!-- Multiple providers: individually clickable icons + info popover -->
+    <Popover v-else-if="showSynthesis || providers.length > 0" v-model:open="popoverOpen">
         <div class="flex items-center">
             <!-- AI Synthesis icon (separate from stack) -->
             <Tooltip v-if="showSynthesis">
@@ -90,83 +90,76 @@
                 class="mx-1.5 h-5 w-px bg-border/50"
             />
 
-            <!-- Overlapping provider stack — expands on hover, triggers popover on click -->
-            <PopoverTrigger as-child>
-                <button
-                    v-if="providers.length > 0"
-                    class="group/stack flex items-center focus:outline-none focus:ring-0"
-                    :class="[
-                        interactive
-                            ? 'cursor-pointer'
-                            : 'cursor-default',
-                    ]"
-                >
-                    <div
-                        v-for="(provider, i) in orderedProviders"
-                        :key="provider"
-                        :class="[
-                            'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 shadow-sm transition-all duration-200 ease-apple-spring',
-                            i > 0 ? '-ml-2 group-hover/stack:ml-0.5' : '',
-                            activeSource === provider
-                                ? 'ring-2 ring-primary/30 bg-muted'
-                                : '',
-                        ]"
-                        :style="{ zIndex: orderedProviders.length - i }"
+            <!-- Provider icons — each individually clickable to switch, expand on hover -->
+            <div
+                v-if="providers.length > 0"
+                class="group/stack relative flex items-center"
+            >
+                <!-- Info button — floats above the icon stack -->
+                <PopoverTrigger as-child>
+                    <button
+                        class="absolute -top-3.5 left-1/2 -translate-x-1/2 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/40 transition-all duration-150 opacity-0 group-hover/stack:opacity-100 hover:text-muted-foreground hover:bg-muted/60 z-10"
                     >
-                        <component
-                            :is="getProviderIcon(provider)"
-                            :size="14"
-                            class="text-muted-foreground"
-                        />
-                    </div>
-                </button>
-            </PopoverTrigger>
+                        <Info :size="10" />
+                    </button>
+                </PopoverTrigger>
+
+                <Tooltip v-for="(provider, i) in orderedProviders" :key="provider">
+                    <TooltipTrigger as-child>
+                        <button
+                            :disabled="!interactive"
+                            @click="$emit('select-source', provider)"
+                            :class="[
+                                'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 shadow-sm transition-all duration-200 ease-apple-spring',
+                                interactive ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
+                                i > 0 ? '-ml-2 group-hover/stack:ml-0.5' : '',
+                                activeSource === provider
+                                    ? 'ring-2 ring-primary/30 bg-muted'
+                                    : '',
+                            ]"
+                            :style="{ zIndex: orderedProviders.length - i }"
+                        >
+                            <component
+                                :is="getProviderIcon(provider)"
+                                :size="14"
+                                class="text-muted-foreground"
+                            />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="6">
+                        {{ getProviderDisplayName(provider) }}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
         </div>
 
-        <!-- Provider selection dropdown — rendered inline (no PopoverPortal) to preserve card hover -->
+        <!-- Provider metadata dropdown -->
         <InlinePopoverContent
             side="bottom"
             align="start"
             :side-offset="20"
-            class="w-56 rounded-xl border border-border/30 bg-background/92 p-1.5 shadow-lg backdrop-blur-md"
+            class="w-64 rounded-xl border border-border/40 bg-popover p-1.5 shadow-lg backdrop-blur-md"
         >
-            <div
-                v-for="src in (sourceEntries?.length ? sourceEntries : providerFallback)"
+            <ProviderMetadataCard
+                v-for="src in sortedDropdownEntries"
                 :key="getKey(src)"
-                class="flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors duration-150"
-                :class="[
-                    interactive ? 'cursor-pointer hover:bg-muted/60' : 'cursor-default',
-                    activeSource === getId(src)
-                        ? 'bg-primary/10 font-medium text-foreground'
-                        : 'text-foreground/80',
-                ]"
-                @click="$emit('select-source', getId(src))"
-            >
-                <component
-                    :is="getProviderIcon(getId(src))"
-                    :size="16"
-                    class="flex-shrink-0"
-                    :class="activeSource === getId(src) ? 'text-foreground' : 'text-muted-foreground'"
-                />
-                <span class="text-sm flex-1">
-                    {{ getProviderDisplayName(getId(src)) }}
-                </span>
-                <span
-                    v-if="'entry_version' in src && src.entry_version"
-                    class="font-mono text-xs text-muted-foreground/60"
-                >v{{ src.entry_version }}</span>
-                <div
-                    v-if="activeSource === getId(src)"
-                    class="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"
-                />
-            </div>
+                :provider="getId(src)"
+                :display-name="getProviderDisplayName(getId(src))"
+                :is-active="activeSource === getId(src)"
+                :interactive="interactive"
+                :version="'entry_version' in src ? src.entry_version : undefined"
+                :richness-score="providerMetadata.get(getId(src))?.richness_score ?? null"
+                :definition-count="providerMetadata.get(getId(src))?.definition_count ?? null"
+                :fetched-at="providerMetadata.get(getId(src))?.fetched_at ?? null"
+                @click="handleDropdownSelect(getId(src))"
+            />
         </InlinePopoverContent>
     </Popover>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Wand2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
+import { Wand2, Info } from 'lucide-vue-next';
 import {
     Popover,
     PopoverTrigger,
@@ -183,6 +176,8 @@ import {
     getProviderIcon,
     getProviderDisplayName,
 } from '../utils/providers';
+import ProviderMetadataCard from './ProviderMetadataCard.vue';
+import { providersApi, type ProviderEntry } from '@/api/providers';
 import type { SourceReference } from '@/types/api';
 
 interface ProviderIconsProps {
@@ -191,6 +186,7 @@ interface ProviderIconsProps {
     showSynthesis?: boolean;
     interactive?: boolean;
     sourceEntries?: SourceReference[];
+    word?: string;
 }
 
 const props = withDefaults(defineProps<ProviderIconsProps>(), {
@@ -199,17 +195,71 @@ const props = withDefaults(defineProps<ProviderIconsProps>(), {
     interactive: true,
 });
 
-defineEmits<{
+const emit = defineEmits<{
     'select-source': [source: string];
 }>();
 
-// Reorder providers so the active source is always first in the stack
+// Lazy-fetch provider metadata on popover open
+const providerMetadata = ref<Map<string, ProviderEntry>>(new Map());
+const metadataLoaded = ref(false);
+const popoverOpen = ref(false);
+
+watch(popoverOpen, async (open) => {
+    if (!open || metadataLoaded.value || !props.word) return;
+    try {
+        const entries = await providersApi.getWordProviders(props.word);
+        const map = new Map<string, ProviderEntry>();
+        for (const e of entries) map.set(e.provider, e);
+        providerMetadata.value = map;
+        metadataLoaded.value = true;
+    } catch {
+        // Silently degrade — cards render without richness data
+    }
+});
+
+// Reset cache when word changes
+watch(() => props.word, () => {
+    metadataLoaded.value = false;
+    providerMetadata.value = new Map();
+});
+
+// Select from dropdown and close popover
+function handleDropdownSelect(provider: string) {
+    emit('select-source', provider);
+    popoverOpen.value = false;
+}
+
+// Sort providers by richness (richest first) — used for icon stack and dropdown
+const richnessSorted = computed(() => {
+    const list = [...props.providers];
+    if (list.length <= 1 || providerMetadata.value.size === 0) return list;
+    return list.sort((a, b) => {
+        const ra = providerMetadata.value.get(a)?.richness_score ?? 0;
+        const rb = providerMetadata.value.get(b)?.richness_score ?? 0;
+        return rb - ra; // descending
+    });
+});
+
+// Icon stack: active source shown first (z-order), rest by richness
 const orderedProviders = computed(() => {
-    const list = props.providers;
+    const list = richnessSorted.value;
     if (!list || list.length <= 1) return list;
     const active = props.activeSource;
     if (!active || active === 'synthesis' || list[0] === active) return list;
     return [active, ...list.filter(p => p !== active)];
+});
+
+// Dropdown list: sorted by richness (richest first)
+const sortedDropdownEntries = computed(() => {
+    const base = props.sourceEntries?.length ? props.sourceEntries : providerFallback.value;
+    if (providerMetadata.value.size === 0) return base;
+    return [...base].sort((a, b) => {
+        const idA = getId(a);
+        const idB = getId(b);
+        const ra = providerMetadata.value.get(idA)?.richness_score ?? 0;
+        const rb = providerMetadata.value.get(idB)?.richness_score ?? 0;
+        return rb - ra;
+    });
 });
 
 // Fallback for when sourceEntries is empty but we have provider strings

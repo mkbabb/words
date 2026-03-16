@@ -10,13 +10,29 @@ import type { SynthesizedDictionaryEntry } from '@/types';
 
 export function useSidebarState() {
     const { content } = useStores();
-    
-    // Transform API entry to frontend format for compatibility
+
+    // Transform API entry to frontend format, filtering by active provider tab
     const entry = computed(() => {
         const apiEntry = content.currentEntry;
         if (!apiEntry) return null;
-        // The API type is compatible with the frontend type for this composable
-        return apiEntry as any as SynthesizedDictionaryEntry;
+        const raw = apiEntry as any as SynthesizedDictionaryEntry;
+
+        const activeTab = content.activeSourceTab;
+        // Synthesis view → show all definitions (current behaviour)
+        if (!activeTab || activeTab === 'synthesis') {
+            return raw;
+        }
+
+        // Provider view → filter to definitions whose providers_data includes this provider
+        const filtered = (raw.definitions ?? []).filter((def: any) => {
+            if (!def.providers_data) return false;
+            const pdList = Array.isArray(def.providers_data)
+                ? def.providers_data
+                : [def.providers_data];
+            return pdList.some((pd: any) => pd.provider === activeTab);
+        });
+
+        return { ...raw, definitions: filtered } as SynthesizedDictionaryEntry;
     });
     const { groupedDefinitions } = useDefinitionGroups(entry);
     

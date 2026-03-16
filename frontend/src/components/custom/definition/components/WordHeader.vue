@@ -60,49 +60,55 @@
                         Language: {{ languages[0] }}
                     </TooltipContent>
                 </Tooltip>
-                <!-- Multiple languages: overlapping stack → popover dropdown on click -->
+                <!-- Multiple languages: each badge directly clickable + info popover -->
                 <Popover v-else>
-                    <PopoverTrigger as-child>
-                        <button class="group/lang flex items-center cursor-pointer focus:outline-none focus:ring-0">
-                            <div
-                                v-for="(lang, i) in orderedLanguages.slice(0, 3)"
-                                :key="lang"
+                    <div class="group/lang flex items-center">
+                        <Tooltip v-for="(lang, i) in orderedLanguages.slice(0, 3)" :key="lang">
+                            <TooltipTrigger as-child>
+                                <button
+                                    @click="selectAudioLanguage(lang)"
+                                    :class="[
+                                        'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 text-[10px] font-bold uppercase shadow-sm transition-all duration-200 ease-apple-spring cursor-pointer hover:bg-muted',
+                                        i > 0 ? '-ml-2 group-hover/lang:ml-0.5' : '',
+                                        lang === audioLanguage ? 'ring-2 ring-primary/30 bg-muted' : '',
+                                    ]"
+                                    :style="{ zIndex: orderedLanguages.length - i }"
+                                >
+                                    <span :class="lang === audioLanguage ? 'text-primary' : 'text-muted-foreground'">
+                                        {{ lang }}
+                                    </span>
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" :side-offset="6">
+                                {{ getLanguageDisplayName(lang) }}
+                            </TooltipContent>
+                        </Tooltip>
+                        <!-- Overflow count + popover trigger for 4+ languages -->
+                        <PopoverTrigger v-if="orderedLanguages.length > 3" as-child>
+                            <button
                                 :class="[
-                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 text-[10px] font-bold uppercase shadow-sm transition-all duration-200 ease-apple-spring',
-                                    i > 0 ? '-ml-2 group-hover/lang:ml-0.5' : '',
-                                    lang === audioLanguage ? 'ring-2 ring-primary/30 bg-muted' : '',
-                                ]"
-                                :style="{ zIndex: orderedLanguages.length - i }"
-                            >
-                                <span :class="lang === audioLanguage ? 'text-primary' : 'text-muted-foreground'">
-                                    {{ lang }}
-                                </span>
-                            </div>
-                            <div
-                                v-if="orderedLanguages.length > 3"
-                                :class="[
-                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/50 text-[10px] font-medium text-muted-foreground/60 transition-all duration-200 ease-apple-spring',
+                                    'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/50 text-[10px] font-medium text-muted-foreground/60 transition-all duration-200 ease-apple-spring cursor-pointer hover:bg-muted/80 hover:text-muted-foreground',
                                     '-ml-2 group-hover/lang:ml-0.5',
                                 ]"
                             >
                                 +{{ orderedLanguages.length - 3 }}
-                            </div>
-                        </button>
-                    </PopoverTrigger>
+                            </button>
+                        </PopoverTrigger>
+                    </div>
                     <InlinePopoverContent
                         side="bottom"
                         align="start"
                         :side-offset="20"
-                        class="w-44 rounded-xl border border-border/30 bg-background/92 p-1.5 shadow-lg backdrop-blur-md"
+                        class="w-44 rounded-xl border border-border/40 bg-popover p-1.5 shadow-lg backdrop-blur-md"
                     >
                         <div
                             v-for="lang in languages"
                             :key="lang"
                             :class="[
-                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-colors duration-150 hover:bg-muted/60',
+                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-colors duration-150',
                                 lang === audioLanguage
-                                    ? 'bg-primary/10 font-medium text-foreground'
-                                    : 'text-foreground/80',
+                                    ? 'bg-primary/10 font-medium text-foreground hover:bg-primary/15'
+                                    : 'text-foreground/80 hover:bg-muted/80 hover:text-foreground',
                             ]"
                             @click="selectAudioLanguage(lang)"
                         >
@@ -168,6 +174,7 @@
                 :show-synthesis="isAISynthesized"
                 :interactive="!sourceSelectionDisabled"
                 :source-entries="sourceEntries"
+                :word="word"
                 @select-source="$emit('select-source', $event)"
             />
         </div>

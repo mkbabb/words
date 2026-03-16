@@ -7,7 +7,7 @@
     <!-- No TabsList — source switching is controlled by ProviderIcons in WordHeader -->
 
     <!-- AI Synthesis content (default slot) -->
-    <TabsContent v-if="showSynthesis" value="synthesis" class="mt-0">
+    <TabsContent v-if="showSynthesis" value="synthesis" class="mt-0 tab-content-animate">
       <slot />
     </TabsContent>
 
@@ -16,7 +16,7 @@
       v-for="providerName in availableProviders"
       :key="providerName"
       :value="providerName"
-      class="mt-0"
+      class="mt-0 tab-content-animate"
     >
       <div class="px-4 pb-4 sm:px-6">
         <!-- Per-provider version history (admin mode) -->
@@ -171,3 +171,15 @@ watch(
 // Pre-load on mount
 onMounted(loadProviders);
 </script>
+
+<style scoped>
+/* Tab content entrance animation — Reka UI mounts/unmounts TabsContent,
+   so a CSS animation on mount gives us the fade+slide without Vue <Transition>. */
+@keyframes tabContentIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.tab-content-animate {
+    animation: tabContentIn 0.25s ease both;
+}
+</style>
