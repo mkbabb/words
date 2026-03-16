@@ -140,7 +140,6 @@ import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
 import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
-import { DefinitionSkeleton } from '@/components/custom/definition';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
