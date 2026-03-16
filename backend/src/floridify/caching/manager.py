@@ -9,13 +9,14 @@ from collections import defaultdict
 from typing import Any, TypeVar
 
 from beanie import PydanticObjectId
+from pydantic import ValidationError
 from pymongo.errors import OperationFailure
 
 from ..utils.introspection import extract_metadata_params
 from ..utils.logging import get_logger
 from .config import DELTA_CONFIG, RESOURCE_TYPE_MAP
 from .core import GlobalCacheManager, get_global_cache, get_versioned_content, set_versioned_content
-from .delta import apply_delta, compute_delta
+from .delta_manager import convert_to_delta, reconstruct_from_delta
 from .filesystem import FilesystemBackend
 from .keys import generate_resource_key as _generate_cache_key
 from .models import (
@@ -29,7 +30,12 @@ from .models import (
 )
 from .serialize import encode_for_json
 from .validation import should_create_new_version
-from .version_chains import increment_version, parse_version
+from .version_chains import increment_version
+from .version_crud import (
+    delete_version as _delete_version,
+    list_versions as _list_versions,
+    prune_old_versions as _prune_old_versions,
+)
 
 logger = get_logger(__name__)
 
@@ -358,54 +364,9 @@ class VersionedDataManager:
     ) -> None:
         """Convert an old version's content from full snapshot to delta.
 
-        The delta stores only the differences needed to reconstruct the old
-        version from the new version (which is always a full snapshot).
-
-        Skips conversion if:
-        - Resource type is not delta-eligible (binary types)
-        - Old version is at a snapshot interval boundary
-        - Old version has no inline content
+        Delegates to :func:`delta_manager.convert_to_delta`.
         """
-        if resource_type not in DELTA_ELIGIBLE_TYPES:
-            return
-
-        # Check if this version should remain a snapshot (every Nth version)
-        version_parts = parse_version(old_version.version_info.version)
-        version_num = version_parts.patch
-        if version_num % DELTA_CONFIG.snapshot_interval == 0:
-            logger.debug(
-                f"Keeping v{old_version.version_info.version} as snapshot (interval boundary)"
-            )
-            return
-
-        # Only convert inline content (external content is too complex for delta)
-        old_content = old_version.content_inline
-        new_content = new_version.content_inline
-        if old_content is None or new_content is None:
-            return
-
-        # Compute and store delta
-        delta = compute_delta(old_content, new_content)
-        if not delta:
-            return  # Identical content, nothing to do
-
-        # Replace old version's content with the delta
-        collection = BaseVersionedData.get_pymongo_collection()
-        await collection.update_one(
-            {"_id": old_version.id},
-            {
-                "$set": {
-                    "content_inline": delta,
-                    "version_info.storage_mode": "delta",
-                    "version_info.delta_base_id": new_version.id,
-                }
-            },
-        )
-
-        logger.debug(
-            f"Converted v{old_version.version_info.version} to delta "
-            f"(base: v{new_version.version_info.version})"
-        )
+        await convert_to_delta(old_version, new_version, resource_type)
 
     async def _reconstruct_from_delta(
         self,
@@ -414,83 +375,9 @@ class VersionedDataManager:
     ) -> dict[str, Any] | None:
         """Reconstruct full content for a delta-stored version.
 
-        Walks the delta_base_id chain until hitting a full snapshot,
-        then applies deltas in reverse order to reconstruct the target version.
-
-        Args:
-            delta_version: The version stored as a delta
-            resource_type: Type of resource
-
-        Returns:
-            Reconstructed content dict, or None if chain is broken
+        Delegates to :func:`delta_manager.reconstruct_from_delta`.
         """
-        model_class = self._get_model_class(resource_type)
-
-        # Collect delta chain: walk from delta_version toward the nearest snapshot
-        chain: list[BaseVersionedData] = [delta_version]
-        current = delta_version
-        safety = DELTA_CONFIG.max_chain_length
-
-        while current.version_info.storage_mode == "delta" and safety > 0:
-            base_id = current.version_info.delta_base_id
-            if base_id is None:
-                logger.error(
-                    f"Broken delta chain: v{current.version_info.version} has no delta_base_id"
-                )
-                return None
-
-            base_version = await model_class.get(base_id)
-            if base_version is None:
-                logger.error(
-                    f"Broken delta chain: base {base_id} not found for "
-                    f"v{current.version_info.version}"
-                )
-                return None
-
-            chain.append(base_version)
-            current = base_version
-            safety -= 1
-
-        if safety <= 0:
-            logger.error(
-                f"Delta chain exceeded max length ({DELTA_CONFIG.max_chain_length}) "
-                f"for {delta_version.resource_id}"
-            )
-            return None
-
-        # The last element in chain is the snapshot base
-        snapshot = chain[-1]
-        if snapshot.content_inline is None:
-            logger.error(f"Snapshot base v{snapshot.version_info.version} has no inline content")
-            return None
-
-        # Apply deltas from snapshot toward the target version
-        # chain = [target_delta, ..., intermediate_delta, snapshot]
-        # We apply deltas from second-to-last back to first
-        chain_length = len(chain) - 1  # Exclude the snapshot itself
-        result = dict(snapshot.content_inline)
-        for delta_ver in reversed(chain[:-1]):
-            if delta_ver.content_inline is None:
-                logger.error(f"Delta v{delta_ver.version_info.version} has no content")
-                return None
-            result = apply_delta(result, delta_ver.content_inline)
-
-        # Auto-resnapshot: if chain was long, save reconstructed as new snapshot
-        # to prevent unbounded delta chain traversal on subsequent reads
-        if chain_length > 20:
-            try:
-                delta_version.content_inline = result
-                delta_version.version_info.storage_mode = "snapshot"
-                delta_version.version_info.delta_base_id = None
-                await delta_version.save()
-                logger.info(
-                    f"Auto-resnapshotted v{delta_version.version_info.version} "
-                    f"(chain was {chain_length} deep)"
-                )
-            except Exception as e:
-                logger.warning(f"Auto-resnapshot failed (non-fatal): {e}")
-
-        return result
+        return await reconstruct_from_delta(delta_version, resource_type, self._get_model_class)
 
     async def get_latest(
         self,
@@ -527,7 +414,7 @@ class VersionedDataManager:
                         raise TypeError(
                             f"Unexpected cache entry type {type(cached).__name__} for {cache_key}"
                         )
-                except Exception as e:
+                except (TypeError, ValueError, ValidationError) as e:
                     logger.warning(
                         f"Cache entry for {cache_key} could not be coerced to {model_class.__name__}: {e}",
                         exc_info=True,
@@ -558,7 +445,7 @@ class VersionedDataManager:
                                 else:
                                     logger.debug(f"Cache hit for {cache_key}")
                                     return cached_obj  # type: ignore[no-any-return]
-                        except Exception as e:
+                        except (TypeError, ValueError, ValidationError) as e:
                             logger.warning(
                                 f"Cache validation failed for {cache_key}: {e}, invalidating cache",
                                 exc_info=True,
@@ -713,13 +600,11 @@ class VersionedDataManager:
     async def list_versions(
         self, resource_id: str, resource_type: ResourceType
     ) -> list[BaseVersionedData]:
-        """List all versions of a resource."""
-        # Use the specific model class for polymorphic queries
-        model_class = self._get_model_class(resource_type)
-        results = await model_class.find(
-            {"resource_id": resource_id, "resource_type": resource_type.value}
-        ).to_list()
-        return results
+        """List all versions of a resource.
+
+        Delegates to :func:`version_crud.list_versions`.
+        """
+        return await _list_versions(resource_id, resource_type, self._get_model_class)
 
     async def invalidate_cache(
         self,
@@ -855,54 +740,19 @@ class VersionedDataManager:
         resource_type: ResourceType,
         version: str,
     ) -> bool:
-        """Delete a specific version."""
-        # Use the specific model class for polymorphic queries
-        model_class = self._get_model_class(resource_type)
-        result = await model_class.find_one(
-            {
-                "resource_id": resource_id,
-                "resource_type": resource_type.value,
-                "version_info.version": version,
-            },
+        """Delete a specific version.
+
+        Delegates to :func:`version_crud.delete_version`.
+        """
+        success, self.cache = await _delete_version(
+            resource_id,
+            resource_type,
+            version,
+            self._get_model_class,
+            self._get_namespace,
+            self.cache,
         )
-
-        if result:
-            # Update version chain
-            if result.version_info.superseded_by:
-                next_version = await model_class.get(result.version_info.superseded_by)
-                if next_version:
-                    next_version.version_info.supersedes = result.version_info.supersedes
-                    await next_version.save()
-
-            if result.version_info.supersedes:
-                prev_version = await model_class.get(result.version_info.supersedes)
-                if prev_version:
-                    prev_version.version_info.superseded_by = result.version_info.superseded_by
-                    if result.version_info.is_latest:
-                        prev_version.version_info.is_latest = True
-                    await prev_version.save()
-
-            await result.delete()
-
-            # Clear cache for both specific version and latest version
-            namespace = self._get_namespace(resource_type)
-            if self.cache is None:
-                self.cache = await get_global_cache()
-
-            # CRITICAL FIX #8: Use consistent hashing for cache keys
-            # Clear specific version cache
-            version_cache_key = _generate_cache_key(resource_type, resource_id, "v", version)
-            await self.cache.delete(namespace, version_cache_key)
-
-            # Clear latest version cache if this was marked as latest
-            if result.version_info.is_latest:
-                latest_cache_key = _generate_cache_key(resource_type, resource_id)
-                await self.cache.delete(namespace, latest_cache_key)
-
-            logger.info(f"Deleted {resource_type.value} '{resource_id}' v{version}")
-            return True
-
-        return False
+        return success
 
     async def prune_old_versions(
         self,
@@ -912,126 +762,9 @@ class VersionedDataManager:
     ) -> dict[str, Any]:
         """Delete old non-latest versions older than max_age_days, keeping at least keep_minimum.
 
-        For each (resource_id, resource_type) group, versions are sorted by creation time.
-        The latest version is always preserved. Among non-latest versions, those older than
-        max_age_days are candidates for deletion, but at least keep_minimum total versions
-        (including the latest) are always retained.
-
-        Args:
-            max_age_days: Delete non-latest versions older than this many days.
-            keep_minimum: Always keep at least this many versions per resource.
-            dry_run: If True, return counts without actually deleting.
-
-        Returns:
-            Dict with pruning statistics: total_deleted, resources_affected, details.
+        Delegates to :func:`version_crud.prune_old_versions`.
         """
-        from datetime import UTC, datetime, timedelta as td
-
-        cutoff = datetime.now(UTC) - td(days=max_age_days)
-        collection = BaseVersionedData.get_pymongo_collection()
-
-        # Find all distinct (resource_id, resource_type) pairs
-        pipeline = [
-            {"$group": {"_id": {"resource_id": "$resource_id", "resource_type": "$resource_type"}}},
-        ]
-        groups = await collection.aggregate(pipeline).to_list(length=None)
-
-        total_deleted = 0
-        resources_affected = 0
-        details: list[dict[str, Any]] = []
-
-        for group in groups:
-            resource_id = group["_id"]["resource_id"]
-            resource_type = group["_id"]["resource_type"]
-
-            # Get all versions for this resource, sorted newest first
-            versions = (
-                await collection.find(
-                    {
-                        "resource_id": resource_id,
-                        "resource_type": resource_type,
-                    },
-                )
-                .sort([("version_info.created_at", -1), ("_id", -1)])
-                .to_list(length=None)
-            )
-
-            total_versions = len(versions)
-            if total_versions <= keep_minimum:
-                # Already at or below minimum -- skip entirely
-                continue
-
-            # Identify candidates for deletion:
-            # - Must NOT be the latest version
-            # - Must be older than cutoff
-            # - Must leave at least keep_minimum versions remaining
-            candidates_to_delete: list[PydanticObjectId] = []
-            for version_doc in versions:
-                # Never delete the latest version
-                vi = version_doc.get("version_info", {})
-                if vi.get("is_latest", False):
-                    continue
-
-                created_at = vi.get("created_at")
-                if created_at is not None and created_at < cutoff:
-                    candidates_to_delete.append(version_doc["_id"])
-
-            # Ensure we keep at least keep_minimum versions
-            max_deletable = total_versions - keep_minimum
-            if max_deletable <= 0:
-                continue
-
-            ids_to_delete = candidates_to_delete[:max_deletable]
-
-            if not ids_to_delete:
-                continue
-
-            if not dry_run:
-                # Also clean up delta chains: any version that has delta_base_id
-                # pointing to a deleted version needs to be handled.
-                # For safety, we skip deleting versions that are delta bases for others.
-                delta_base_ids = set()
-                dependent_cursor = collection.find(
-                    {"version_info.delta_base_id": {"$in": ids_to_delete}},
-                    {"version_info.delta_base_id": 1},
-                )
-                async for dep_doc in dependent_cursor:
-                    base_id = dep_doc.get("version_info", {}).get("delta_base_id")
-                    if base_id:
-                        delta_base_ids.add(base_id)
-
-                # Remove delta bases from deletion candidates
-                safe_ids = [did for did in ids_to_delete if did not in delta_base_ids]
-
-                if safe_ids:
-                    result = await collection.delete_many({"_id": {"$in": safe_ids}})
-                    deleted_count = result.deleted_count
-                else:
-                    deleted_count = 0
-            else:
-                deleted_count = len(ids_to_delete)
-
-            if deleted_count > 0:
-                total_deleted += deleted_count
-                resources_affected += 1
-                details.append(
-                    {
-                        "resource_id": resource_id,
-                        "resource_type": resource_type,
-                        "versions_before": total_versions,
-                        "versions_deleted": deleted_count,
-                        "versions_after": total_versions - deleted_count,
-                    }
-                )
-
-        return {
-            "total_deleted": total_deleted,
-            "resources_affected": resources_affected,
-            "max_age_days": max_age_days,
-            "keep_minimum": keep_minimum,
-            "dry_run": dry_run,
-            "details": details,
-        }
+        return await _prune_old_versions(max_age_days, keep_minimum, dry_run)
 
     async def _find_by_hash(
         self, resource_id: str, resource_type: ResourceType, content_hash: str
@@ -1049,7 +782,7 @@ class VersionedDataManager:
             )
             if result:
                 return result
-        except Exception as e:
+        except (OperationFailure, ValueError, TypeError) as e:
             logger.debug(f"Error finding version by hash: {e}")
             return None
         return None
