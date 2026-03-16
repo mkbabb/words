@@ -13,6 +13,7 @@ from ...models.dictionary import (
     Pronunciation,
     Word,
 )
+from ...models.richness import compute_entry_richness
 from ...utils.language_precedence import to_language_codes
 
 T = TypeVar("T", bound=Document)
@@ -22,17 +23,15 @@ class DataLoader:
     """Base class for data loading operations."""
 
     @staticmethod
-    async def load_by_ids(model_class: type[T], ids: list[str]) -> list[T]:
-        """Load multiple documents by IDs efficiently."""
+    async def load_by_ids(model_class: type[T], ids: list[Any]) -> list[T]:
+        """Load multiple documents by IDs efficiently using batch query."""
         if not ids:
             return []
 
-        documents = []
-        for doc_id in ids:
-            doc = await model_class.get(doc_id)
-            if doc:
-                documents.append(doc)
-        return documents
+        docs = await model_class.find({"_id": {"$in": ids}}).to_list()
+        # Preserve original ordering
+        doc_map = {doc.id: doc for doc in docs}
+        return [doc_map[did] for did in ids if did in doc_map]
 
 
 class PronunciationLoader(DataLoader):
@@ -51,17 +50,15 @@ class PronunciationLoader(DataLoader):
         # Convert to dict
         pron_dict = pronunciation.model_dump(mode="json", exclude={"id", "word_id"})
 
-        # Load and transform audio files
+        # Load and transform audio files (batch query)
         audio_files = []
         if pron_dict.get("audio_file_ids"):
-            for audio_id in pron_dict["audio_file_ids"]:
-                audio = await AudioMedia.get(audio_id)
-                if audio:
-                    audio_dict = audio.model_dump(mode="json", exclude={"id"})
-                    # Convert file path to API URL
-                    if audio_dict.get("url", "").startswith("/"):
-                        audio_dict["url"] = f"/api/v1/audio/{audio_id!s}/content"
-                    audio_files.append(audio_dict)
+            audios = await DataLoader.load_by_ids(AudioMedia, pron_dict["audio_file_ids"])
+            for audio in audios:
+                audio_dict = audio.model_dump(mode="json", exclude={"id"})
+                if audio_dict.get("url", "").startswith("/"):
+                    audio_dict["url"] = f"/api/v1/audio/{audio.id!s}/content"
+                audio_files.append(audio_dict)
 
         pron_dict["audio_files"] = audio_files
         return pron_dict
@@ -77,6 +74,7 @@ class DefinitionLoader(DataLoader):
         include_images: bool = True,
         include_provider_data: bool = True,
         provider_data_ids: list[str] | None = None,
+        _provider_data_cache: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Load definition with all related data resolved.
 
@@ -86,6 +84,7 @@ class DefinitionLoader(DataLoader):
             include_images: Whether to load image data
             include_provider_data: Whether to include provider data
             provider_data_ids: Provider data IDs to load (for shared provider data)
+            _provider_data_cache: Pre-loaded provider data dicts (avoids N+1 re-fetch)
 
         Returns:
             Dictionary with fully resolved definition data
@@ -119,36 +118,31 @@ class DefinitionLoader(DataLoader):
             "frequency_band": definition.frequency_band,
         }
 
-        # Load examples if requested
+        # Load examples (batch query)
         if include_examples and definition.example_ids:
-            examples = []
-            for example_id in definition.example_ids:
-                example = await Example.get(example_id)
-                if example:
-                    examples.append(example.model_dump(mode="json"))
-            def_dict["examples"] = examples
+            examples = await DataLoader.load_by_ids(Example, definition.example_ids)
+            def_dict["examples"] = [e.model_dump(mode="json") for e in examples]
         else:
             def_dict["examples"] = []
 
-        # Load images if requested
+        # Load images (batch query)
         if include_images and definition.image_ids:
-            images = []
-            for image_id in definition.image_ids:
-                image = await ImageMedia.get(image_id)
-                if image:
-                    images.append(image.model_dump(mode="json", exclude={"data"}))
-            def_dict["images"] = images
+            images = await DataLoader.load_by_ids(ImageMedia, definition.image_ids)
+            def_dict["images"] = [
+                img.model_dump(mode="json", exclude={"data"}) for img in images
+            ]
         else:
             def_dict["images"] = []
 
-        # Load provider data if requested
+        # Use pre-loaded provider data if available, otherwise load
         if include_provider_data and provider_data_ids:
-            providers_data = []
-            for provider_id in provider_data_ids:
-                provider_data = await DictionaryEntry.get(provider_id)
-                if provider_data:
-                    providers_data.append(provider_data.model_dump(mode="json", exclude={"id"}))
-            def_dict["providers_data"] = providers_data
+            if _provider_data_cache is not None:
+                def_dict["providers_data"] = _provider_data_cache
+            else:
+                providers = await DataLoader.load_by_ids(DictionaryEntry, provider_data_ids)
+                def_dict["providers_data"] = [
+                    p.model_dump(mode="json", exclude={"id"}) for p in providers
+                ]
         else:
             def_dict["providers_data"] = []
 
@@ -216,35 +210,39 @@ class DictionaryEntryLoader(DataLoader):
         ).to_list()
         provider_entry_ids = [str(pe.id) for pe in provider_entries] if provider_entries else None
 
-        # Load definitions with all relations
+        # Pre-serialize provider data once (avoids N+1 re-fetch per definition)
+        provider_data_cache: list[dict[str, Any]] | None = None
+        if provider_entry_ids:
+            provider_data_cache = [
+                pe.model_dump(mode="json", exclude={"id"}) for pe in provider_entries
+            ]
+
+        # Batch-load all definitions in one query, then resolve relations
         definitions = []
+        all_defs: list[Definition] = []
         if entry.definition_ids:
-            # Load each definition with relations
-            for def_id in entry.definition_ids:
-                definition = await Definition.get(def_id)
-                if definition:
-                    def_dict = await DefinitionLoader.load_with_relations(
-                        definition=definition,
-                        include_examples=True,
-                        include_images=True,
-                        include_provider_data=True,
-                        provider_data_ids=provider_entry_ids,
-                    )
-                    definitions.append(def_dict)
+            all_defs = await DataLoader.load_by_ids(Definition, entry.definition_ids)
+            for definition in all_defs:
+                def_dict = await DefinitionLoader.load_with_relations(
+                    definition=definition,
+                    include_examples=True,
+                    include_images=True,
+                    include_provider_data=True,
+                    provider_data_ids=provider_entry_ids,
+                    _provider_data_cache=provider_data_cache,
+                )
+                definitions.append(def_dict)
 
         # Load pronunciation with audio files
         pronunciation = None
         if entry.pronunciation_id:
             pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id))
 
-        # Load images for the synth entry itself
+        # Load images for the synth entry itself (batch query)
         images = []
         if entry.image_ids:
-            for image_id in entry.image_ids:
-                image = await ImageMedia.get(image_id)
-                if image:
-                    image_dict = image.model_dump(mode="json", exclude={"data"})
-                    images.append(image_dict)
+            image_docs = await DataLoader.load_by_ids(ImageMedia, entry.image_ids)
+            images = [img.model_dump(mode="json", exclude={"data"}) for img in image_docs]
 
         # Build the response dictionary from canonical Word language precedence.
         response_languages = to_language_codes(list(word_obj.languages))
@@ -253,6 +251,9 @@ class DictionaryEntryLoader(DataLoader):
                 f"Word '{word_obj.id}' is missing languages. "
                 "Migration is required to provide a non-empty languages list.",
             )
+
+        # Compute richness score (reuses already-loaded definitions)
+        richness_score = compute_entry_richness(entry, all_defs)
 
         return {
             "word": word_obj.text,
@@ -264,4 +265,5 @@ class DictionaryEntryLoader(DataLoader):
             "model_info": (entry.model_info.model_dump(mode="json") if entry.model_info else None),
             "id": str(entry.id),
             "images": images,
+            "richness_score": richness_score,
         }

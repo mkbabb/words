@@ -23,9 +23,10 @@ from ...models.dictionary import (
     DictionaryProvider,
     Word as WordModel,
 )
+from ...models.richness import compute_entry_richness
 from ...models.parameters import LookupParams
 from ...models.user import UserRole
-from ...storage.mongodb import get_synthesized_entry
+from ...storage.mongodb import get_best_existing_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
 from ..core import AdminDep, OptionalUserRoleDep
@@ -33,9 +34,29 @@ from ..core import AdminDep, OptionalUserRoleDep
 logger = get_logger(__name__)
 router = APIRouter()
 
+# Deduplicates concurrent background synthesis requests
+_background_synthesis_in_flight: set[str] = set()
 
-# Use the centralized loader service instead of duplicating logic
-# The PronunciationLoader is imported from services.loaders above
+
+async def _background_synthesize(word: str, params: LookupParams) -> None:
+    """Fire-and-forget AI synthesis using existing provider data in the DB."""
+    if word in _background_synthesis_in_flight:
+        return
+    _background_synthesis_in_flight.add(word)
+    try:
+        await lookup_word_pipeline(
+            word=word,
+            providers=params.providers,
+            languages=params.languages,
+            no_ai=False,
+            skip_search=True,
+            state_tracker=None,
+        )
+        logger.info(f"Background synthesis complete for '{word}'")
+    except Exception as e:
+        logger.warning(f"Background synthesis failed for '{word}': {e}")
+    finally:
+        _background_synthesis_in_flight.discard(word)
 
 
 # Models specific to lookup endpoints
@@ -67,6 +88,9 @@ class DictionaryEntryResponse(BaseModel):
         default_factory=list,
         description="Images attached to the synthesized entry",
     )
+
+    # Richness score (0.0–1.0)
+    richness_score: float | None = Field(None, description="Entry richness score (0.0–1.0)")
 
     # Definitions with all resolved data
     definitions: list[dict[str, Any]] = Field(
@@ -106,6 +130,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
         languages=params.languages,
         force_refresh=params.force_refresh,
         no_ai=params.no_ai,
+        skip_search=True,
         state_tracker=None,  # No state tracking for cached lookups
     )
 
@@ -164,9 +189,10 @@ async def lookup_word(
     # Premium gating: free users can only get AI synthesis if it's already cached
     is_premium = user_role in (UserRole.PREMIUM, UserRole.ADMIN) if user_role else False
     if not is_premium and not params.no_ai:
-        # Check if synthesis is cached; if not, force no_ai
-        existing = await get_synthesized_entry(word)
-        if not existing:
+        # Reuse get_best_existing_entry — if synthesis exists we're good,
+        # otherwise force no_ai for free users
+        existing_entry, is_synthesis = await get_best_existing_entry(word)
+        if not is_synthesis:
             params = LookupParams(
                 force_refresh=params.force_refresh,
                 providers=params.providers,
@@ -266,10 +292,11 @@ async def _lookup_with_tracking(
                 )
                 return cached_result
 
-            # Check MongoDB cache
-            existing = await get_synthesized_entry(word)
+            # Check MongoDB for ANY existing entry (synthesis preferred, then provider)
+            existing, is_synthesis = await get_best_existing_entry(word)
             if existing:
-                logger.info(f"📋 DB cache hit for '{word}'")
+                source_label = "synthesis cache" if is_synthesis else f"{existing.provider} DB"
+                logger.info(f"📋 DB hit for '{word}' ({source_label})")
                 # Ensure audio exists for primary language (fire-and-forget)
                 asyncio.ensure_future(_ensure_primary_audio(existing))
                 response_dict = await DictionaryEntryLoader.load_as_lookup_response(
@@ -288,9 +315,14 @@ async def _lookup_with_tracking(
                 await _report_cached_progress(
                     state_tracker,
                     word,
-                    "database cache",
+                    source_label,
                     len(result.definitions),
                 )
+
+                # Non-synthesis entry + AI allowed → background synthesis upgrade
+                if not is_synthesis and not params.no_ai:
+                    asyncio.ensure_future(_background_synthesize(word, params))
+
                 return result
 
         # No cache hit - run full pipeline with real progress tracking
@@ -300,12 +332,14 @@ async def _lookup_with_tracking(
         await state_tracker.update(stage=Stages.START, message=f"Starting lookup for '{word}'...")
 
         # Execute the actual lookup pipeline with state tracking
+        # skip_search=True: the API endpoint already resolved the word
         entry = await lookup_word_pipeline(
             word=word,
             providers=params.providers,
             languages=params.languages,
             force_refresh=params.force_refresh,
             no_ai=params.no_ai,
+            skip_search=True,
             state_tracker=state_tracker,
         )
 
@@ -368,8 +402,8 @@ async def lookup_word_stream(
     # Premium gating: free users can only get AI synthesis if it's already cached
     is_premium = user_role in (UserRole.PREMIUM, UserRole.ADMIN) if user_role else False
     if not is_premium and not params.no_ai:
-        existing = await get_synthesized_entry(word)
-        if not existing:
+        existing_entry, is_synthesis = await get_best_existing_entry(word)
+        if not is_synthesis:
             params = LookupParams(
                 force_refresh=params.force_refresh,
                 providers=params.providers,
@@ -556,25 +590,28 @@ async def get_word_providers(word: str) -> list[dict[str, Any]]:
             "id": str(entry.id),
             "etymology": entry.etymology.model_dump() if entry.etymology else None,
             "model_info": entry.model_info.model_dump() if entry.model_info else None,
+            "fetched_at": entry.created_at.isoformat() if entry.created_at else None,
         }
 
         # Load definitions
-        definitions = []
+        defs: list[DefModel] = []
         if entry.definition_ids:
             defs = await DefModel.find({"_id": {"$in": entry.definition_ids}}).to_list()
-            definitions = [
-                {
-                    "id": str(d.id),
-                    "part_of_speech": d.part_of_speech,
-                    "text": d.text,
-                    "synonyms": d.synonyms[:10] if d.synonyms else [],
-                    "antonyms": d.antonyms[:10] if d.antonyms else [],
-                    "examples": [],
-                }
-                for d in defs
-            ]
 
-        provider_data["definitions"] = definitions
+        provider_data["definitions"] = [
+            {
+                "id": str(d.id),
+                "part_of_speech": d.part_of_speech,
+                "text": d.text,
+                "synonyms": d.synonyms[:10] if d.synonyms else [],
+                "antonyms": d.antonyms[:10] if d.antonyms else [],
+                "examples": [],
+            }
+            for d in defs
+        ]
+        provider_data["definition_count"] = len(defs)
+        provider_data["richness_score"] = compute_entry_richness(entry, defs)
+
         result.append(provider_data)
 
     return result
