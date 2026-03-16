@@ -365,6 +365,76 @@ const config: Config = {
         '.texture-strong': {
           backgroundSize: '100px 100px',
         },
+        // Mastery level utilities (text, bg, border)
+        '.mastery-default': { color: 'var(--mastery-default)' },
+        '.mastery-bronze':  { color: 'var(--mastery-bronze)' },
+        '.mastery-silver':  { color: 'var(--mastery-silver)' },
+        '.mastery-gold':    { color: 'var(--mastery-gold)' },
+        '.bg-mastery-default': { backgroundColor: 'color-mix(in srgb, var(--mastery-default) 10%, transparent)' },
+        '.bg-mastery-bronze':  { backgroundColor: 'color-mix(in srgb, var(--mastery-bronze) 10%, transparent)' },
+        '.bg-mastery-silver':  { backgroundColor: 'color-mix(in srgb, var(--mastery-silver) 10%, transparent)' },
+        '.bg-mastery-gold':    { backgroundColor: 'color-mix(in srgb, var(--mastery-gold) 10%, transparent)' },
+        '.border-mastery-default': { borderColor: 'color-mix(in srgb, var(--mastery-default) 25%, transparent)' },
+        '.border-mastery-bronze':  { borderColor: 'color-mix(in srgb, var(--mastery-bronze) 25%, transparent)' },
+        '.border-mastery-silver':  { borderColor: 'color-mix(in srgb, var(--mastery-silver) 25%, transparent)' },
+        '.border-mastery-gold':    { borderColor: 'color-mix(in srgb, var(--mastery-gold) 25%, transparent)' },
+        // Card state utilities
+        '.state-new':         { color: 'var(--card-state-new)' },
+        '.state-learning':    { color: 'var(--card-state-learning)' },
+        '.state-young':       { color: 'var(--card-state-young)' },
+        '.state-mature':      { color: 'var(--card-state-mature)' },
+        '.state-relearning':  { color: 'var(--card-state-relearning)' },
+        '.bg-state-new':         { backgroundColor: 'color-mix(in srgb, var(--card-state-new) 10%, transparent)' },
+        '.bg-state-learning':    { backgroundColor: 'color-mix(in srgb, var(--card-state-learning) 10%, transparent)' },
+        '.bg-state-young':       { backgroundColor: 'color-mix(in srgb, var(--card-state-young) 10%, transparent)' },
+        '.bg-state-mature':      { backgroundColor: 'color-mix(in srgb, var(--card-state-mature) 10%, transparent)' },
+        '.bg-state-relearning':  { backgroundColor: 'color-mix(in srgb, var(--card-state-relearning) 10%, transparent)' },
+        // Review quality button styles
+        '.review-btn-again': {
+          '@apply border transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-again) 15%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-again) 30%, transparent)',
+          color: 'var(--review-again)',
+          '&:hover': {
+            backgroundColor: 'color-mix(in srgb, var(--review-again) 25%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-again) 50%, transparent)',
+          },
+        },
+        '.review-btn-hard': {
+          '@apply border transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-hard) 15%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-hard) 30%, transparent)',
+          color: 'var(--review-hard)',
+          '&:hover': {
+            backgroundColor: 'color-mix(in srgb, var(--review-hard) 25%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-hard) 50%, transparent)',
+          },
+        },
+        '.review-btn-good': {
+          '@apply border transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-good) 15%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-good) 30%, transparent)',
+          color: 'var(--review-good)',
+          '&:hover': {
+            backgroundColor: 'color-mix(in srgb, var(--review-good) 25%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-good) 50%, transparent)',
+          },
+        },
+        '.review-btn-easy': {
+          '@apply border transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-easy) 15%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-easy) 30%, transparent)',
+          color: 'var(--review-easy)',
+          '&:hover': {
+            backgroundColor: 'color-mix(in srgb, var(--review-easy) 25%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-easy) 50%, transparent)',
+          },
+        },
+        // Mastery stat card
+        '.stat-mastery': {
+          '@apply rounded-xl border p-3 backdrop-blur-md transition-all duration-200': {},
+          '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
+        },
       }
       addUtilities(newUtilities, ['responsive', 'hover'])
       

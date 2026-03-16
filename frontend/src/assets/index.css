@@ -28,10 +28,12 @@
   }
 }
 
-/* Smooth color transitions only during intentional theme toggles */
+/* Smooth color transitions only during intentional theme toggles.
+   Target specific elements with explicit backgrounds — NOT the universal wildcard (*).
+   Using * forces style recalculation on every DOM node (1500+ with wordlist cards),
+   causing severe jank. Body handles inherited text color; cards handle their own backgrounds. */
 .theme-transitioning,
-.theme-transitioning *,
-.theme-transitioning *::before,
-.theme-transitioning *::after {
+.theme-transitioning .themed-card,
+.theme-transitioning .stat-mastery {
   transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, fill 0.3s ease !important;
 }

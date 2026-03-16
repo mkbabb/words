@@ -1,113 +1,103 @@
 <template>
-    <div class="space-y-4">
-        <!-- Sort Criteria Chips -->
-        <div v-if="sortCriteria.length > 0" class="space-y-3">
-            <div class="flex items-center justify-between">
-                <h4 class="text-sm font-medium text-muted-foreground">
-                    Sort Order
-                </h4>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    @click.stop="clearAllCriteria"
-                    class="h-7 px-2 text-xs hover:text-destructive"
-                >
-                    <X :size="12" class="mr-1" />
-                    Clear All
-                </Button>
-            </div>
-
-            <div class="space-y-2">
-                <TransitionGroup
-                    name="sort-chip"
-                    tag="div"
-                    class="flex flex-wrap gap-2"
+    <div>
+        <!-- Compact mode: vertical list (progressive sidebar) -->
+        <div v-if="compact" class="space-y-1">
+            <TransitionGroup
+                name="sort-item"
+                tag="div"
+                class="space-y-1"
+            >
+                <div
+                    v-for="option in sortedOptions"
+                    :key="option.field"
+                    :class="[
+                        'flex items-center transition-all duration-200 select-none',
+                        'gap-1.5 rounded-md px-2 py-1.5',
+                        isActive(option.field)
+                            ? 'border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 hover:border-primary/30 hover:shadow-sm'
+                            : 'border border-transparent hover:border-border/50 hover:bg-muted/60 hover:shadow-sm cursor-pointer',
+                        isActive(option.field) && 'cursor-grab active:cursor-grabbing',
+                    ]"
+                    :draggable="isActive(option.field)"
+                    @dragstart="isActive(option.field) && handleDragStart(getActiveIndex(option.field))"
+                    @dragover.prevent
+                    @drop="isActive(option.field) && handleDrop(getActiveIndex(option.field))"
+                    @click="!isActive(option.field) && addCriterion(option.field)"
                 >
                     <div
-                        v-for="(criterion, index) in sortCriteria"
-                        :key="criterion.id"
-                        :class="[
-                            'group flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200',
-                            'border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5',
-                            'hover:border-primary/30 hover:from-primary/15 hover:to-primary/10',
-                            'cursor-move select-none',
-                        ]"
-                        draggable="true"
-                        @dragstart="handleDragStart(index)"
-                        @dragover.prevent
-                        @drop="handleDrop(index)"
+                        v-if="isActive(option.field)"
+                        class="flex shrink-0 items-center justify-center rounded-full bg-primary/20 font-bold text-primary tabular-nums h-5 w-5 text-xs"
                     >
-                        <!-- Priority indicator -->
-                        <div
-                            class="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-xs font-medium text-primary"
-                        >
-                            {{ index + 1 }}
-                        </div>
-
-                        <!-- Criterion info -->
-                        <div class="flex min-w-0 flex-1 items-center gap-2">
-                            <component
-                                :is="getCriterionIcon(criterion.field)"
-                                :size="14"
-                                class="text-primary"
-                            />
-                            <span class="truncate text-sm font-medium">{{
-                                getCriterionLabel(criterion.field)
-                            }}</span>
-                        </div>
-
-                        <!-- Direction toggle -->
-                        <button
-                            @click.stop="toggleDirection(criterion.id)"
-                            :class="[
-                                'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                                'text-primary hover:bg-primary/20 hover:text-primary-foreground',
-                            ]"
-                            :title="`Sort ${criterion.direction === 'asc' ? 'ascending' : 'descending'}`"
-                        >
-                            <ArrowUp
-                                v-if="criterion.direction === 'asc'"
-                                :size="12"
-                            />
-                            <ArrowDown v-else :size="12" />
-                        </button>
-
-                        <!-- Remove button -->
-                        <button
-                            @click.stop="removeCriterion(criterion.id)"
-                            class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                            title="Remove criterion"
-                        >
-                            <X :size="12" />
-                        </button>
+                        {{ getActiveIndex(option.field) + 1 }}
                     </div>
-                </TransitionGroup>
-            </div>
+                    <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                        <component
+                            :is="option.icon"
+                            :size="14"
+                            :class="isActive(option.field) ? 'text-primary' : 'text-muted-foreground'"
+                        />
+                        <span
+                            :class="[
+                                'truncate text-sm font-medium',
+                                isActive(option.field) ? 'text-foreground' : 'text-muted-foreground',
+                            ]"
+                        >
+                            {{ option.label }}
+                        </span>
+                    </div>
+                    <template v-if="isActive(option.field)">
+                        <button
+                            @click.stop="toggleDirection(getCriterionId(option.field))"
+                            class="flex shrink-0 items-center justify-center rounded transition-colors text-primary hover:bg-primary/20 h-5 w-5"
+                        >
+                            <ArrowUp v-if="getDirection(option.field) === 'asc'" :size="14" />
+                            <ArrowDown v-else :size="14" />
+                        </button>
+                        <button
+                            @click.stop="removeCriterion(getCriterionId(option.field))"
+                            class="flex shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-destructive/20 hover:text-destructive h-5 w-5"
+                        >
+                            <X :size="10" />
+                        </button>
+                    </template>
+                </div>
+            </TransitionGroup>
         </div>
 
-        <!-- Add Criteria -->
-        <div class="space-y-3">
-            <h4 class="text-sm font-medium text-muted-foreground">
-                Add Sort Criteria
-            </h4>
-            <div class="grid grid-cols-2 gap-2">
-                <button
-                    v-for="option in availableOptions"
-                    :key="option.field"
-                    @click.stop="addCriterion(option.field)"
-                    :disabled="isCriterionActive(option.field)"
-                    :class="[
-                        'flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200',
-                        'text-left text-sm font-medium',
-                        isCriterionActive(option.field)
-                            ? 'cursor-not-allowed border-muted bg-muted/50 text-muted-foreground opacity-50'
-                            : 'border-border bg-background hover:border-primary/20 hover:bg-muted/50 hover:text-primary',
-                    ]"
+        <!-- Non-compact mode: grid layout (search controls dropdown) -->
+        <div v-else class="grid grid-cols-3 gap-1.5">
+            <button
+                v-for="option in availableOptions"
+                :key="option.field"
+                @click="toggleCriterion(option.field)"
+                :class="[
+                    'relative flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 select-none',
+                    isActive(option.field)
+                        ? 'border border-primary/30 bg-primary/10 text-primary shadow-sm hover:bg-primary/15'
+                        : 'border border-border/50 bg-background hover:border-primary/20 hover:bg-muted/50 hover:shadow-sm text-muted-foreground hover:text-foreground',
+                ]"
+            >
+                <!-- Priority badge (top-left overlay) -->
+                <div
+                    v-if="isActive(option.field)"
+                    class="absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground shadow-sm"
                 >
-                    <component :is="option.icon" :size="14" />
-                    {{ option.label }}
+                    {{ getActiveIndex(option.field) + 1 }}
+                </div>
+
+                <component :is="option.icon" :size="14" class="shrink-0" />
+                <span class="truncate">{{ option.label }}</span>
+
+                <!-- Direction arrow (inline, only when active) -->
+                <button
+                    v-if="isActive(option.field)"
+                    @click.stop="toggleDirection(getCriterionId(option.field))"
+                    class="ml-auto flex shrink-0 items-center justify-center rounded-full h-5 w-5 hover:bg-primary/20 transition-colors"
+                >
+                    <ArrowUp v-if="getDirection(option.field) === 'asc'" :size="12" />
+                    <ArrowDown v-else :size="12" />
                 </button>
-            </div>
+            </button>
         </div>
     </div>
 </template>
@@ -125,13 +115,15 @@ import {
     Clock,
     Type,
 } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
 
 import type { AdvancedSortCriterion, SortField, SortOption } from '@/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     modelValue: AdvancedSortCriterion[];
-}>();
+    compact?: boolean;
+}>(), {
+    compact: false,
+});
 
 const emit = defineEmits<{
     'update:modelValue': [criteria: AdvancedSortCriterion[]];
@@ -185,15 +177,30 @@ const availableOptions: SortOption[] = [
     },
 ];
 
+// Active items come first, in their sort order; inactive follow in their default order
+const sortedOptions = computed(() => {
+    const active = sortCriteria.value
+        .map(c => availableOptions.find(o => o.field === c.field))
+        .filter(Boolean) as SortOption[];
+    const inactive = availableOptions.filter(o => !isCriterionActive(o.field));
+    return [...active, ...inactive];
+});
+
+const isActive = (field: SortField) => isCriterionActive(field);
+
+const getActiveIndex = (field: SortField) => {
+    return sortCriteria.value.findIndex(c => c.field === field);
+};
+
+const getCriterionId = (field: SortField) => {
+    return sortCriteria.value.find(c => c.field === field)?.id ?? '';
+};
+
+const getDirection = (field: SortField) => {
+    return sortCriteria.value.find(c => c.field === field)?.direction ?? 'asc';
+};
+
 // Methods
-const getCriterionIcon = (field: SortField) => {
-    return availableOptions.find((opt) => opt.field === field)?.icon || Trophy;
-};
-
-const getCriterionLabel = (field: SortField) => {
-    return availableOptions.find((opt) => opt.field === field)?.label || '';
-};
-
 const isCriterionActive = (field: SortField) => {
     return sortCriteria.value.some((criterion) => criterion.field === field);
 };
@@ -219,6 +226,15 @@ const removeCriterion = (id: string) => {
     );
 };
 
+const toggleCriterion = (field: SortField) => {
+    if (isCriterionActive(field)) {
+        const id = getCriterionId(field);
+        removeCriterion(id);
+    } else {
+        addCriterion(field);
+    }
+};
+
 const toggleDirection = (id: string) => {
     sortCriteria.value = sortCriteria.value.map((criterion) =>
         criterion.id === id
@@ -228,10 +244,6 @@ const toggleDirection = (id: string) => {
               }
             : criterion
     );
-};
-
-const clearAllCriteria = () => {
-    sortCriteria.value = [];
 };
 
 // Drag and drop handlers
@@ -255,35 +267,17 @@ const handleDrop = (dropIndex: number) => {
 </script>
 
 <style scoped>
-/* Transition animations for sort chips */
-.sort-chip-move,
-.sort-chip-enter-active,
-.sort-chip-leave-active {
-    transition:
-        opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-        transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.sort-item-move,
+.sort-item-enter-active,
+.sort-item-leave-active {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-
-.sort-chip-enter-from {
+.sort-item-enter-from {
     opacity: 0;
-    transform: scale(0.8) translateY(-10px);
+    transform: translateX(-10px);
 }
-
-.sort-chip-leave-to {
+.sort-item-leave-to {
     opacity: 0;
-    transform: scale(0.8) translateY(10px);
-}
-
-.sort-chip-leave-active {
-    position: absolute;
-}
-
-/* Drag cursor */
-[draggable='true'] {
-    cursor: grab;
-}
-
-[draggable='true']:active {
-    cursor: grabbing;
+    transform: translateX(10px);
 }
 </style>

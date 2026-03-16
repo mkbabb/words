@@ -1,5 +1,61 @@
 <template>
     <div class="space-y-4 p-2">
+        <!-- Search bar -->
+        <div class="relative">
+            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+            <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="Search wordlists..."
+                class="w-full rounded-lg bg-background/60 dark:bg-white/[0.04] border border-border/30 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+            />
+        </div>
+
+        <!-- Gradient separator -->
+        <hr class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent" />
+
+        <!-- All Wordlists -->
+        <div v-if="isLoading" class="space-y-2">
+            <div v-for="i in 3" :key="i" class="animate-pulse">
+                <div class="h-16 rounded-md bg-muted/30"></div>
+            </div>
+        </div>
+
+        <div v-else-if="wordlists.length === 0" class="py-8 text-center">
+            <FileText class="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+            <p class="text-muted-foreground">No wordlists found</p>
+            <p class="mt-1 text-xs text-muted-foreground/70">
+                Create your first wordlist to get started
+            </p>
+        </div>
+
+        <div v-else-if="filteredWordlists.length === 0" class="py-4 text-center">
+            <p class="text-sm text-muted-foreground">No matching wordlists</p>
+        </div>
+
+        <div v-else class="space-y-0">
+            <template v-for="(wordlist, index) in filteredWordlists" :key="wordlist.id">
+                <SidebarWordListItem
+                    :wordlist="wordlist"
+                    :is-selected="selectedWordlist === wordlist.id"
+                    @select="handleWordlistSelect"
+                    @edit="handleWordlistEdit"
+                    @delete="handleWordlistDelete"
+                    @duplicate="handleWordlistDuplicate"
+                />
+                <hr
+                    v-if="index < filteredWordlists.length - 1"
+                    class="my-0.5 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/15 to-transparent"
+                />
+            </template>
+        </div>
+
+        <!-- Gradient separator -->
+        <hr class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent" />
+
+        <!-- Add wordlist label -->
+        <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Add wordlist</p>
+
         <!-- File Upload Drop Zone -->
         <div
             @drop="onDrop"
@@ -45,11 +101,6 @@
             Create New Wordlist
         </Button>
 
-        <!-- Gradient separator -->
-        <hr
-            class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent"
-        />
-
         <!-- Processing Status (if there are any active uploads) -->
         <div v-if="activeUploads.length > 0" class="mb-4">
             <h3 class="mb-2 text-sm font-medium text-muted-foreground">
@@ -81,34 +132,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- All Wordlists -->
-        <div v-if="isLoading" class="space-y-2">
-            <div v-for="i in 3" :key="i" class="animate-pulse">
-                <div class="h-16 rounded-md bg-muted/30"></div>
-            </div>
-        </div>
-
-        <div v-else-if="wordlists.length === 0" class="py-8 text-center">
-            <FileText class="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-            <p class="text-muted-foreground">No wordlists found</p>
-            <p class="mt-1 text-xs text-muted-foreground/70">
-                Create your first wordlist to get started
-            </p>
-        </div>
-
-        <div v-else class="space-y-2">
-            <SidebarWordListItem
-                v-for="wordlist in wordlists"
-                :key="wordlist.id"
-                :wordlist="wordlist"
-                :is-selected="selectedWordlist === wordlist.id"
-                @select="handleWordlistSelect"
-                @edit="handleWordlistEdit"
-                @delete="handleWordlistDelete"
-                @duplicate="handleWordlistDuplicate"
-            />
         </div>
 
         <!-- File Upload Modal -->
@@ -144,7 +167,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
-import { FileText, Plus, Upload } from 'lucide-vue-next';
+import { FileText, Plus, Search, Upload } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/modals/WordListUploadModal.vue';
@@ -185,6 +208,14 @@ const activeUploads = ref<
     }>
 >([]);
 const isLoading = ref(false);
+
+// Search/filter
+const searchQuery = ref('');
+const filteredWordlists = computed(() => {
+    const q = searchQuery.value.toLowerCase().trim();
+    if (!q) return wordlists.value;
+    return wordlists.value.filter(w => w.name.toLowerCase().includes(q));
+});
 
 // Computed properties
 const selectedWordlist = computed(() => wordlistMode.selectedWordlist);

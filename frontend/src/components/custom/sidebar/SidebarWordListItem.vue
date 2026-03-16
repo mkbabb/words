@@ -2,65 +2,68 @@
   <button
     @click="$emit('select', wordlist)"
     :class="[
-      'group flex w-full items-center justify-between rounded-md px-3 py-2',
+      'group flex w-full items-center justify-between rounded-md px-2 py-1.5',
       'transition-all duration-200',
       'text-left',
-      isSelected 
-        ? 'bg-primary/10 text-primary border border-primary/20' 
-        : 'hover:bg-muted/50 active:scale-[0.98]',
+      isSelected
+        ? 'bg-primary/10 text-foreground'
+        : 'text-foreground/80 hover:bg-muted/30 hover:text-foreground',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
     ]"
   >
     <div class="min-w-0 flex-1">
-      <div class="flex items-center gap-2">
-        <p class="font-medium text-sm truncate">{{ wordlist.name }}</p>
-        
-        <!-- Mastery indicator dots -->
-        <div class="flex items-center gap-0.5">
-          <div 
-            v-if="masteryStats.gold > 0"
-            class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-amber-600"
-            :title="`${masteryStats.gold} mastered`"
-          />
-          <div 
-            v-if="masteryStats.silver > 0"
-            class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-gray-400 to-gray-600"
-            :title="`${masteryStats.silver} familiar`"
-          />
-          <div 
-            v-if="masteryStats.bronze > 0"
-            class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-orange-400 to-orange-600"
-            :title="`${masteryStats.bronze} learning`"
-          />
-        </div>
+      <div class="flex items-center gap-1.5">
+        <p :class="[
+          'truncate text-sm',
+          isSelected ? 'font-bold' : 'font-medium'
+        ]">{{ wordlist.name }}</p>
+
+        <!-- Mastery indicator dot -->
+        <div
+          v-if="hasMastered"
+          class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gradient-to-r from-yellow-400 to-amber-600"
+          :title="`${props.wordlist.learning_stats?.words_mastered ?? 0} mastered`"
+        />
+        <!-- Active indicator (matches SidebarCluster) -->
+        <div
+          v-if="isSelected"
+          class="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-all duration-300"
+        />
       </div>
-      
-      <div class="flex items-center gap-2 mt-0.5">
-        <p class="text-xs text-muted-foreground">
+
+      <div class="flex items-center gap-1.5 mt-0.5">
+        <span class="text-[10px] text-muted-foreground/70 tabular-nums">
           {{ wordlist.unique_words }} words
-        </p>
-        <span class="text-xs text-muted-foreground">•</span>
-        <p class="text-xs text-muted-foreground">
+        </span>
+        <span class="text-[10px] text-muted-foreground/40">·</span>
+        <span class="text-[10px] text-muted-foreground/70">
           {{ formatRelativeTime(wordlist.last_accessed) }}
-        </p>
+        </span>
       </div>
-      
+
       <!-- Progress bar -->
-      <div v-if="!isPublic" class="mt-1 w-full">
-        <div class="h-1 w-full bg-muted rounded-full overflow-hidden">
-          <div 
-            class="h-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-300"
+      <div v-if="!isPublic && masteryProgress > 0" class="mt-1 w-full">
+        <div class="h-0.5 w-full rounded-full bg-muted/50 overflow-hidden">
+          <div
+            :class="[
+                'h-full transition-all duration-300 rounded-full',
+                masteryProgress >= 80
+                    ? 'bg-gradient-to-r from-yellow-400/60 to-amber-500/70'
+                    : masteryProgress >= 40
+                        ? 'bg-gradient-to-r from-gray-300/60 to-gray-400/70'
+                        : 'bg-gradient-to-r from-primary/40 to-primary/70'
+            ]"
             :style="{ width: `${masteryProgress}%` }"
           />
         </div>
       </div>
     </div>
-    
-    <!-- Action menu -->
-    <div class="ml-2 opacity-60 hover:opacity-100 transition-opacity duration-200">
+
+    <!-- Action menu (only visible on hover) -->
+    <div class="ml-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity duration-200">
       <DropdownMenu>
         <DropdownMenuTrigger as-child @click.stop>
-          <Button variant="ghost" size="sm" class="h-6 w-6 p-0">
+          <Button variant="ghost" size="sm" class="h-5 w-5 p-0">
             <MoreVertical class="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
@@ -69,19 +72,19 @@
             <Edit2 class="h-3 w-3 mr-2" />
             Edit
           </DropdownMenuItem>
-          
+
           <DropdownMenuItem @click.stop="$emit('duplicate', wordlist)">
             <Copy class="h-3 w-3 mr-2" />
             Duplicate
           </DropdownMenuItem>
-          
+
           <DropdownMenuSeparator />
-          
+
           <DropdownMenuItem @click.stop="handleExport" class="text-muted-foreground">
             <Download class="h-3 w-3 mr-2" />
             Export
           </DropdownMenuItem>
-          
+
           <DropdownMenuItem v-if="!isPublic" @click.stop="confirmDelete" class="text-destructive">
             <Trash2 class="h-3 w-3 mr-2" />
             Delete
@@ -121,7 +124,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import ConfirmDialog from '../ConfirmDialog.vue';
-import type { WordList, MasteryLevel } from '@/types';
+import type { WordList } from '@/types';
 import { formatRelativeTime } from '@/utils';
 
 interface Props {
@@ -145,28 +148,14 @@ const emit = defineEmits<{
 // Dialog state
 const showDeleteDialog = ref(false);
 
-// Computed properties
-const masteryStats = computed(() => {
-  if (!props.wordlist.words || props.wordlist.words.length === 0) {
-    return { bronze: 0, silver: 0, gold: 0 };
-  }
-  
-  return props.wordlist.words.reduce((acc, word) => {
-    acc[word.mastery_level]++;
-    return acc;
-  }, { bronze: 0, silver: 0, gold: 0 } as Record<MasteryLevel, number>);
-});
+// Derived from learning_stats metadata (always populated) instead of empty words[]
+const hasMastered = computed(() => (props.wordlist.learning_stats?.words_mastered ?? 0) > 0);
 
 const masteryProgress = computed(() => {
-  const total = props.wordlist.unique_words;
-  if (total === 0) return 0;
-  
-  const mastered = masteryStats.value.gold;
-  const familiar = masteryStats.value.silver;
-  
-  // Weight gold more heavily than silver
-  const progress = ((mastered * 1.0) + (familiar * 0.6)) / total;
-  return Math.min(Math.round(progress * 100), 100);
+  const total = props.wordlist.unique_words ?? 0;
+  if (!total) return 0;
+  const mastered = props.wordlist.learning_stats?.words_mastered ?? 0;
+  return Math.min(Math.round((mastered / total) * 100), 100);
 });
 
 // Methods

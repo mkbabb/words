@@ -412,18 +412,18 @@ export const useWordlistMode = defineStore(
         // ==========================================================================
 
         return {
-            // Configuration State
-            selectedWordlist: readonly(selectedWordlist),
-            wordlistFilters: readonly(wordlistFilters),
-            wordlistSortCriteria: readonly(wordlistSortCriteria),
+            // Configuration State (no readonly for persisted fields — hydration requires writable refs)
+            selectedWordlist,
+            wordlistFilters,
+            wordlistSortCriteria,
 
             // Search Bar State
             batchMode: readonly(batchMode),
             processingQueue: readonly(processingQueue),
 
-            // UI State
-            viewMode: readonly(viewMode),
-            itemsPerPage: readonly(itemsPerPage),
+            // UI State (no readonly for persisted fields — hydration requires writable refs)
+            viewMode,
+            itemsPerPage,
 
             // Results State
             results: readonly(results),
