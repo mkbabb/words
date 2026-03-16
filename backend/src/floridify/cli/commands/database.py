@@ -175,7 +175,7 @@ async def _get_provider_coverage() -> dict[str, int]:
             {"$sort": {"count": -1}},
         ]
 
-        results = await Word.aggregate(pipeline).to_list()
+        results = await Word.aggregate(pipeline).to_list(length=None)
         return {item["_id"]: item["count"] for item in results}
 
     except Exception as e:

@@ -54,17 +54,17 @@ async def get_database_stats(
             "total_entries": entry_count,
         }
 
-        # Provider coverage
+        # Provider coverage (from DictionaryEntry.provider)
         provider_coverage = None
         if params.include_provider_coverage:
-            # Aggregate definitions by provider
             pipeline = [
                 {"$group": {"_id": "$provider", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1}},
             ]
-            provider_results = []
-            async for result in Definition.aggregate(pipeline):
-                provider_results.append(result)
+            # Use raw Motor collection — Beanie's aggregate() has cursor issues
+            collection = DictionaryEntry.get_pymongo_collection()
+            cursor = collection.aggregate(pipeline)
+            provider_results = await cursor.to_list(length=50)
             provider_coverage = {
                 str(result["_id"]): result["count"]
                 for result in provider_results

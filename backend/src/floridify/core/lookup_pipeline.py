@@ -26,7 +26,7 @@ from ..models.dictionary import (
 )
 from ..providers.factory import create_connector
 from ..storage.dictionary import save_entry_versioned
-from ..storage.mongodb import get_storage, get_synthesized_entry
+from ..storage.mongodb import get_best_existing_entry, get_storage, get_synthesized_entry
 from ..utils.language_precedence import (
     merge_language_precedence,
     to_language_codes,
@@ -94,6 +94,7 @@ async def lookup_word_pipeline(
     semantic: bool = True,
     no_ai: bool = False,
     force_refresh: bool = False,
+    skip_search: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> DictionaryEntry | None:
     """Core lookup pipeline that normalizes, searches, gets provider definitions,
@@ -106,6 +107,7 @@ async def lookup_word_pipeline(
         semantic: Enable semantic search
         no_ai: Skip AI synthesis
         force_refresh: Force refresh of cached data
+        skip_search: Skip find_best_match (caller already resolved the word)
         state_tracker: Optional state tracker for progress updates
 
     Returns:
@@ -133,38 +135,45 @@ async def lookup_word_pipeline(
     )
 
     try:
+        pipeline_start = time.perf_counter()
+
         # Search for the word using generalized search pipeline
-        if state_tracker:
-            await state_tracker.update_stage(Stages.SEARCH_START)
-
-        search_start = time.perf_counter()
-        best_match_result = await find_best_match(
-            word=word,
-            languages=[lookup_languages[0]],
-            semantic=semantic,
-        )
-        search_duration = time.perf_counter() - search_start
-
-        if state_tracker:
-            await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
-
-        if best_match_result:
-            best_match = best_match_result.word
-            logger.info(
-                f"✅ Found best match: '{best_match}' "
-                f"(score: {best_match_result.score:.3f}, method: {best_match_result.method}, "
-                f"search_time: {search_duration:.2f}s)",
-            )
-        else:
-            # No corpus match — use the raw query word and proceed to provider fetch
+        if skip_search:
             best_match = word
-            logger.info(
-                f"No corpus match for '{word}' after {search_duration:.2f}s — "
-                f"proceeding to provider fetch with raw query",
+            logger.info(f"⚡ Skipping search — using word as-is: '{best_match}'")
+            if state_tracker:
+                await state_tracker.update_stage(Stages.SEARCH_START)
+                await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
+        else:
+            if state_tracker:
+                await state_tracker.update_stage(Stages.SEARCH_START)
+
+            search_start = time.perf_counter()
+            best_match_result = await find_best_match(
+                word=word,
+                languages=[lookup_languages[0]],
+                semantic=semantic,
             )
+            search_duration = time.perf_counter() - search_start
+
+            if state_tracker:
+                await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
+
+            if best_match_result:
+                best_match = best_match_result.word
+                logger.info(
+                    f"✅ Found best match: '{best_match}' "
+                    f"(score: {best_match_result.score:.3f}, method: {best_match_result.method}, "
+                    f"search_time: {search_duration:.2f}s)",
+                )
+            else:
+                best_match = word
+                logger.info(
+                    f"No corpus match for '{word}' after {search_duration:.2f}s — "
+                    f"proceeding to provider fetch with raw query",
+                )
 
         # Handle force_refresh: skip cache but preserve history
-        # (Old versions are retained in the VersionedDataManager chain)
         if force_refresh:
             existing = await get_synthesized_entry(best_match)
             if existing:
@@ -172,13 +181,19 @@ async def lookup_word_pipeline(
                     f"🔄 Force refresh for '{best_match}' — existing entry preserved in version history",
                 )
         else:
-            # Try to get a cached entry if not forcing refresh (regardless of AI setting)
-            existing = await get_synthesized_entry(best_match)
+            # Unified cache check: synthesis preferred, then any provider entry
+            existing, is_synthesis = await get_best_existing_entry(best_match)
             if existing:
-                logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
-                # Ensure audio exists for primary language (fire-and-forget)
-                asyncio.ensure_future(_ensure_primary_audio(existing))
-                return existing
+                if is_synthesis or no_ai:
+                    source = "synthesis" if is_synthesis else str(existing.provider)
+                    logger.info(f"📋 Using cached {source} entry for '{best_match}'")
+                    asyncio.ensure_future(_ensure_primary_audio(existing))
+                    return existing
+                # Non-synthesis entry with AI enabled — fall through to synthesis
+                logger.info(
+                    f"📋 Found {existing.provider} entry for '{best_match}', "
+                    f"proceeding to AI synthesis"
+                )
 
         # Get definitions from providers in parallel
         if state_tracker:
@@ -261,7 +276,7 @@ async def lookup_word_pipeline(
                     log_metrics(
                         word=best_match,
                         ai_synthesis_time=ai_duration,
-                        total_pipeline_time=time.perf_counter() - search_start,
+                        total_pipeline_time=time.perf_counter() - pipeline_start,
                         definition_count=len(synthesized_entry.definition_ids),
                         provider_count=len(providers_data),
                     )
@@ -345,6 +360,21 @@ async def _get_provider_definition(
                 logger.debug(
                     f"Updated languages for '{word}': {old_languages} → {merged}",
                 )
+
+        # Check if this provider's data already exists in the DB (skip external fetch)
+        if not force_refresh and word_obj:
+            db_entry = await DictionaryEntry.find_one(
+                DictionaryEntry.word_id == word_obj.id,
+                DictionaryEntry.provider == provider,
+                {"definition_ids": {"$exists": True, "$ne": []}},
+            )
+            if db_entry and db_entry.definition_ids:
+                logger.info(
+                    f"⚡ DB hit for '{word}' provider={provider.value} "
+                    f"({len(db_entry.definition_ids)} definitions) — skipping external fetch"
+                )
+                return db_entry
+
         if connector:
             fetch_start = time.perf_counter()
 
