@@ -38,6 +38,9 @@ from ...repositories import (
     WordListUpdate,
 )
 
+# Safety cap for unbounded list queries (clone, export)
+_MAX_WORDLIST_ITEMS = 10_000
+
 router = APIRouter()
 
 
@@ -173,7 +176,6 @@ async def get_wordlist(
 ) -> ResourceResponse:
     """Get wordlist metadata (no embedded words — use /words endpoint for word data)."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Check access: public or owner
     if not wordlist.is_public and wordlist.owner_id and user_id != wordlist.owner_id:
@@ -185,8 +187,7 @@ async def get_wordlist(
         {"$group": {"_id": "$mastery_level", "count": {"$sum": 1}}},
     ]
     mastery_distribution: dict[str, int] = {}
-    collection = WordListItemDoc.get_pymongo_collection()
-    async for doc in collection.aggregate(pipeline):
+    async for doc in WordListItemDoc.aggregate(pipeline):
         mastery_distribution[doc["_id"]] = doc["count"]
 
     wordlist_data = wordlist.model_dump(mode="json")
@@ -236,7 +237,6 @@ async def update_wordlist(
 ) -> ResourceResponse:
     """Update wordlist metadata."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     wordlist = await repo.update(wordlist_id, data)
@@ -262,7 +262,6 @@ async def delete_wordlist(
 ) -> None:
     """Delete a wordlist."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
     await verify_wordlist_ownership(wordlist, user_id, user_role)
     await repo.delete(wordlist_id)
 
@@ -276,10 +275,13 @@ async def clone_wordlist(
 ) -> ResourceResponse:
     """Clone a wordlist with reset learning stats."""
     source = await repo.get(wordlist_id, raise_on_missing=True)
-    assert source is not None
 
     # Get word texts for the clone by querying items collection
-    source_items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    source_items = (
+        await WordListItemDoc.find({"wordlist_id": wordlist_id})
+        .limit(_MAX_WORDLIST_ITEMS)
+        .to_list()
+    )
     word_ids = [item.word_id for item in source_items]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_texts = [w.text for w in words]
@@ -313,14 +315,17 @@ async def export_wordlist(
 ) -> StreamingResponse:
     """Export wordlist as a downloadable file."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Get items from items collection
-    items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    items = (
+        await WordListItemDoc.find({"wordlist_id": wordlist_id})
+        .limit(_MAX_WORDLIST_ITEMS)
+        .to_list()
+    )
 
     # Get word texts
     word_ids = [item.word_id for item in items]
-    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    words = await Word.find({"_id": {"$in": word_ids}}).limit(_MAX_WORDLIST_ITEMS).to_list()
     word_text_map = {str(w.id): w.text for w in words}
 
     safe_name = wordlist.name.replace(" ", "_").replace("/", "_")[:50]
@@ -389,17 +394,22 @@ async def export_wordlist_anki(
 ) -> StreamingResponse:
     """Export wordlist as Anki .apkg file."""
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
 
     # Get items from items collection, then word texts and definitions
-    anki_items = await WordListItemDoc.find({"wordlist_id": wordlist_id}).to_list()
+    anki_items = (
+        await WordListItemDoc.find({"wordlist_id": wordlist_id})
+        .limit(_MAX_WORDLIST_ITEMS)
+        .to_list()
+    )
     word_ids = [item.word_id for item in anki_items]
-    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    words = await Word.find({"_id": {"$in": word_ids}}).limit(_MAX_WORDLIST_ITEMS).to_list()
     word_text_map = {str(w.id): w.text for w in words}
     word_texts = [w.text for w in words]
 
     # Get definitions for these words
-    definitions = await Definition.find({"word_id": {"$in": word_ids}}).to_list()
+    definitions = (
+        await Definition.find({"word_id": {"$in": word_ids}}).limit(_MAX_WORDLIST_ITEMS).to_list()
+    )
     word_defs: dict[str, list[str]] = {}
     for defn in definitions:
         text = word_text_map.get(str(defn.word_id), "")

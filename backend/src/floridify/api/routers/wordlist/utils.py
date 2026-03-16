@@ -11,7 +11,7 @@ from ....models import Word
 from ....models.base import Language
 from ....search import Search
 from ....wordlist.models import WordList, WordListItemDoc
-from ..search import SearchResponse
+from ....models.responses import SearchResponse
 
 
 async def search_wordlist_names(
