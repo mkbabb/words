@@ -8,8 +8,7 @@
         >
             <div
                 v-if="isOpen"
-                class="fixed inset-0 flex flex-col"
-                style="z-index: 99999"
+                class="fixed inset-0 z-max flex flex-col"
                 @click="handleBackdropClick"
             >
                 <!-- Backdrop -->
@@ -126,7 +125,7 @@
                         <!-- Empty state -->
                         <div
                             v-else-if="versions.length === 0"
-                            class="py-6 text-center text-xs text-muted-foreground/60"
+                            class="py-6 text-center text-xs text-muted-foreground/50"
                         >
                             No version history available.
                         </div>

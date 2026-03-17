@@ -22,6 +22,7 @@
                     />
                 </template>
             </SidebarSection>
+            <div class="divider-h-tapered mx-2" />
 
             <!-- AI Query History -->
             <SidebarSection
@@ -44,6 +45,7 @@
                     </button>
                 </template>
             </SidebarSection>
+            <div class="divider-h-tapered mx-2" />
 
             <!-- Vocabulary Suggestions -->
             <GoldenSidebarSection
@@ -59,6 +61,7 @@
                     />
                 </template>
             </GoldenSidebarSection>
+            <div class="divider-h-tapered mx-2" />
 
             <!-- Recent Searches -->
             <SidebarSection

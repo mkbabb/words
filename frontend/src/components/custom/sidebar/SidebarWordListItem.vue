@@ -1,8 +1,9 @@
 <template>
   <button
     @click="$emit('select', wordlist)"
+    :title="wordlist.name"
     :class="[
-      'group flex w-full items-center justify-between rounded-md px-2 py-1.5',
+      'group flex w-full items-center justify-between rounded-lg px-2 py-1.5',
       'transition-all duration-200',
       'text-left',
       isSelected
@@ -32,11 +33,11 @@
       </div>
 
       <div class="flex items-center gap-1.5 mt-0.5">
-        <span class="text-[10px] text-muted-foreground/70 tabular-nums">
+        <span class="text-micro text-muted-foreground/70 tabular-nums">
           {{ wordlist.unique_words }} words
         </span>
-        <span class="text-[10px] text-muted-foreground/40">·</span>
-        <span class="text-[10px] text-muted-foreground/70">
+        <span class="text-micro text-muted-foreground/50">·</span>
+        <span class="text-micro text-muted-foreground/70">
           {{ formatRelativeTime(wordlist.last_accessed) }}
         </span>
       </div>

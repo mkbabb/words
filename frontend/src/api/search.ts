@@ -35,6 +35,10 @@ export const searchApi = {
       if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
+      // Silently drop 429 rate limit responses — debounce handles the retry
+      if (error.response?.status === 429) {
+        return [];
+      }
       logger.error('Search API error:', error);
       return [];
     }

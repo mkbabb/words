@@ -1,4 +1,4 @@
-/* Utilities: scrollbar, heatmap, cartoon-shadow, shimmer, shake, fira-code, reduced motion */
+/* Utilities: scrollbar, heatmap, shimmer, shake, fira-code, reduced motion */
 
 /* Shimmer text animation utility */
 @keyframes shimmer-sweep {
@@ -153,91 +153,6 @@
     color: rgb(255 255 255);
   }
 
-  /* Cartoonish box shadow variants (softened with subtle blur) */
-  .cartoon-shadow-sm {
-    box-shadow:
-      -6px 4px 1px rgba(0, 0, 0, 0.12),
-      0 6px 1px rgba(0, 0, 0, 0.12),
-      -6px 6px 2px rgba(0, 0, 0, 0.08);
-    border: 2px solid var(--color-border);
-    transform: translateY(-2px);
-  }
-
-  .cartoon-shadow-md {
-    box-shadow:
-      -8px 5px 1px rgba(0, 0, 0, 0.12),
-      0 8px 2px rgba(0, 0, 0, 0.12),
-      -8px 8px 2px rgba(0, 0, 0, 0.08);
-    border: 2px solid var(--color-border);
-    transform: translateY(-2px);
-  }
-
-  .cartoon-shadow-lg {
-    box-shadow:
-      -10px 6px 2px rgba(0, 0, 0, 0.12),
-      0 10px 2px rgba(0, 0, 0, 0.12),
-      -10px 10px 3px rgba(0, 0, 0, 0.08);
-    border: 2px solid var(--color-border);
-    transform: translateY(-3px);
-  }
-
-  /* Dark mode variants */
-  .dark .cartoon-shadow-sm {
-    box-shadow:
-      -6px 4px 1px rgba(255, 255, 255, 0.07),
-      0 6px 1px rgba(255, 255, 255, 0.07),
-      -6px 6px 2px rgba(255, 255, 255, 0.04);
-    border: 2px solid var(--color-border);
-  }
-
-  .dark .cartoon-shadow-md {
-    box-shadow:
-      -8px 5px 1px rgba(255, 255, 255, 0.07),
-      0 8px 2px rgba(255, 255, 255, 0.07),
-      -8px 8px 2px rgba(255, 255, 255, 0.04);
-    border: 2px solid var(--color-border);
-  }
-
-  .dark .cartoon-shadow-lg {
-    box-shadow:
-      -10px 6px 2px rgba(255, 255, 255, 0.07),
-      0 10px 2px rgba(255, 255, 255, 0.07),
-      -10px 10px 3px rgba(255, 255, 255, 0.04);
-    border: 2px solid var(--color-border);
-  }
-
-  .cartoon-shadow-sm-hover {
-    box-shadow:
-      -8px 6px 1px rgba(0, 0, 0, 0.14),
-      0 8px 1px rgba(0, 0, 0, 0.14),
-      -8px 8px 2px rgba(0, 0, 0, 0.10);
-    border: 2px solid var(--color-border);
-    transform: translateY(-4px);
-  }
-
-  .dark .cartoon-shadow-sm-hover {
-    box-shadow:
-      -8px 6px 1px rgba(255, 255, 255, 0.09),
-      0 8px 1px rgba(255, 255, 255, 0.09),
-      -8px 8px 2px rgba(255, 255, 255, 0.06);
-    border: 2px solid var(--color-border);
-  }
-
-  .card-shadow-hover {
-    box-shadow:
-      0 4px 8px rgba(0, 0, 0, 0.12),
-      0 8px 16px rgba(0, 0, 0, 0.12),
-      0 16px 32px rgba(0, 0, 0, 0.12);
-    transform: translateY(-2px);
-  }
-
-  .dark .card-shadow-hover {
-    box-shadow:
-      0 4px 8px rgba(255, 255, 255, 0.08),
-      0 8px 16px rgba(255, 255, 255, 0.08),
-      0 16px 32px rgba(255, 255, 255, 0.08);
-  }
-
   /* Fira Code utility class */
   .fira-code {
     font-family: theme('fontFamily.mono');
@@ -252,6 +167,84 @@
 
   .shake-error {
     animation: shake 0.5s ease-in-out;
+  }
+
+  /* ── Cartoon shadow system ── */
+  .shadow-cartoon-sm {
+    box-shadow:
+      -6px 4px 1px var(--shadow-cartoon-color),
+      0 6px 1px var(--shadow-cartoon-color),
+      -6px 6px 2px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-2px);
+  }
+
+  .shadow-cartoon-md {
+    box-shadow:
+      -8px 5px 1px var(--shadow-cartoon-color),
+      0 8px 2px var(--shadow-cartoon-color),
+      -8px 8px 2px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-2px);
+  }
+
+  .shadow-cartoon-lg {
+    box-shadow:
+      -10px 6px 2px var(--shadow-cartoon-color),
+      0 10px 2px var(--shadow-cartoon-color),
+      -10px 10px 3px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-3px);
+  }
+
+  .shadow-cartoon-sm-hover {
+    box-shadow:
+      -8px 6px 1px var(--shadow-cartoon-color-hover),
+      0 8px 1px var(--shadow-cartoon-color-hover),
+      -8px 8px 2px var(--shadow-cartoon-color-hover-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-4px);
+  }
+
+  /* ── Focus ring ── */
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+
+  /* ── Glass morphism ── */
+  .glass-light {
+    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
+    backdrop-filter: blur(4px);
+    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
+
+  .glass-medium {
+    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
+
+  .glass-heavy {
+    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
+    backdrop-filter: blur(24px);
+    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
+
+  /* ── Divider utilities ── */
+  .divider-h {
+    height: 2px;
+    background: linear-gradient(to right, transparent 1%, var(--color-border) 8%, var(--color-border) 92%, transparent 99%);
+  }
+
+  .divider-h-tapered {
+    height: 2px;
+    background: linear-gradient(to right, transparent 3%, var(--color-border) 15%, var(--color-border) 85%, transparent 97%);
+  }
+
+  .divider-v {
+    width: 2px;
+    background: linear-gradient(to bottom, transparent 3%, var(--color-border) 15%, var(--color-border) 85%, transparent 97%);
   }
 
   /* Reduced motion support */

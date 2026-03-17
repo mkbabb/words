@@ -112,6 +112,9 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
 
         const target = event.target as HTMLElement;
 
+        // Ignore clicks on the sidebar or glass overlay (prevents controls disappearing when closing sidebar)
+        if (target.closest('[data-sidebar]') || target.closest('.glass-overlay')) return;
+
         // If click is outside the search container, handle blur behavior
         if (!searchContainer.value.contains(target)) {
             // Close controls

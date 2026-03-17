@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <h3 class="text-sm font-semibold">Version History</h3>
-        <Badge v-if="currentVersion" variant="secondary" class="font-mono text-[10px]">
+        <Badge v-if="currentVersion" variant="secondary" class="font-mono text-micro">
           v{{ currentVersion }}
         </Badge>
         <Button
@@ -52,7 +52,7 @@
             <div class="flex items-center gap-2">
               <Badge
                 :variant="version.version === currentVersion ? 'default' : 'outline'"
-                class="font-mono text-[10px]"
+                class="font-mono text-micro"
               >
                 v{{ version.version }}
               </Badge>
@@ -62,7 +62,7 @@
               <Badge
                 v-if="version.is_latest"
                 variant="secondary"
-                class="text-[10px]"
+                class="text-micro"
               >
                 Latest
               </Badge>
@@ -93,7 +93,7 @@
               </Button>
               <Badge
                 v-if="version.version === currentVersion"
-                class="text-[10px]"
+                class="text-micro"
               >
                 Current
               </Badge>
@@ -101,7 +101,7 @@
           </div>
 
           <!-- Storage mode indicator -->
-          <div class="mt-1 text-[10px] text-muted-foreground/60">
+          <div class="mt-1 text-micro text-muted-foreground/50">
             {{ version.storage_mode === 'snapshot' ? 'Full snapshot' : 'Delta' }}
           </div>
         </div>
@@ -115,7 +115,7 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <h4 class="text-xs font-semibold">Preview</h4>
-            <Badge variant="outline" class="font-mono text-[10px]">v{{ previewVersion }}</Badge>
+            <Badge variant="outline" class="font-mono text-micro">v{{ previewVersion }}</Badge>
           </div>
           <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="previewContent = null">
             Close
@@ -135,7 +135,7 @@
             v-for="(src, i) in previewContent.source_entries"
             :key="i"
             variant="secondary"
-            class="text-[10px] capitalize"
+            class="text-micro capitalize"
           >
             {{ src.provider }} ({{ src.entry_version }})
           </Badge>
@@ -156,7 +156,7 @@
         </div>
 
         <!-- Created/updated -->
-        <div v-if="previewContent.created_at" class="text-[10px] text-muted-foreground">
+        <div v-if="previewContent.created_at" class="text-micro text-muted-foreground">
           Created {{ formatDate(previewContent.created_at) }}
         </div>
       </div>

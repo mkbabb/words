@@ -20,7 +20,7 @@
                 v-if="items.length > 0"
                 :class="[
                     'space-y-1',
-                    items.length > 15 ? 'max-h-[60vh] overflow-y-auto scrollbar-thin pr-2' : ''
+                    items.length > 10 ? 'max-h-[40vh] overflow-y-auto scrollbar-thin pr-2' : ''
                 ]"
             >
                 <div v-for="(item, index) in items" :key="(item as any).id ?? (item as any).word ?? index">

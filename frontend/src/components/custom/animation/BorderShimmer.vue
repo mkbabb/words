@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="active"
-    class="pointer-events-none absolute inset-0 z-[25]"
+    class="pointer-events-none absolute inset-0 z-float"
     :style="{ borderRadius: radius }"
     aria-hidden="true"
     ref="rootEl"

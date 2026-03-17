@@ -67,14 +67,14 @@
                 </template>
                 <span
                     v-if="isDueForReview"
-                    class="ml-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                    class="ml-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-micro font-medium"
                     style="background: color-mix(in srgb, var(--review-again) 15%, transparent); color: var(--review-again);"
                 >
                     Due
                 </span>
                 <span
                     v-if="word.review_data?.is_leech"
-                    class="ml-0.5 inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
+                    class="ml-0.5 inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-micro font-medium text-destructive"
                 >
                     Leech
                 </span>
@@ -150,3 +150,120 @@ const progressPercentage = computed(() =>
     computeProgress(props.word.mastery_level, props.word.review_data?.repetitions ?? 0)
 );
 </script>
+
+<style>
+/* Search match highlighting borders (colocated — sole consumer) */
+.search-match-gold {
+    border-width: 2px;
+    border-color: rgb(252 211 77 / 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.search-match-silver {
+    border-width: 2px;
+    border-color: rgb(209 213 219 / 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.search-match-bronze {
+    border-width: 2px;
+    border-color: rgb(253 186 116 / 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.dark .search-match-gold {
+    border-color: rgb(251 191 36 / 0.2);
+}
+
+.dark .search-match-silver {
+    border-color: rgb(156 163 175 / 0.2);
+}
+
+.dark .search-match-bronze {
+    border-color: rgb(251 146 60 / 0.2);
+}
+
+/* Metallic shimmer effect for search match borders */
+.search-match-gold::before,
+.search-match-silver::before,
+.search-match-bronze::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.4) 45%,
+        rgba(255, 255, 255, 0.6) 50%,
+        rgba(255, 255, 255, 0.4) 55%,
+        transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: border-shimmer 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    mask-composite: exclude;
+    padding: 2px;
+}
+
+/* Different shimmer colors for each metal */
+.search-match-gold::before {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(251, 191, 36, 0.4) 45%,
+        rgba(251, 191, 36, 0.7) 50%,
+        rgba(251, 191, 36, 0.4) 55%,
+        transparent 100%
+    );
+}
+
+.search-match-silver::before {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(229, 231, 235, 0.5) 45%,
+        rgba(229, 231, 235, 0.8) 50%,
+        rgba(229, 231, 235, 0.5) 55%,
+        transparent 100%
+    );
+}
+
+.search-match-bronze::before {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(251, 146, 60, 0.4) 45%,
+        rgba(251, 146, 60, 0.6) 50%,
+        rgba(251, 146, 60, 0.4) 55%,
+        transparent 100%
+    );
+}
+
+/* Shimmer animation */
+@keyframes border-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(200%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .search-match-gold::before,
+    .search-match-silver::before,
+    .search-match-bronze::before {
+        animation: none;
+    }
+}
+</style>

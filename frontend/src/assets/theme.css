@@ -60,8 +60,21 @@
 
 }
 
+/* Cartoon shadow color system — CSS custom properties for dark mode theming */
+:root {
+  --shadow-cartoon-color: rgb(0 0 0 / 0.12);
+  --shadow-cartoon-color-soft: rgb(0 0 0 / 0.08);
+  --shadow-cartoon-color-hover: rgb(0 0 0 / 0.14);
+  --shadow-cartoon-color-hover-soft: rgb(0 0 0 / 0.10);
+}
+
 /* Dark theme colors - dark paper tones */
 .dark {
+  --shadow-cartoon-color: rgb(255 255 255 / 0.07);
+  --shadow-cartoon-color-soft: rgb(255 255 255 / 0.04);
+  --shadow-cartoon-color-hover: rgb(255 255 255 / 0.09);
+  --shadow-cartoon-color-hover-soft: rgb(255 255 255 / 0.06);
+
   --color-background: hsl(24 8% 6%);
   --color-foreground: hsl(48 10% 92%);
   --color-card: hsl(24 6% 7%);

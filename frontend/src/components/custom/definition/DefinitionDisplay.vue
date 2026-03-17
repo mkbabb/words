@@ -87,23 +87,6 @@
                 editModeEnabled && 'ring-1 ring-inset ring-muted-foreground/15',
             ]"
         >
-            <!-- Theme Selector (includes edit button) -->
-            <ThemeSelector
-                v-model="selectedCardVariant"
-                :isMounted="isMounted"
-                :showDropdown="actions.showThemeDropdown.value"
-                :editModeEnabled="editModeEnabled"
-                :word="entry?.word"
-                :currentVersion="entry?.version"
-                @toggle-dropdown="
-                    actions.showThemeDropdown.value =
-                        !actions.showThemeDropdown.value
-                "
-                @toggle-edit-mode="editModeEnabled = !editModeEnabled"
-                @toggle-version-history="actions.handleToggleVersionHistory"
-                @resynthesize="actions.handleReSynthesize"
-            />
-
             <!-- Image Carousel Display -->
             <ImageCarousel
                 :images="allImages"
@@ -124,10 +107,10 @@
                 :pronunciation="entry.pronunciation"
                 :pronunciationMode="lookupMode.pronunciationMode"
                 :providers="usedProviders"
-                :isAISynthesized="!!entry.model_info"
-                :activeSource="activeSourceTab"
-                :sourceSelectionDisabled="sourceSelectionDisabled"
-                :sourceEntries="entry?.source_entries"
+                :active-source="activeSourceTab"
+                :show-synthesis="!!entry.model_info"
+                :interactive="!sourceSelectionDisabled"
+                :source-entries="entry?.source_entries"
                 @toggle-pronunciation="lookupMode.togglePronunciation"
                 @select-source="activeSourceTab = $event"
             />
@@ -145,8 +128,29 @@
 
             <!-- Gradient Separator -->
             <hr
-                class="mt-1 mb-1 h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
+                class="mt-1 mb-1 h-[2px] border-0"
+                style="background: linear-gradient(to right, transparent 2%, var(--color-border) 15%, var(--color-border) 85%, transparent 98%);"
             />
+
+            <!-- Admin Edit Dock — anchor point below separator, zero height, no flow impact -->
+            <div class="relative h-0 z-50">
+                <ThemeSelector
+                    v-model="selectedCardVariant"
+                    :isMounted="isMounted"
+                    :showDropdown="actions.showThemeDropdown.value"
+                    :editModeEnabled="editModeEnabled"
+                    :word="entry?.word"
+                    :currentVersion="entry?.version"
+                    @toggle-dropdown="
+                        actions.showThemeDropdown.value =
+                            !actions.showThemeDropdown.value
+                    "
+                    @toggle-edit-mode="editModeEnabled = !editModeEnabled"
+                    @toggle-version-history="actions.handleToggleVersionHistory"
+                    @resynthesize="actions.handleReSynthesize"
+                    @add-image="handleAddImage"
+                />
+            </div>
 
             <!-- Provider source tabs (AI Synthesis + raw provider data) -->
             <ProviderViewTabs
@@ -658,6 +662,38 @@ function handleInlineAddToWordlist(word: string) {
     actions.handleAddToWordlist(word);
 }
 
+// Trigger file input for image upload from admin dock button
+const imageFileInput = ref<HTMLInputElement | null>(null);
+function handleAddImage() {
+    if (!imageFileInput.value) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        input.addEventListener('change', async () => {
+            const file = input.files?.[0];
+            if (!file || !entry.value?.id) return;
+            try {
+                const [{ mediaApi: imgApi }, { entriesApi }] = await Promise.all([
+                    import('@/api/media'),
+                    import('@/api/entries'),
+                ]);
+                const uploaded = await imgApi.uploadImage(file, {
+                    alt_text: file.name.replace(/\.[^/.]+$/, ''),
+                });
+                await entriesApi.addImagesToEntry(entry.value.id, [uploaded.id]);
+                actions.handleImagesUpdated([uploaded]);
+            } catch {
+                // Silently degrade
+            }
+            input.value = '';
+        });
+        document.body.appendChild(input);
+        imageFileInput.value = input;
+    }
+    imageFileInput.value.click();
+}
+
 // Wire up the toggle: open Time Machine instead of old panel
 watch(() => actions.showVersionHistory.value, (show) => {
     if (show) {
@@ -788,17 +824,6 @@ const getGlobalDefinitionIndex = (
 .mode-switch-leave-to {
     opacity: 0;
     transform: translateX(-16px);
-}
-
-/* Themed gradients and hover effects */
-.themed-hr {
-    background: linear-gradient(
-        to right,
-        transparent,
-        var(--border) 20%,
-        var(--border) 80%,
-        transparent
-    );
 }
 
 /* Ensure proper stacking context */

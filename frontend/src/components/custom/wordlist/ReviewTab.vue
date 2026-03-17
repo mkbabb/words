@@ -56,7 +56,7 @@
                         <div class="flex flex-wrap items-center gap-1.5">
                             <span
                                 :class="[
-                                    'inline-flex items-center rounded-full px-1.5 py-px text-[10px] font-medium',
+                                    'inline-flex items-center rounded-full px-1.5 py-px text-micro font-medium',
                                     getCardStateBadgeClasses(word.card_state),
                                 ]"
                             >
@@ -64,7 +64,7 @@
                             </span>
                             <span
                                 v-if="word.is_leech"
-                                class="inline-flex items-center rounded-full bg-destructive/10 border border-destructive/20 px-1.5 py-px text-[10px] font-medium text-destructive"
+                                class="inline-flex items-center rounded-full bg-destructive/10 border border-destructive/20 px-1.5 py-px text-micro font-medium text-destructive"
                             >
                                 Leech
                             </span>

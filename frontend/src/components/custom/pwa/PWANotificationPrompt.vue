@@ -6,7 +6,7 @@
         class="fixed top-6 left-6 right-6 z-50 max-w-md mx-auto"
       >
         <div
-          class="cartoon-shadow-md rounded-2xl bg-background/95 backdrop-blur-xl 
+          class="shadow-cartoon-md rounded-2xl bg-background/95 backdrop-blur-xl
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >
@@ -63,7 +63,7 @@
               class="flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground
                      font-medium transition-smooth disabled:opacity-50
                      disabled:cursor-not-allowed"
-              :class="!(isIOS && !isInstalled) && 'hover-lift cartoon-shadow-sm active-scale'"
+              :class="!(isIOS && !isInstalled) && 'hover-lift shadow-cartoon-sm active-scale'"
             >
               <Bell class="h-4 w-4 inline mr-2" />
               Enable Notifications

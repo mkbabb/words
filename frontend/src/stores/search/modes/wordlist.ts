@@ -3,6 +3,7 @@ import { ref, readonly, computed, shallowRef } from 'vue';
 import type { ModeHandler } from '@/stores/types/mode-types';
 import type {
     SearchMode,
+    WordList,
     WordListItem,
     WordlistFilters as WordlistFiltersType,
     MasteryLevel,
@@ -16,6 +17,7 @@ import {
     type WordlistPanelFilters,
     type SortCriterion,
 } from '@/stores/types/constants';
+import { wordlistApi } from '@/api';
 
 /**
  * Unified wordlist mode store — pure state management only.
@@ -49,6 +51,42 @@ export const useWordlistMode = defineStore(
 
         const viewMode = ref<ViewMode>(DEFAULT_VIEW_MODE);
         const itemsPerPage = ref(25);
+
+        // ==========================================================================
+        // SHARED WORDLISTS (used by sidebar + dashboard to avoid duplicate fetches)
+        // ==========================================================================
+
+        const allWordlists = shallowRef<WordList[]>([]);
+        const wordlistsLoading = ref(false);
+
+        const fetchAllWordlists = async () => {
+            if (wordlistsLoading.value) return;
+            wordlistsLoading.value = true;
+            try {
+                const response = await wordlistApi.getWordlists({ limit: 50 });
+                allWordlists.value = response.items.map((wl: any) => ({
+                    id: wl._id || wl.id,
+                    name: wl.name,
+                    description: wl.description,
+                    hash_id: wl.hash_id,
+                    words: wl.words || [],
+                    total_words: wl.total_words,
+                    unique_words: wl.unique_words,
+                    learning_stats: wl.learning_stats,
+                    last_accessed: wl.last_accessed,
+                    created_at: wl.created_at,
+                    updated_at: wl.updated_at,
+                    metadata: wl.metadata || {},
+                    tags: wl.tags || [],
+                    is_public: wl.is_public || false,
+                    owner_id: wl.owner_id,
+                }));
+            } catch {
+                // Silently degrade
+            } finally {
+                wordlistsLoading.value = false;
+            }
+        };
 
         // ==========================================================================
         // RESULTS STATE
@@ -416,6 +454,11 @@ export const useWordlistMode = defineStore(
             selectedWordlist,
             wordlistFilters,
             wordlistSortCriteria,
+
+            // Shared wordlists
+            allWordlists,
+            wordlistsLoading: readonly(wordlistsLoading),
+            fetchAllWordlists,
 
             // Search Bar State
             batchMode: readonly(batchMode),

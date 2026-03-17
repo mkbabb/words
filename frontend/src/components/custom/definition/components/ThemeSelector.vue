@@ -18,20 +18,34 @@
                 </Tooltip>
             </template>
 
-            <!-- Expanded toolbar -->
+            <!-- Expanded toolbar — card theme far-left, edit toggle far-right -->
             <div class="flex items-center gap-1">
-                <!-- Edit toggle -->
-                <button
-                    class="dock-icon-btn"
-                    :class="editModeEnabled && 'active'"
-                    @click="handleEditToggle"
-                >
-                    <Edit2 v-if="!editModeEnabled" :size="20" />
-                    <Check v-else :size="20" />
-                </button>
-
                 <template v-if="editModeEnabled">
+                    <!-- Card Theme (far left) -->
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button class="dock-icon-btn" @click="toggleDropdown">
+                                <Layers :size="20" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            Card Theme
+                        </TooltipContent>
+                    </Tooltip>
+
                     <span class="dock-separator" />
+
+                    <!-- Add Image -->
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button class="dock-icon-btn" @click="$emit('add-image')">
+                                <ImagePlus :size="20" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            Add Image
+                        </TooltipContent>
+                    </Tooltip>
 
                     <!-- Version History -->
                     <Tooltip>
@@ -58,19 +72,17 @@
                     </Tooltip>
 
                     <span class="dock-separator" />
-
-                    <!-- Card Theme -->
-                    <Tooltip>
-                        <TooltipTrigger as-child>
-                            <button class="dock-icon-btn" @click="toggleDropdown">
-                                <Layers :size="20" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" :side-offset="6">
-                            Card Theme
-                        </TooltipContent>
-                    </Tooltip>
                 </template>
+
+                <!-- Edit toggle (far right — checkmark when active, pencil when collapsed) -->
+                <button
+                    class="dock-icon-btn"
+                    :class="editModeEnabled && 'active'"
+                    @click="handleEditToggle"
+                >
+                    <Edit2 v-if="!editModeEnabled" :size="20" />
+                    <Check v-else :size="20" />
+                </button>
             </div>
         </GlassDock>
 
@@ -128,7 +140,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Edit2, Check, History, RefreshCw, Layers } from 'lucide-vue-next';
+import { Edit2, Check, History, RefreshCw, Layers, ImagePlus } from 'lucide-vue-next';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import GlassDock from '@/components/custom/animation/GlassDock.vue';
 import { CARD_THEMES } from '../constants';
@@ -156,6 +168,7 @@ const emit = defineEmits<{
     'toggle-edit-mode': [];
     'toggle-version-history': [];
     'resynthesize': [];
+    'add-image': [];
 }>();
 
 const dockRef = ref<InstanceType<typeof GlassDock>>();

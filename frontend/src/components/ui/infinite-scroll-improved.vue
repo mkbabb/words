@@ -15,7 +15,7 @@
         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
         <span class="text-sm text-muted-foreground">Loading more...</span>
       </div>
-      <div v-else-if="hasMore" class="text-xs text-muted-foreground/60">
+      <div v-else-if="hasMore" class="text-xs text-muted-foreground/50">
         <!-- Silent sentinel -->
       </div>
       <div v-else class="text-xs text-muted-foreground text-center py-2">

@@ -1,5 +1,5 @@
 <template>
-    <div class="border-border border-b p-4 flex items-center min-h-[4rem] overflow-hidden">
+    <div class="border-border border-b px-3 py-2.5 flex items-center min-h-[3.25rem] overflow-hidden">
         <Transition
             mode="out-in"
             enter-active-class="transition-opacity duration-200 ease-apple-smooth"
@@ -9,53 +9,62 @@
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
-            <div v-if="!collapsed" key="expanded" class="flex items-center justify-between w-full">
-                <!-- Left: Floridify + @mbabb -->
-                <div class="flex items-center gap-3">
-                    <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
-                    <Popover>
-                        <PopoverTrigger as-child>
-                            <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
-                        </PopoverTrigger>
-                        <PopoverContent class="w-72">
-                            <div class="flex gap-4">
-                                <Avatar>
-                                    <AvatarImage src="https://avatars.githubusercontent.com/u/2848617?v=4" />
-                                </Avatar>
-                                <div>
-                                    <h4 class="text-sm font-semibold hover:underline">
-                                        <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
-                                    </h4>
-                                    <p class="text-muted-foreground text-sm italic">
-                                        Floridify your words, effloresce your communication and life thereof
-                                    </p>
-                                    <hr class="my-2 border-border/50" />
-                                    <a href="https://github.com/mkbabb/words" class="text-sm text-primary hover:underline block mt-2">
-                                        View the project on GitHub
-                                    </a>
-                                </div>
+            <div v-if="!collapsed" key="expanded" class="flex items-center w-full gap-2">
+                <!-- Floridify icon -->
+                <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
+
+                <!-- Vertical divider -->
+                <div class="h-6 w-px bg-border/40 flex-shrink-0" />
+
+                <!-- @mbabb + Dark Mode grouped -->
+                <Popover>
+                    <PopoverTrigger as-child>
+                        <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-72">
+                        <div class="flex gap-4">
+                            <Avatar>
+                                <AvatarImage src="https://avatars.githubusercontent.com/u/2848617?v=4" />
+                            </Avatar>
+                            <div>
+                                <h4 class="text-sm font-semibold hover:underline">
+                                    <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
+                                </h4>
+                                <p class="text-muted-foreground text-sm italic">
+                                    Floridify your words, effloresce your communication and life thereof
+                                </p>
+                                <hr class="my-2 border-border/50" />
+                                <a href="https://github.com/mkbabb/words" class="text-sm text-primary hover:underline block mt-2">
+                                    View the project on GitHub
+                                </a>
                             </div>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                <!-- Right: Dark Mode + Hamburger -->
-                <div class="flex items-center gap-3">
-                    <DarkModeToggle class="h-7 w-7" />
-                    <HamburgerIcon
-                        :is-open="mobile ? ui.sidebarOpen : !collapsed"
-                        :class="cn(
-                            'transition-all duration-300 ease-apple-smooth',
-                            mobile ? 'cursor-pointer' : 'cursor-ew-resize'
-                        )"
-                        @toggle="mobile ? ui.toggleSidebar() : ui.setSidebarCollapsed(!collapsed)"
-                    />
-                </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
+                <DarkModeToggle class="h-9 w-9 flex-shrink-0" />
+
+                <!-- Spacer -->
+                <div class="flex-1" />
+
+                <!-- Vertical divider -->
+                <div class="h-6 w-px bg-border/40 flex-shrink-0" />
+
+                <!-- Hamburger / collapse -->
+                <HamburgerIcon
+                    :is-open="mobile ? ui.sidebarOpen : !collapsed"
+                    :class="cn(
+                        'transition-all duration-300 ease-apple-smooth flex-shrink-0',
+                        mobile ? 'cursor-pointer' : 'cursor-ew-resize'
+                    )"
+                    @toggle="mobile ? ui.toggleSidebar() : ui.setSidebarCollapsed(!collapsed)"
+                />
             </div>
-            <div v-else key="collapsed" class="flex flex-col items-center gap-2 w-full">
+            <div v-else key="collapsed" class="flex flex-col items-center gap-3 py-3 w-full">
                 <DarkModeToggle class="h-6 w-6 flex-shrink-0" />
                 <button
                     @click="ui.setSidebarCollapsed(false)"
-                    class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
+                    class="focus-ring cursor-ew-resize hover:bg-muted/50 rounded-xl p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
                 >
                     <PanelRight :size="16" class="text-muted-foreground" />
                 </button>
@@ -91,6 +100,10 @@ const canToggleMode = computed(() => {
     const hasSuggestionQuery = !!content.wordSuggestions;
     if (!hasWordQuery && !hasSuggestionQuery) return false;
     if (hasSuggestionQuery && !hasWordQuery) return false;
+
+    // Only allow thesaurus toggle if a dedicated thesaurus response exists
+    if (!content.currentThesaurus) return false;
+
     return true;
 });
 </script>

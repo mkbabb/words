@@ -20,15 +20,15 @@
                 ref="searchBarElement"
                 :class="[
                     'search-bar relative flex items-center gap-2 overflow-visible px-1 py-0.5 sm:px-1',
-                    'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
+                    'shadow-cartoon-sm rounded-2xl transition-all duration-500 ease-out',
                     searchBar.isAIQuery && !searchBar.hasErrorAnimation
                         ? 'border-2 border-amber-500 bg-amber-50 backdrop-blur-sm dark:border-amber-700/40 dark:bg-amber-950/30'
                         : searchBar.hasErrorAnimation
                           ? 'border-2 border-red-400/50 bg-gradient-to-br from-red-50/20 to-red-50/10 dark:border-red-600/50 dark:from-red-900/20 dark:to-red-900/10'
-                          : 'border-2 border-border bg-background backdrop-blur-xl',
+                          : 'border-2 border-border bg-background/90 backdrop-blur-xl',
                     {
-                        'cartoon-shadow-sm-hover': uiState.isContainerHovered,
-                        'bg-background':
+                        'shadow-cartoon-sm-hover': uiState.isContainerHovered,
+                        'bg-background/95':
                             uiState.isContainerHovered && !searchBar.isAIQuery,
                         'shake-error': searchBar.hasErrorAnimation,
                     },
@@ -347,6 +347,10 @@ const canToggleMode = computed(() => {
 
     if (!hasWordQuery && !hasSuggestionQuery) return false;
     if (hasSuggestionQuery && !hasWordQuery) return false;
+
+    // Only allow thesaurus toggle if a dedicated thesaurus response exists
+    if (!content.currentThesaurus) return false;
+
     return true;
 });
 
@@ -639,11 +643,10 @@ watchEffect(() => {
 
 // Click outside handler is now in useFocusManagement composable
 
-// Watch query changes for immediate search - NO DEBOUNCING
+// Watch query changes — direct search (429s silenced in api/search.ts)
 watch(
     () => searchBar.searchQuery,
     () => {
-        // Trigger search immediately for all modes
         performSearch();
 
         // Immediately recompute autocomplete for the new query.

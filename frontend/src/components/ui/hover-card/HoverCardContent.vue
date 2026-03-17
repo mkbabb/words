@@ -35,7 +35,7 @@ const forwardedProps = useForwardProps(delegatedProps)
       v-bind="{ ...forwardedProps, ...attrs }"
       :class="
         cn(
-          'hovercard-animated bg-popover/20 backdrop-blur-md text-popover-foreground border-border/30 z-50 w-64 rounded-2xl border-2 cartoon-shadow-sm p-4 outline-none',
+          'hovercard-animated bg-popover/20 backdrop-blur-md text-popover-foreground border-border/30 z-50 w-64 rounded-2xl border-2 shadow-cartoon-sm p-4 outline-none',
           props.class,
         )
       "
@@ -47,25 +47,13 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <style>
 @keyframes hovercard-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  from { opacity: 0; transform: scale(0.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes hovercard-out {
-  from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.9) translateY(8px);
-  }
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.9) translateY(8px); }
 }
 
 .hovercard-animated {

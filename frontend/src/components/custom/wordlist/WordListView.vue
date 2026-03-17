@@ -38,7 +38,7 @@
                             review
                             <span
                                 v-if="dueForReview > 0"
-                                class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary tabular-nums"
+                                class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-micro font-medium text-primary tabular-nums"
                             >
                                 {{ dueForReview }}
                             </span>
@@ -130,13 +130,9 @@
                 </Tabs>
             </div>
 
-            <!-- No wordlist selected -->
-            <div v-else-if="!isInitialLoading" key="empty" class="py-8">
-                <EmptyState
-                    title="Start with a wordlist"
-                    message="Create a new wordlist or select one from the sidebar to begin reviewing words."
-                    empty-type="generic"
-                />
+            <!-- No wordlist selected — show dashboard -->
+            <div v-else-if="!isInitialLoading" key="empty">
+                <WordlistDashboard />
             </div>
         </Transition>
 
@@ -208,6 +204,7 @@ import { useSearchOrchestrator } from '@/components/custom/search/composables/us
 import { applySortCriteria } from './utils/sortWords';
 import { logger } from '@/utils/logger';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
+import WordlistDashboard from './WordlistDashboard.vue';
 
 const { searchBar } = useStores();
 const wordlistMode = useWordlistMode();

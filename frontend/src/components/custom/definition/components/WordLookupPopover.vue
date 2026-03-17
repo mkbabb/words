@@ -5,7 +5,7 @@
             <button
                 v-if="isPillVisible && !isPopoverVisible"
                 data-word-lookup-pill
-                class="lookup-popover fixed z-50 rounded-full border-2 border-border/30 bg-background/90 px-3 py-1 text-xs font-medium text-primary cartoon-shadow-sm backdrop-blur-md transition-[background,box-shadow] duration-200 hover:bg-background/95 hover:cartoon-shadow-sm-hover"
+                class="lookup-popover fixed z-50 rounded-full border-2 border-border/30 bg-background/90 px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm backdrop-blur-md transition-[background,box-shadow] duration-200 hover:bg-background/95 hover:shadow-cartoon-sm-hover"
                 :style="pillStyle"
                 @mousedown.prevent.stop="onPillClick"
             >
@@ -18,7 +18,7 @@
             <div
                 v-if="isPopoverVisible"
                 data-word-lookup-popover
-                class="lookup-popover fixed z-50 w-64 rounded-2xl border-2 border-border/30 bg-background/90 p-3 cartoon-shadow-sm backdrop-blur-md"
+                class="lookup-popover fixed z-50 w-64 rounded-xl border-2 border-border/30 bg-background/90 p-3 shadow-cartoon-sm backdrop-blur-md"
                 :style="{ ...popoverStyle, backgroundImage: 'var(--paper-clean-texture)', backgroundBlendMode: 'multiply' }"
             >
                 <!-- Loading state -->
@@ -53,7 +53,7 @@
 
                     <!-- Definition -->
                     <div v-if="preview.definition" class="py-1.5">
-                        <span class="text-[10px] font-medium text-primary/80">
+                        <span class="text-micro font-medium text-primary/80">
                             {{ preview.definition.part_of_speech }}
                         </span>
                         <p class="mt-0.5 line-clamp-3 text-sm font-serif leading-relaxed text-foreground/80">

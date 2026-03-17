@@ -6,7 +6,7 @@
         class="fixed bottom-6 left-6 right-6 z-50 max-w-md mx-auto"
       >
         <div
-          class="cartoon-shadow-md rounded-2xl glass-heavy
+          class="shadow-cartoon-md rounded-2xl glass-heavy
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >
@@ -26,7 +26,7 @@
               </div>
               <button
                 @click="minimize"
-                class="p-1 rounded-lg hover:bg-muted/50 transition-fast"
+                class="p-1 rounded-lg hover:bg-muted/50 transition-fast focus-ring"
                 title="Minimize"
               >
                 <Minus class="h-4 w-4 text-muted-foreground" />
@@ -56,14 +56,14 @@
                 @click="dismissPrompt"
                 class="flex-1 px-4 py-2 rounded-xl border-2 border-border
                        text-foreground hover-lift transition-smooth
-                       hover:bg-muted/50 active-scale"
+                       hover:bg-muted/50 active-scale focus-ring"
               >
                 Maybe later
               </button>
               <button
                 @click="dismissPromptPermanently"
                 class="px-4 py-2 rounded-xl text-muted-foreground
-                       hover:text-foreground transition-smooth"
+                       hover:text-foreground transition-smooth focus-ring"
               >
                 Don't show again
               </button>
@@ -86,7 +86,7 @@
               </div>
               <button
                 @click="minimize"
-                class="p-1 rounded-lg hover:bg-muted/50 transition-fast"
+                class="p-1 rounded-lg hover:bg-muted/50 transition-fast focus-ring"
                 title="Minimize"
               >
                 <Minus class="h-4 w-4 text-muted-foreground" />
@@ -112,7 +112,7 @@
               <button
                 @click="installPWA"
                 class="flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground
-                       font-medium hover-lift cartoon-shadow-sm transition-smooth
+                       font-medium hover-lift shadow-cartoon-sm transition-smooth
                        active-scale"
               >
                 Install App
@@ -137,7 +137,7 @@
         v-if="showPrompt && isMinimized"
         @click="restore"
         class="fixed bottom-6 right-6 z-50 p-3 rounded-full
-               bg-primary text-primary-foreground cartoon-shadow-sm
+               bg-primary text-primary-foreground shadow-cartoon-sm
                hover-lift hover:scale-110 transition-smooth active-scale"
         title="Show install prompt"
       >

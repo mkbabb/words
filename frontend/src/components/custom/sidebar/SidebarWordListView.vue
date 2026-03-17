@@ -7,12 +7,12 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="Search wordlists..."
-                class="w-full rounded-lg bg-background/60 dark:bg-white/[0.04] border border-border/30 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                class="w-full rounded-lg bg-background/60 dark:bg-white/[0.04] border border-border/30 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
             />
         </div>
 
         <!-- Gradient separator -->
-        <hr class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent" />
+        <hr class="h-px border-0 divider-h" />
 
         <!-- All Wordlists -->
         <div v-if="isLoading" class="space-y-2">
@@ -45,16 +45,16 @@
                 />
                 <hr
                     v-if="index < filteredWordlists.length - 1"
-                    class="my-0.5 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/15 to-transparent"
+                    class="my-0.5 border-0 h-px divider-h"
                 />
             </template>
         </div>
 
         <!-- Gradient separator -->
-        <hr class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent" />
+        <hr class="h-px border-0 divider-h" />
 
         <!-- Add wordlist label -->
-        <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Add wordlist</p>
+        <p class="text-micro font-medium uppercase tracking-wider text-muted-foreground/50">Add wordlist</p>
 
         <!-- File Upload Drop Zone -->
         <div
@@ -199,8 +199,11 @@ const pendingFiles = ref<File[]>([]);
 const showDeleteDialog = ref(false);
 const wordlistToDelete = ref<WordList | null>(null);
 
-// Real data from API
-const wordlists = ref<WordList[]>([]);
+// Shared wordlists from store
+const wordlists = computed({
+    get: () => wordlistMode.allWordlists as WordList[],
+    set: (val: WordList[]) => { wordlistMode.allWordlists = val; },
+});
 const activeUploads = ref<
     Array<{
         id: string;
@@ -209,7 +212,7 @@ const activeUploads = ref<
         progress: number;
     }>
 >([]);
-const isLoading = ref(false);
+const isLoading = computed(() => wordlistMode.wordlistsLoading);
 
 // Search/filter
 const searchQuery = ref('');
@@ -331,30 +334,14 @@ const transformWordlistFromAPI = (apiWordlist: any): WordList => {
     };
 };
 
-// Load wordlists from API
+// Load wordlists via shared store
 const loadWordlists = async () => {
-    if (isLoading.value) return;
-    if (!auth.isAuthenticated) {
-        wordlists.value = [];
-        return;
-    }
+    if (!auth.isAuthenticated) return;
+    await wordlistMode.fetchAllWordlists();
 
-    isLoading.value = true;
-    try {
-        const response = await wordlistApi.getWordlists({
-            limit: 50,
-        });
-
-        wordlists.value = response.items.map(transformWordlistFromAPI);
-
-        // Auto-select first wordlist if none selected and wordlists exist
-        if (!selectedWordlist.value && wordlists.value.length > 0) {
-            wordlistMode.setWordlist(wordlists.value[0].id);
-        }
-    } catch (error) {
-        logger.error('Failed to load wordlists:', error);
-    } finally {
-        isLoading.value = false;
+    // Auto-select first wordlist if none selected and wordlists exist
+    if (!selectedWordlist.value && wordlists.value.length > 0) {
+        wordlistMode.setWordlist(wordlists.value[0].id);
     }
 };
 

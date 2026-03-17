@@ -45,7 +45,7 @@
                     ]"
                 >
                     <span
-                        class="whitespace-nowrap font-mono text-[10px] font-medium"
+                        class="whitespace-nowrap font-mono text-micro font-medium"
                         :class="[
                             index === selectedIndex
                                 ? 'text-primary'
@@ -54,7 +54,7 @@
                     >
                         v{{ version.version }}
                     </span>
-                    <span class="whitespace-nowrap text-[9px] text-muted-foreground/60">
+                    <span class="whitespace-nowrap text-micro text-muted-foreground/50">
                         {{ formatShortDate(version.created_at) }}
                     </span>
                 </div>

@@ -1,11 +1,11 @@
 <template>
     <div
         v-if="metadata"
-        class="space-y-1 rounded-md border border-border/20 bg-muted/10 px-2 py-1.5"
+        class="space-y-1 rounded-xl border border-border/20 bg-muted/10 px-2 py-1.5"
     >
         <!-- Operation type + user -->
-        <div class="flex items-center gap-1.5 text-[10px]">
-            <Badge variant="outline" class="h-4 px-1 text-[9px] font-medium">
+        <div class="flex items-center gap-1.5 text-micro">
+            <Badge variant="outline" class="h-4 px-1 text-micro font-medium">
                 {{ operationLabel }}
             </Badge>
             <span v-if="metadata.username" class="text-muted-foreground">
@@ -16,7 +16,7 @@
         <!-- Change reason -->
         <p
             v-if="metadata.change_reason"
-            class="text-[10px] text-muted-foreground/80 italic"
+            class="text-micro text-muted-foreground/70 italic"
         >
             {{ metadata.change_reason }}
         </p>
@@ -24,7 +24,7 @@
         <!-- Synthesis audit -->
         <div
             v-if="metadata.synthesis_audit"
-            class="flex flex-wrap gap-1.5 text-[9px] text-muted-foreground/60"
+            class="flex flex-wrap gap-1.5 text-micro text-muted-foreground/50"
         >
             <span class="font-mono">{{ metadata.synthesis_audit.model_name }}</span>
             <span v-if="metadata.synthesis_audit.total_tokens">
@@ -46,14 +46,14 @@
             <span
                 v-for="(fc, i) in visibleChanges"
                 :key="i"
-                class="rounded px-1 py-0.5 text-[9px] font-mono"
+                class="rounded-md px-1 py-0.5 text-micro font-mono"
                 :class="changeTypeClass(fc.change_type)"
             >
                 {{ changePrefix(fc.change_type) }}{{ fc.field_path }}
             </span>
             <span
                 v-if="overflowCount > 0"
-                class="text-[9px] text-muted-foreground/50"
+                class="text-micro text-muted-foreground/50"
             >
                 +{{ overflowCount }} more
             </span>

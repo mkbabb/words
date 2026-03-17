@@ -6,7 +6,7 @@
                 <h4 class="themed-cluster-title text-sm font-semibold uppercase">
                     {{ partOfSpeech.type }}
                 </h4>
-                <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <span class="rounded bg-muted px-1.5 py-0.5 text-micro font-medium text-muted-foreground">
                     {{ partOfSpeech.count }} def{{ partOfSpeech.count !== 1 ? 's' : '' }}
                 </span>
             </div>
@@ -28,7 +28,7 @@
                 <!-- Example -->
                 <div
                     v-if="definition.examples?.[0]"
-                    class="mt-1 text-[10px] italic text-muted-foreground line-clamp-1"
+                    class="mt-1 text-micro italic text-muted-foreground line-clamp-1"
                 >
                     "{{ definition.examples[0].text }}"
                 </div>
@@ -40,13 +40,13 @@
                     <span
                         v-for="syn in definition.synonyms.slice(0, 4)"
                         :key="syn"
-                        class="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        class="rounded bg-muted/50 px-1.5 py-0.5 text-micro text-muted-foreground"
                     >
                         {{ syn }}
                     </span>
                     <span
                         v-if="definition.synonyms.length > 4"
-                        class="text-[10px] text-muted-foreground/50"
+                        class="text-micro text-muted-foreground/50"
                     >
                         +{{ definition.synonyms.length - 4 }}
                     </span>
@@ -57,7 +57,7 @@
         <!-- More indicator -->
         <div
             v-if="definitions.length > 2"
-            class="text-[10px] text-muted-foreground/60"
+            class="text-micro text-muted-foreground/50"
         >
             +{{ definitions.length - 2 }} more definition{{ definitions.length - 2 !== 1 ? 's' : '' }}
         </div>

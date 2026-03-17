@@ -7,8 +7,9 @@
                     @click="$emit('cluster-click')"
                     :data-toc-id="cluster.clusterId"
                     :data-sidebar-cluster="cluster.clusterId"
+                    :aria-current="isActive ? 'true' : undefined"
                     :class="[
-                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200',
+                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200 focus-ring',
                         isActive
                             ? 'font-bold text-foreground'
                             : 'font-normal text-foreground/80 hover:bg-muted/30 hover:text-foreground'

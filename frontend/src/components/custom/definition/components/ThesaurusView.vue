@@ -71,8 +71,8 @@
                 <HoverCardContent
                     :class="
                         cn(
-                            'themed-hovercard z-[80] w-80',
-                            cardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                            'themed-hovercard z-hovercard w-80',
+                            cardVariant !== 'default' ? 'shadow-cartoon-sm' : ''
                         )
                     "
                     :data-theme="cardVariant || 'default'"

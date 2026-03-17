@@ -47,14 +47,14 @@ const handleToggle = () => {
 <style scoped lang="scss">
 .dark-mode-toggle-button {
     cursor: pointer;
-    border: 0;
+    border: 1px solid transparent;
     opacity: 0.65;
-    padding: 0;
-    border-radius: 50%;
+    padding: 0.375rem;
+    border-radius: 9999px;
     position: relative;
-    background: 0;
+    background: transparent;
 
-    transition: opacity 200ms, background 200ms, transform 200ms;
+    transition: opacity 200ms, background 200ms, border-color 200ms, box-shadow 200ms, transform 200ms, backdrop-filter 200ms;
 
     z-index: auto;
 
@@ -68,10 +68,26 @@ const handleToggle = () => {
     }
 
     &:hover,
-    &:focus {
+    &:focus-visible {
         outline: none;
         opacity: 1;
-        background: hsl(0 0% 50% / 0.15);
+        background: color-mix(in srgb, var(--color-card) 70%, transparent);
+        border-color: color-mix(in srgb, var(--color-border) 45%, transparent);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--color-foreground) 8%, transparent);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    &:focus-visible {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--color-ring) 40%, transparent),
+            0 2px 8px color-mix(in srgb, var(--color-foreground) 8%, transparent);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
     }
 
     &:active {

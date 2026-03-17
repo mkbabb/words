@@ -57,6 +57,17 @@ const config: Config = {
           foreground: 'var(--color-card-foreground)',
         },
       },
+      fontSize: {
+        'micro': '10px',
+      },
+      lineHeight: {
+        'display': '1.2',
+        'prose': '1.625',
+      },
+      spacing: {
+        'sidebar-collapsed': '4rem',
+        'sidebar-expanded': '20rem',
+      },
       zIndex: {
         'overlay': '0',
         'content': '1',
@@ -66,6 +77,7 @@ const config: Config = {
         'modal': '50',
         'mobile-nav': '60',
         'hovercard': '80',
+        'sidebar-mobile': '81',
         'critical': '100',
         'toggle': '999',
         'max': '9999',
@@ -174,6 +186,18 @@ const config: Config = {
           '25%': { transform: 'rotate(2deg) translateY(-2px)' },
           '75%': { transform: 'rotate(-2deg) translateY(2px)' },
         },
+        'tab-content-in': {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'hovercard-in': {
+          from: { opacity: '0', transform: 'scale(0.9) translateY(8px)' },
+          to: { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+        'hovercard-out': {
+          from: { opacity: '1', transform: 'scale(1) translateY(0)' },
+          to: { opacity: '0', transform: 'scale(0.9) translateY(8px)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -196,6 +220,9 @@ const config: Config = {
         'spin-slow': 'spin-slow 3s linear infinite',
         wiggle: 'wiggle 2.5s ease-in-out infinite',
         'wiggle-bounce': 'wiggle-bounce 2.5s ease-in-out infinite',
+        'tab-content-in': 'tab-content-in 0.25s ease both',
+        'hovercard-in': 'hovercard-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+        'hovercard-out': 'hovercard-out 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards',
       },
       transitionTimingFunction: {
         // Primary Apple-like easings
@@ -245,7 +272,7 @@ const config: Config = {
           '@apply transition-shadow duration-250 ease-apple-smooth hover:shadow-card-hover': {},
         },
         '.focus-ring': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background': {},
+          '@apply focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none': {},
         },
         // Standardized transition utilities
         '.transition-micro': {
@@ -435,6 +462,50 @@ const config: Config = {
           '@apply rounded-xl border p-3 backdrop-blur-md transition-all duration-200': {},
           '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
         },
+        // ── Unified cartoon shadow system (WS1a) ──
+        '.shadow-cartoon-sm': {
+          boxShadow: '-6px 4px 1px var(--shadow-cartoon-color), 0 6px 1px var(--shadow-cartoon-color), -6px 6px 2px var(--shadow-cartoon-color-soft)',
+          border: '2px solid var(--color-border)',
+          transform: 'translateY(-2px)',
+        },
+        '.shadow-cartoon-md': {
+          boxShadow: '-8px 5px 1px var(--shadow-cartoon-color), 0 8px 2px var(--shadow-cartoon-color), -8px 8px 2px var(--shadow-cartoon-color-soft)',
+          border: '2px solid var(--color-border)',
+          transform: 'translateY(-2px)',
+        },
+        '.shadow-cartoon-lg': {
+          boxShadow: '-10px 6px 2px var(--shadow-cartoon-color), 0 10px 2px var(--shadow-cartoon-color), -10px 10px 3px var(--shadow-cartoon-color-soft)',
+          border: '2px solid var(--color-border)',
+          transform: 'translateY(-3px)',
+        },
+        '.shadow-cartoon-sm-hover': {
+          boxShadow: '-8px 6px 1px var(--shadow-cartoon-color-hover), 0 8px 1px var(--shadow-cartoon-color-hover), -8px 8px 2px var(--shadow-cartoon-color-hover-soft)',
+          border: '2px solid var(--color-border)',
+          transform: 'translateY(-4px)',
+        },
+        // ── Interactive state utilities (WS1b) ──
+        '.disabled-base': {
+          '@apply disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none': {},
+        },
+        '.card-hover': {
+          '@apply transition-all duration-200 hover:border-border/50 hover:bg-muted/30': {},
+        },
+        '.card-hover-interactive': {
+          '@apply transition-all duration-200 hover:bg-primary/5 hover:border-primary/30': {},
+        },
+        // ── Typography scale (WS1c) ──
+        '.heading-1': { '@apply text-7xl font-serif font-bold leading-display': {} },
+        '.heading-2': { '@apply text-5xl font-serif font-semibold leading-display': {} },
+        '.heading-3': { '@apply text-3xl font-serif font-semibold leading-snug': {} },
+        '.heading-4': { '@apply text-2xl font-serif font-semibold leading-snug': {} },
+        '.heading-5': { '@apply text-xl font-serif font-semibold': {} },
+        '.heading-6': { '@apply text-lg font-serif font-semibold': {} },
+        // ── Definition display utilities (WS1d) ──
+        '.def-spacing': { '@apply space-y-3': {} },
+        '.def-item-spacing': { '@apply space-y-2': {} },
+        '.def-padding': { '@apply px-4 sm:px-6 py-6': {} },
+        '.def-border-subtle': { '@apply border-border/30': {} },
+        '.def-border-normal': { '@apply border-border/50': {} },
       }
       addUtilities(newUtilities, ['responsive', 'hover'])
       

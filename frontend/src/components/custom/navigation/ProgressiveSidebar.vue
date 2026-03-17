@@ -1,10 +1,10 @@
 <template>
     <div
-        class="themed-card themed-shadow-lg rounded-lg bg-background/95 p-2 backdrop-blur-sm"
+        class="themed-card shadow-cartoon-lg rounded-lg bg-background/95 p-2 backdrop-blur-sm"
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
-        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0 overflow-y-auto">
+        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100dvh-8rem)] space-y-0 overflow-y-auto">
             <TransitionGroup name="sidebar-item" tag="div" class="space-y-0">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
                 <!-- Special handling for etymology -->
@@ -43,7 +43,7 @@
                     <!-- Regular separator between non-etymology clusters -->
                     <hr
                         v-if="index < sidebarSections.length - 1 && sidebarSections[index + 1].clusterId !== 'etymology'"
-                        class="my-1 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
+                        class="my-1 border-0 h-px divider-h"
                     />
                 </template>
             </template>

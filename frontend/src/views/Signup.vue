@@ -9,7 +9,7 @@
   >
     <!-- Card container -->
     <div
-      class="flex w-full max-w-md flex-col items-center rounded-2xl glass-light p-8 cartoon-shadow-sm"
+      class="flex w-full max-w-md flex-col items-center rounded-xl glass-light p-8 shadow-cartoon-sm"
     >
       <!-- Branding -->
       <div class="mb-6 flex flex-col items-center gap-2">

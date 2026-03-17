@@ -175,11 +175,11 @@ onMounted(loadProviders);
 <style scoped>
 /* Tab content entrance animation — Reka UI mounts/unmounts TabsContent,
    so a CSS animation on mount gives us the fade+slide without Vue <Transition>. */
-@keyframes tabContentIn {
+@keyframes tab-content-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
 }
 .tab-content-animate {
-    animation: tabContentIn 0.25s ease both;
+    animation: tab-content-in 0.25s ease both;
 }
 </style>

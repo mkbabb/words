@@ -26,7 +26,7 @@
                     "
                 >
                     <template #display>
-                        <span class="text-2xl font-semibold text-primary">
+                        <span class="text-lg font-semibold text-muted-foreground">
                             {{ definition.part_of_speech }}
                         </span>
                     </template>
@@ -44,7 +44,7 @@
 
             <!-- Frequency temperature slider (edit mode) -->
             <div v-if="editModeEnabled" class="ml-auto flex items-center gap-2">
-                <span class="text-[10px] text-muted-foreground/60">Freq</span>
+                <span class="text-micro text-muted-foreground/50">Freq</span>
                 <div class="relative flex items-center">
                     <div
                         class="h-1.5 w-16 rounded-full"
@@ -61,7 +61,7 @@
                     />
                 </div>
                 <span
-                    class="min-w-[1ch] text-center text-[10px] font-mono font-medium"
+                    class="min-w-[1ch] text-center text-micro font-mono font-medium"
                     :style="{ color: temperatureColor((fields.frequency_band.value || 3) / 5) }"
                 >
                     {{ fields.frequency_band.value || '—' }}
@@ -123,7 +123,7 @@
                 <span
                     v-for="src in definition.source_definitions"
                     :key="src.entry_id"
-                    class="inline-flex items-center rounded border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    class="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-micro font-medium text-muted-foreground"
                 >
                     {{ getProviderDisplayName(src.provider) }}
                     <span v-if="src.entry_version" class="ml-0.5 opacity-60">v{{ src.entry_version }}</span>
@@ -260,7 +260,7 @@
                 <div
                     v-for="(note, i) in definition.usage_notes"
                     :key="i"
-                    class="rounded border border-border/50 bg-muted/20 px-2 py-1 text-xs"
+                    class="rounded-lg border border-border/50 bg-muted/20 px-2 py-1 text-xs"
                 >
                     <span class="font-medium text-muted-foreground">{{ note.type }}:</span>
                     {{ note.text }}
@@ -273,7 +273,7 @@
                 <div
                     v-for="(pattern, i) in definition.grammar_patterns"
                     :key="i"
-                    class="rounded border border-border/50 bg-muted/20 px-2 py-1 text-xs font-mono"
+                    class="rounded-lg border border-border/50 bg-muted/20 px-2 py-1 text-xs font-mono"
                 >
                     {{ pattern.pattern }}
                     <span v-if="pattern.description" class="ml-1 font-sans text-muted-foreground">
@@ -289,10 +289,10 @@
                     <span
                         v-for="(coll, i) in definition.collocations"
                         :key="i"
-                        class="rounded border border-border/50 bg-muted/30 px-1.5 py-0.5 text-xs"
+                        class="rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-xs"
                     >
                         {{ coll.text }}
-                        <span class="text-muted-foreground/60">{{ coll.type }}</span>
+                        <span class="text-muted-foreground/50">{{ coll.type }}</span>
                     </span>
                 </div>
             </div>

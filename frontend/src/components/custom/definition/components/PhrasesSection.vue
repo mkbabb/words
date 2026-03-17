@@ -19,7 +19,7 @@
                     <Badge
                         v-if="phrase.usage_register"
                         variant="outline"
-                        class="text-[10px] h-4 px-1"
+                        class="text-micro h-4 px-1"
                     >
                         {{ phrase.usage_register }}
                     </Badge>

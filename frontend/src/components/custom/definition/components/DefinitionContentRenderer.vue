@@ -18,7 +18,7 @@
 
         <!-- Gradient Separator -->
         <hr
-            class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
+            class="h-px border-0 divider-h"
         />
 
         <!-- Definition Clusters -->
@@ -49,7 +49,7 @@
                 </DefinitionCluster>
                 <p
                     v-if="groupedDefinitions.length === 0"
-                    class="py-6 text-center text-sm text-muted-foreground/60"
+                    class="py-6 text-center text-sm text-muted-foreground/50"
                 >
                     No definitions in this version
                 </p>
@@ -203,7 +203,7 @@ const DiffSection: FunctionalComponent<
             h(
                 'div',
                 {
-                    class: 'absolute top-2 right-2 flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400',
+                    class: 'absolute top-2 right-2 flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-micro font-medium text-amber-600 dark:text-amber-400',
                 },
                 [
                     h('span', { class: 'inline-block h-1.5 w-1.5 rounded-full bg-amber-500' }),

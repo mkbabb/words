@@ -7,7 +7,7 @@
             <div
                 v-if="version"
                 :key="version.version"
-                class="rounded-2xl border border-border/30 bg-background/80 p-6 shadow-2xl cartoon-shadow-lg backdrop-blur-xl"
+                class="rounded-xl border border-border/30 bg-background/80 p-6 shadow-2xl shadow-cartoon-lg backdrop-blur-xl"
             >
                 <!-- Header -->
                 <div class="flex items-center gap-2">
@@ -17,11 +17,11 @@
                     <Badge
                         v-if="version.is_latest"
                         variant="secondary"
-                        class="text-[10px]"
+                        class="text-micro"
                     >
                         Latest
                     </Badge>
-                    <Badge v-if="isCurrentVersion" class="text-[10px]">
+                    <Badge v-if="isCurrentVersion" class="text-micro">
                         Current
                     </Badge>
                     <span class="ml-auto text-xs text-muted-foreground">
@@ -100,7 +100,7 @@
                     />
 
                     <!-- Storage mode -->
-                    <div class="mt-2 text-[10px] text-muted-foreground/40">
+                    <div class="mt-2 text-micro text-muted-foreground/50">
                         {{ version.storage_mode === 'snapshot' ? 'Full snapshot' : 'Delta' }}
                         · {{ version.data_hash?.slice(0, 8) }}
                     </div>
@@ -110,7 +110,7 @@
                         v-if="diffFields.size > 0"
                         class="mt-2 space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-2"
                     >
-                        <div class="flex items-center gap-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        <div class="flex items-center gap-1.5 text-micro font-medium text-amber-600 dark:text-amber-400">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
                             {{ diffFields.size }} field{{ diffFields.size !== 1 ? 's' : '' }} changed
                         </div>
@@ -118,7 +118,7 @@
                             <span
                                 v-for="field in [...diffFields]"
                                 :key="field"
-                                class="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-600 dark:text-amber-400"
+                                class="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-micro text-amber-600 dark:text-amber-400"
                             >
                                 {{ field }}
                             </span>
@@ -127,7 +127,7 @@
                 </template>
 
                 <!-- No detail yet -->
-                <div v-else class="mt-4 text-xs text-muted-foreground/60">
+                <div v-else class="mt-4 text-xs text-muted-foreground/50">
                     Select a version to view details
                 </div>
 

@@ -1,9 +1,6 @@
 <template>
-    <!-- Single provider: direct click, no popover -->
-    <div
-        v-if="(showSynthesis || providers.length > 0) && providers.length <= 1"
-        class="flex items-center"
-    >
+    <!-- Vertical layout mode -->
+    <div v-if="layout === 'vertical' && (showSynthesis || providers.length > 0)" class="flex flex-col items-center gap-2">
         <!-- AI Synthesis icon -->
         <Tooltip v-if="showSynthesis">
             <TooltipTrigger as-child>
@@ -11,54 +8,81 @@
                     :disabled="!interactive"
                     @click="$emit('select-source', 'synthesis')"
                     :class="[
-                        'flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-all duration-200',
+                        'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition-colors duration-200',
                         activeSource === 'synthesis'
                             ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:text-amber-400 ring-2 ring-amber-500/20'
                             : interactive
                               ? 'border-border/50 bg-background text-muted-foreground opacity-60 hover:border-border hover:opacity-100'
-                              : 'cursor-default border-border/50 bg-background text-muted-foreground/60 opacity-60',
+                              : 'cursor-default border-border/50 bg-background text-muted-foreground/50 opacity-60',
                     ]"
                 >
-                    <Wand2 :size="14" />
+                    <Wand2 :size="20" />
                 </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="6">
+            <TooltipContent side="left" :side-offset="6">
                 AI Synthesis
             </TooltipContent>
         </Tooltip>
 
-        <!-- Divider between AI and single provider -->
-        <div
-            v-if="showSynthesis && providers.length === 1"
-            class="mx-1.5 h-5 w-px bg-border/50"
-        />
-
-        <!-- Single provider icon — direct click -->
-        <Tooltip v-if="providers.length === 1">
+        <!-- Provider icons — each on its own line -->
+        <Tooltip v-for="provider in orderedProviders" :key="provider">
             <TooltipTrigger as-child>
                 <button
                     :disabled="!interactive"
-                    @click="$emit('select-source', providers[0])"
+                    @click="$emit('select-source', provider)"
                     :class="[
-                        'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 shadow-sm transition-all duration-200',
+                        'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/80 shadow-sm transition-colors duration-200',
                         interactive ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
-                        activeSource === providers[0] ? 'ring-2 ring-primary/30' : '',
+                        activeSource === provider
+                            ? 'border-primary/40 ring-2 ring-primary/20 bg-muted'
+                            : 'border-border/20',
                     ]"
                 >
                     <component
-                        :is="getProviderIcon(providers[0])"
-                        :size="14"
+                        :is="getProviderIcon(provider)"
+                        :size="20"
                         class="text-muted-foreground"
                     />
                 </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="6">
-                {{ getProviderDisplayName(providers[0]) }}
+            <TooltipContent side="left" :side-offset="6">
+                {{ getProviderDisplayName(provider) }}
             </TooltipContent>
         </Tooltip>
+
+        <!-- Info button for metadata popover -->
+        <Popover v-if="providers.length > 1" v-model:open="popoverOpen">
+            <PopoverTrigger as-child>
+                <button
+                    class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/40 transition-all duration-150 hover:text-muted-foreground hover:bg-muted/60"
+                >
+                    <Info :size="12" />
+                </button>
+            </PopoverTrigger>
+            <InlinePopoverContent
+                side="left"
+                align="start"
+                :side-offset="12"
+                class="w-64 rounded-xl border border-border/40 bg-popover p-1.5 shadow-lg backdrop-blur-md"
+            >
+                <ProviderMetadataCard
+                    v-for="src in sortedDropdownEntries"
+                    :key="getKey(src)"
+                    :provider="getId(src)"
+                    :display-name="getProviderDisplayName(getId(src))"
+                    :is-active="activeSource === getId(src)"
+                    :interactive="interactive"
+                    :version="'entry_version' in src ? src.entry_version : undefined"
+                    :richness-score="providerMetadata.get(getId(src))?.richness_score ?? null"
+                    :definition-count="providerMetadata.get(getId(src))?.definition_count ?? null"
+                    :fetched-at="providerMetadata.get(getId(src))?.fetched_at ?? null"
+                    @click="handleDropdownSelect(getId(src))"
+                />
+            </InlinePopoverContent>
+        </Popover>
     </div>
 
-    <!-- Multiple providers: individually clickable icons + info popover -->
+    <!-- Horizontal layout: providers with info popover (works for 1+ providers) -->
     <Popover v-else-if="showSynthesis || providers.length > 0" v-model:open="popoverOpen">
         <div class="flex items-center">
             <!-- AI Synthesis icon (separate from stack) -->
@@ -68,15 +92,15 @@
                         :disabled="!interactive"
                         @click.stop="$emit('select-source', 'synthesis')"
                         :class="[
-                            'flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-all duration-200',
+                            'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition-colors duration-200',
                             activeSource === 'synthesis'
                                 ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:text-amber-400 ring-2 ring-amber-500/20'
                                 : interactive
-                                  ? 'border-border/50 bg-background text-muted-foreground opacity-60 hover:border-border hover:opacity-100'
-                                  : 'cursor-default border-border/50 bg-background text-muted-foreground/60 opacity-60',
+                                  ? 'border-border/20 bg-muted/80 text-muted-foreground opacity-60 hover:border-border/40 hover:opacity-100'
+                                  : 'cursor-default border-border/20 bg-muted/80 text-muted-foreground/50 opacity-60',
                         ]"
                     >
-                        <Wand2 :size="14" />
+                        <Wand2 :size="20" />
                     </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" :side-offset="6">
@@ -87,7 +111,7 @@
             <!-- Vertical divider -->
             <div
                 v-if="showSynthesis && providers.length > 0"
-                class="mx-1.5 h-5 w-px bg-border/50"
+                class="mx-1.5 h-7 w-px bg-border/40"
             />
 
             <!-- Provider icons — each individually clickable to switch, expand on hover -->
@@ -98,7 +122,7 @@
                 <!-- Info button — floats above the icon stack -->
                 <PopoverTrigger as-child>
                     <button
-                        class="absolute -top-3.5 left-1/2 -translate-x-1/2 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/40 transition-all duration-150 opacity-0 group-hover/stack:opacity-100 hover:text-muted-foreground hover:bg-muted/60 z-10"
+                        class="absolute -top-3.5 left-1/2 -translate-x-1/2 flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/50 transition-all duration-150 opacity-0 group-hover/stack:opacity-100 hover:text-muted-foreground hover:bg-muted/60 z-10"
                     >
                         <Info :size="10" />
                     </button>
@@ -110,18 +134,18 @@
                             :disabled="!interactive"
                             @click="$emit('select-source', provider)"
                             :class="[
-                                'flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted/80 shadow-sm transition-all duration-200 ease-apple-spring',
+                                'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/80 shadow-sm transition-colors duration-200 ease-apple-spring',
                                 interactive ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
-                                i > 0 ? '-ml-2 group-hover/stack:ml-0.5' : '',
+                                i > 0 ? '-ml-3 group-hover/stack:ml-0.5' : '',
                                 activeSource === provider
-                                    ? 'ring-2 ring-primary/30 bg-muted'
-                                    : '',
+                                    ? 'border-primary/40 ring-2 ring-primary/20 bg-muted'
+                                    : 'border-border/20',
                             ]"
                             :style="{ zIndex: orderedProviders.length - i }"
                         >
                             <component
                                 :is="getProviderIcon(provider)"
-                                :size="14"
+                                :size="20"
                                 class="text-muted-foreground"
                             />
                         </button>
@@ -187,12 +211,14 @@ interface ProviderIconsProps {
     interactive?: boolean;
     sourceEntries?: SourceReference[];
     word?: string;
+    layout?: 'horizontal' | 'vertical';
 }
 
 const props = withDefaults(defineProps<ProviderIconsProps>(), {
     activeSource: 'synthesis',
     showSynthesis: true,
     interactive: true,
+    layout: 'horizontal',
 });
 
 const emit = defineEmits<{
@@ -240,13 +266,9 @@ const richnessSorted = computed(() => {
     });
 });
 
-// Icon stack: active source shown first (z-order), rest by richness
+// Icon stack: stable order by richness — never reorder on active change to prevent flash
 const orderedProviders = computed(() => {
-    const list = richnessSorted.value;
-    if (!list || list.length <= 1) return list;
-    const active = props.activeSource;
-    if (!active || active === 'synthesis' || list[0] === active) return list;
-    return [active, ...list.filter(p => p !== active)];
+    return richnessSorted.value;
 });
 
 // Dropdown list: sorted by richness (richest first)

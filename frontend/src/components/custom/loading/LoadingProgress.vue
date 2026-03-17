@@ -74,7 +74,7 @@
                             />
                         </HoverCardTrigger>
                         <HoverCardContent
-                            class="z-[10000] w-60"
+                            class="z-max w-60"
                             side="top"
                             :side-offset="variant === 'thin' ? 8 : 16"
                             align="center"
@@ -108,7 +108,7 @@
                                             checkpoint.progress
                                         ) && stageMessage
                                     "
-                                    class="mt-2 rounded border border-primary/20
+                                    class="mt-2 rounded-lg border border-primary/20
                                         bg-primary/5 p-2"
                                 >
                                     <p class="text-xs font-medium text-primary">

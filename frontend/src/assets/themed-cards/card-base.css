@@ -3,7 +3,7 @@
 @layer utilities {
     /* Base themed card styles */
     .themed-card {
-        @apply relative overflow-hidden rounded-2xl transition-all duration-300;
+        @apply relative overflow-hidden rounded-xl transition-all duration-300;
         @apply bg-card text-card-foreground;
     }
 
@@ -63,102 +63,41 @@
         z-index: 1;
     }
 
-    /* Border colors for themed cards with shadow classes */
-    .themed-card.themed-shadow-sm,
-    .themed-card.themed-shadow-md,
-    .themed-card.themed-shadow-lg {
-        @apply border-2 border-border;
-    }
-
-    .themed-card[data-theme='gold'].themed-shadow-sm,
-    .themed-card[data-theme='gold'].themed-shadow-md,
-    .themed-card[data-theme='gold'].themed-shadow-lg {
+    /* Theme-specific border colors for cards with cartoon shadows */
+    .themed-card[data-theme='gold'].shadow-cartoon-sm,
+    .themed-card[data-theme='gold'].shadow-cartoon-md,
+    .themed-card[data-theme='gold'].shadow-cartoon-lg {
         @apply border-amber-300/30;
     }
 
-    .themed-card[data-theme='silver'].themed-shadow-sm,
-    .themed-card[data-theme='silver'].themed-shadow-md,
-    .themed-card[data-theme='silver'].themed-shadow-lg {
+    .themed-card[data-theme='silver'].shadow-cartoon-sm,
+    .themed-card[data-theme='silver'].shadow-cartoon-md,
+    .themed-card[data-theme='silver'].shadow-cartoon-lg {
         @apply border-gray-300/30;
     }
 
-    .themed-card[data-theme='bronze'].themed-shadow-sm,
-    .themed-card[data-theme='bronze'].themed-shadow-md,
-    .themed-card[data-theme='bronze'].themed-shadow-lg {
+    .themed-card[data-theme='bronze'].shadow-cartoon-sm,
+    .themed-card[data-theme='bronze'].shadow-cartoon-md,
+    .themed-card[data-theme='bronze'].shadow-cartoon-lg {
         @apply border-orange-300/30;
     }
 
-    .dark .themed-card[data-theme='gold'].themed-shadow-sm,
-    .dark .themed-card[data-theme='gold'].themed-shadow-md,
-    .dark .themed-card[data-theme='gold'].themed-shadow-lg {
+    .dark .themed-card[data-theme='gold'].shadow-cartoon-sm,
+    .dark .themed-card[data-theme='gold'].shadow-cartoon-md,
+    .dark .themed-card[data-theme='gold'].shadow-cartoon-lg {
         @apply border-amber-400/20;
     }
 
-    .dark .themed-card[data-theme='silver'].themed-shadow-sm,
-    .dark .themed-card[data-theme='silver'].themed-shadow-md,
-    .dark .themed-card[data-theme='silver'].themed-shadow-lg {
+    .dark .themed-card[data-theme='silver'].shadow-cartoon-sm,
+    .dark .themed-card[data-theme='silver'].shadow-cartoon-md,
+    .dark .themed-card[data-theme='silver'].shadow-cartoon-lg {
         @apply border-gray-400/20;
     }
 
-    .dark .themed-card[data-theme='bronze'].themed-shadow-sm,
-    .dark .themed-card[data-theme='bronze'].themed-shadow-md,
-    .dark .themed-card[data-theme='bronze'].themed-shadow-lg {
+    .dark .themed-card[data-theme='bronze'].shadow-cartoon-sm,
+    .dark .themed-card[data-theme='bronze'].shadow-cartoon-md,
+    .dark .themed-card[data-theme='bronze'].shadow-cartoon-lg {
         @apply border-orange-400/20;
-    }
-
-    /* Cartoon shadow variants */
-    .themed-shadow-sm {
-        box-shadow:
-            -6px 4px 0px rgba(0, 0, 0, 0.14),
-            0 6px 0px rgba(0, 0, 0, 0.14),
-            -6px 6px 0px rgba(0, 0, 0, 0.12);
-        transform: translateY(-2px);
-    }
-
-    .themed-shadow-md {
-        box-shadow:
-            -8px 5px 0px rgba(0, 0, 0, 0.14),
-            0 8px 0px rgba(0, 0, 0, 0.14),
-            -8px 8px 0px rgba(0, 0, 0, 0.12);
-        transform: translateY(-2px);
-    }
-
-    .themed-shadow-lg {
-        box-shadow:
-            -10px 6px 0px rgba(0, 0, 0, 0.14),
-            0 10px 0px rgba(0, 0, 0, 0.14),
-            -10px 10px 0px rgba(0, 0, 0, 0.12);
-        transform: translateY(-3px);
-    }
-
-    /* Dark mode shadow adjustments */
-    .dark .themed-shadow-sm,
-    .dark .themed-shadow-md,
-    .dark .themed-shadow-lg {
-        box-shadow:
-            -10px 6px 0px rgba(255, 255, 255, 0.09),
-            0 10px 0px rgba(255, 255, 255, 0.09),
-            -10px 10px 0px rgba(255, 255, 255, 0.06);
-    }
-
-    /* Hover effects for cartoon shadow */
-    .themed-shadow-sm:hover,
-    .themed-shadow-md:hover,
-    .themed-shadow-lg:hover {
-        box-shadow:
-            -12px 8px 0px rgba(0, 0, 0, 0.16),
-            0 12px 0px rgba(0, 0, 0, 0.16),
-            -12px 12px 0px rgba(0, 0, 0, 0.14);
-        transform: translateY(-4px);
-    }
-
-    .dark .themed-shadow-sm:hover,
-    .dark .themed-shadow-md:hover,
-    .dark .themed-shadow-lg:hover {
-        box-shadow:
-            -12px 8px 0px rgba(255, 255, 255, 0.11),
-            0 12px 0px rgba(255, 255, 255, 0.11),
-            -12px 12px 0px rgba(255, 255, 255, 0.08);
     }
 
     /* Remove focus ring */

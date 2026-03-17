@@ -5,7 +5,7 @@
         <div
             v-if="show"
             ref="searchResultsDropdown"
-            class="dropdown-element cartoon-shadow-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl"
+            class="dropdown-element shadow-cartoon-sm origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/90 backdrop-blur-xl"
             @mousedown.prevent
             @click="$emit('interaction')"
         >
@@ -64,7 +64,7 @@
                     <div class="flex items-center gap-2 text-xs">
                         <span
                             :class="[
-                                'inline-block rounded px-2 py-0.5',
+                                'inline-block rounded-full px-2 py-0.5',
                                 result.mastery_level === 'gold' &&
                                     'bg-amber-300/10 text-amber-600 dark:text-amber-400',
                                 result.mastery_level === 'silver' &&
@@ -157,7 +157,7 @@
                 v-if="!loading && results.length === 0 && query.length === 0 && recentSearches && recentSearches.length > 0"
                 class="max-h-64 overflow-y-auto bg-background backdrop-blur-xl"
             >
-                <div class="px-4 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">Recent</div>
+                <div class="px-4 py-2 text-xs font-medium text-muted-foreground/50 uppercase tracking-wider">Recent</div>
                 <button
                     v-for="(search, index) in recentSearches.slice(0, 8)"
                     :key="search.query"

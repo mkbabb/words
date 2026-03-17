@@ -43,7 +43,7 @@
                             <!-- Type indicator for literature examples -->
                             <span
                                 v-if="example.type === 'literature'"
-                                class="ml-2 text-xs text-muted-foreground/60"
+                                class="ml-2 text-xs text-muted-foreground/50"
                                 title="Literature example"
                             >
                                 📚

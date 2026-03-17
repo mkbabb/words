@@ -15,7 +15,7 @@
             <Badge
                 v-if="version.is_latest"
                 variant="secondary"
-                class="text-[10px]"
+                class="text-micro"
             >
                 Latest
             </Badge>
@@ -24,7 +24,7 @@
             </span>
             <span
                 v-if="diffFields.size > 0"
-                class="flex items-center gap-1.5 text-[10px] font-medium text-amber-500/80"
+                class="flex items-center gap-1.5 text-micro font-medium text-amber-500/80"
             >
                 <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
                 {{ diffFields.size }} field{{ diffFields.size !== 1 ? 's' : '' }} changed
@@ -33,7 +33,7 @@
 
         <!-- Scrollable entry content — uses the same renderer as DefinitionDisplay -->
         <div
-            class="flex-1 overflow-y-auto rounded-2xl border border-border/30 bg-background/80 shadow-2xl cartoon-shadow-lg backdrop-blur-xl scrollbar-thin"
+            class="flex-1 overflow-y-auto rounded-xl border border-border/30 bg-background/80 shadow-2xl shadow-cartoon-lg backdrop-blur-xl scrollbar-thin"
         >
             <DefinitionContentRenderer
                 v-if="hydratedEntry"
@@ -49,7 +49,7 @@
         <!-- Action bar -->
         <div class="mt-3 flex items-center justify-between">
             <!-- Version metadata -->
-            <div class="flex items-center gap-3 text-[10px] text-muted-foreground/40">
+            <div class="flex items-center gap-3 text-micro text-muted-foreground/50">
                 <span>Hash: {{ version.data_hash?.slice(0, 12) }}</span>
                 <span>{{ version.storage_mode === 'snapshot' ? 'Full snapshot' : 'Delta' }}</span>
             </div>

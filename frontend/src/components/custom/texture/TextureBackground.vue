@@ -69,7 +69,7 @@ const combinedStyles = computed(() => ({
 }
 
 /* Ensure child content appears above texture */
-.texture-background > :deep(*) {
+.texture-background > :slotted(*) {
   position: relative;
   z-index: 1;
 }

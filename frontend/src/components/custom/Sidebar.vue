@@ -2,9 +2,10 @@
   <div>
     <!-- Desktop Sidebar -->
     <aside
+      data-sidebar
       :class="cn(
-        'bg-background border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-hidden border-r transition-[width] duration-300 ease-apple-smooth lg:flex',
-        sidebarCollapsed ? 'w-16' : 'w-80'
+        'bg-background/95 backdrop-blur-xl border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-hidden border-r shadow-lg transition-[width] duration-350 ease-apple-smooth lg:flex',
+        sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar-expanded'
       )"
     >
       <SidebarHeader :collapsed="sidebarCollapsed" />
@@ -32,8 +33,9 @@
 
       <!-- Mobile Sidebar Content -->
       <div
+        data-sidebar
         :class="cn(
-          'border-border pointer-events-auto fixed top-0 left-0 z-[81] flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl glass-light transition-transform duration-400 ease-apple-smooth',
+          'border-border pointer-events-auto fixed top-0 left-0 z-sidebar-mobile flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-light transition-transform duration-400 ease-apple-smooth will-change-transform',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
         @touchstart.passive="onTouchStart"

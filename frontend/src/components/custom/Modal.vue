@@ -8,7 +8,7 @@
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-max flex items-center justify-center p-4"
+        class="fixed inset-0 z-modal flex items-center justify-center p-4"
         @click="handleBackdropClick"
       >
         <!-- Backdrop with standard blue modal styling -->
@@ -25,7 +25,7 @@
         <!-- Modal container with proper height management and scrolling -->
         <div 
           ref="contentRef"
-          class="modal-content relative z-content w-full rounded-2xl bg-background/95 backdrop-blur-md border border-border/30 cartoon-shadow-lg overflow-hidden flex flex-col"
+          class="modal-content relative z-content w-full rounded-2xl bg-background/95 backdrop-blur-md border border-border/30 shadow-cartoon-lg overflow-hidden flex flex-col"
           :style="{ backgroundImage: 'var(--paper-clean-texture)', backgroundBlendMode: 'multiply' }"
           :class="[
             maxWidthClass,

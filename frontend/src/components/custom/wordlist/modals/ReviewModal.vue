@@ -8,8 +8,7 @@
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 flex items-center justify-center"
-        style="z-index: 99999"
+        class="fixed inset-0 z-max flex items-center justify-center"
         @click="handleBackdropClick"
       >
         <!-- Backdrop -->
@@ -180,7 +179,7 @@
                       <component :is="btn.icon" :size="16" />
                       {{ btn.label }}
                     </span>
-                    <span class="text-[10px] opacity-70">{{ formatInterval(btn.interval) }}</span>
+                    <span class="text-micro opacity-70">{{ formatInterval(btn.interval) }}</span>
                   </button>
                 </template>
               </div>

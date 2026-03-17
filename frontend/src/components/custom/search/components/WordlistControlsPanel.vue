@@ -85,7 +85,7 @@
                 chipBase,
                 hasNonDefaultState
                     ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
-                    : 'bg-muted/30 text-muted-foreground/40 cursor-not-allowed',
+                    : 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed',
             ]"
         >
             <RotateCcw :size="compact ? 14 : 14" />
@@ -210,7 +210,7 @@ const masteryButtons = [
 const sectionClass = (first = false) =>
     props.compact
         ? `px-2 ${first ? 'pt-1' : ''} py-1.5`
-        : `${first ? 'border-t border-border/50' : ''} px-4 py-3`;
+        : `${first ? 'border-t border-border' : ''} px-4 py-3`;
 
 const headingClass = computed(() =>
     props.compact
@@ -220,8 +220,8 @@ const headingClass = computed(() =>
 
 const separatorClass = computed(() =>
     props.compact
-        ? 'my-1 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30'
-        : 'border-t border-border/50'
+        ? 'my-1 border-0 h-px divider-h'
+        : 'border-t border-border'
 );
 
 const chipBase = computed(() =>

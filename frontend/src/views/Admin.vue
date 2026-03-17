@@ -169,7 +169,7 @@
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="truncate font-medium">{{ wl.name }}</span>
-                <span v-if="wl.is_public" class="rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">Public</span>
+                <span v-if="wl.is_public" class="rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-micro font-medium text-green-700 dark:text-green-400">Public</span>
               </div>
               <div class="text-xs text-muted-foreground truncate">
                 {{ wl.total_words }} words

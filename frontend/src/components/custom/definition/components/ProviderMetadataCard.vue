@@ -1,6 +1,6 @@
 <template>
     <div
-        class="flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors duration-150"
+        class="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors duration-150"
         :class="[
             interactive ? 'cursor-pointer' : 'cursor-default',
             isActive
@@ -24,7 +24,7 @@
                 <span class="text-sm truncate">{{ displayName }}</span>
                 <span
                     v-if="version"
-                    class="font-mono text-xs text-muted-foreground/60"
+                    class="font-mono text-xs text-muted-foreground/50"
                 >v{{ version }}</span>
             </div>
 
@@ -41,13 +41,13 @@
                     />
                 </div>
                 <span
-                    class="text-[10px] font-medium tabular-nums whitespace-nowrap"
+                    class="text-micro font-medium tabular-nums whitespace-nowrap"
                     :style="{ color: richnessToColor(richnessScore) }"
                 >{{ richnessToLabel(richnessScore) }}</span>
             </div>
 
             <!-- Definition count + fetch date -->
-            <div class="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+            <div class="flex items-center gap-2 text-micro text-muted-foreground/70">
                 <span v-if="definitionCount != null">{{ definitionCount }} def{{ definitionCount === 1 ? '' : 's' }}</span>
                 <span v-if="definitionCount != null && relativeDate">&middot;</span>
                 <span v-if="relativeDate">{{ relativeDate }}</span>

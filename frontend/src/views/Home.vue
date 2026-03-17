@@ -6,8 +6,8 @@
         <div
             :class="
                 cn('min-h-screen transition-all duration-300 ease-in-out', {
-                    'lg:ml-80': !ui.sidebarCollapsed,
-                    'lg:ml-16': ui.sidebarCollapsed,
+                    'lg:ml-sidebar-expanded': !ui.sidebarCollapsed,
+                    'lg:ml-sidebar-collapsed': ui.sidebarCollapsed,
                 })
             "
         >
@@ -16,7 +16,7 @@
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
                 <SearchBar
-                    class-name="mx-auto w-full sm:max-w-4xl"
+                    class-name="mx-auto w-full sm:max-w-5xl"
                     :scroll-y="y"
                     :scroll-threshold="scrollThreshold"
                     :shrink-percentage="shrinkPercentage"
@@ -25,10 +25,10 @@
             </div>
 
             <!-- Border separator (not sticky) -->
-            <div class="border-b border-border/50 lg:my-6"></div>
+            <div class="border-b border-border lg:my-6"></div>
 
             <!-- Content Area with Sidebar -->
-            <div class="container mx-auto max-w-6xl">
+            <div class="container mx-auto mt-4 lg:mt-6 max-w-6xl min-h-[calc(100dvh-8rem)]">
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
                     <div
@@ -37,8 +37,7 @@
                     >
                         <div
                             v-if="shouldShowProgressiveSidebar"
-                            class="sticky w-48"
-                            :style="{ top: '5.5rem' /* search bar height + padding */ }"
+                            class="sticky w-48 top-[5.5rem]"
                         >
                             <ProgressiveSidebar v-if="searchBar.searchMode === 'lookup'" />
                             <WordlistProgressiveSidebar v-else-if="searchBar.searchMode === 'wordlist'" />

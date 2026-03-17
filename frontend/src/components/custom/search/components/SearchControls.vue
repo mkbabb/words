@@ -1,36 +1,39 @@
 <template>
     <div
         ref="controlsDropdown"
-        class="dropdown-element cartoon-shadow-sm mb-2 flex max-h-[min(500px,70dvh)] origin-top flex-col rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl"
+        class="dropdown-element shadow-cartoon-sm mb-2 flex max-h-[85dvh] origin-top flex-col rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl"
         tabindex="0"
         @mousedown.prevent
         @click="$emit('interaction')"
         @keydown.enter="handleEnterKey"
     >
-            <!-- Header: Sidebar Toggle + Search Mode Toggle -->
+            <!-- Header: Sidebar Toggle + Search Mode Underline Tabs -->
             <div
-                class="flex shrink-0 items-center justify-between border-border/50 px-4 py-3 lg:justify-center"
+                class="flex shrink-0 items-center justify-between border-border px-4 py-3 lg:justify-center"
             >
                 <!-- Mobile Sidebar Toggle (far left) -->
                 <button
-                    class="rounded-lg p-2 transition-colors duration-200 hover:bg-muted/50 lg:hidden"
+                    class="focus-ring rounded-xl p-2 transition-colors duration-200 hover:bg-muted/50 lg:hidden"
                     @click="$emit('toggle-sidebar')"
                     title="Toggle Sidebar"
                 >
                     <PanelLeft :size="20" class="text-muted-foreground" />
                 </button>
 
-                <!-- Search Mode Toggle (center on mobile, full width on desktop) -->
-                <BouncyToggle
-                    :model-value="searchMode"
-                    @update:model-value="handleModeChange"
-                    :options="[
-                        { label: 'Lookup', value: 'lookup' },
-                        { label: 'Wordlist', value: 'wordlist' },
-                        { label: 'Stage', value: 'stage' },
-                    ]"
-                    class="text-base font-bold"
-                />
+                <!-- Search Mode Underline Tabs -->
+                <div class="flex items-center gap-6">
+                    <button
+                        v-for="mode in modes"
+                        :key="mode.value"
+                        @click="handleModeChange(mode.value)"
+                        :class="[
+                            'pb-2 text-sm font-medium transition-colors border-b-2 cursor-pointer',
+                            searchMode === mode.value
+                                ? 'border-primary text-foreground'
+                                : 'border-transparent text-muted-foreground hover:text-foreground',
+                        ]"
+                    >{{ mode.label }}</button>
+                </div>
 
                 <!-- Spacer for mobile layout balance -->
                 <div class="w-10 lg:hidden"></div>
@@ -72,8 +75,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
-import { BouncyToggle } from '@/components/custom/animation';
 import { PanelLeft } from 'lucide-vue-next';
+
+const modes = [
+    { label: 'Lookup', value: 'lookup' },
+    { label: 'Wordlist', value: 'wordlist' },
+    { label: 'Stage', value: 'stage' },
+];
 import LookupControlsPanel from './LookupControlsPanel.vue';
 import WordlistControlsPanel from './WordlistControlsPanel.vue';
 import type { SearchMode } from '../types';

@@ -1,8 +1,8 @@
 <template>
     <HoverCardContent
         :class="cn(
-            'themed-hovercard z-[80] w-96',
-            variant !== 'default' ? 'themed-shadow-sm' : ''
+            'themed-hovercard z-hovercard w-96',
+            variant !== 'default' ? 'shadow-cartoon-sm' : ''
         )"
         :data-theme="variant || 'default'"
         :side="side"
@@ -24,7 +24,7 @@
                 <div
                     v-for="(def, i) in cluster.definitions"
                     :key="i"
-                    class="rounded-md border border-border/30 bg-muted/20 px-3 py-2"
+                    class="rounded-lg border border-border/30 bg-muted/20 px-3 py-2"
                 >
                     <div class="mb-0.5 text-xs font-semibold text-primary/80">
                         {{ def.partOfSpeech }}
@@ -36,7 +36,7 @@
                         <span
                             v-for="syn in def.synonyms"
                             :key="syn"
-                            class="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                            class="rounded-md bg-muted/50 px-1.5 py-0.5 text-micro text-muted-foreground"
                         >
                             {{ syn }}
                         </span>

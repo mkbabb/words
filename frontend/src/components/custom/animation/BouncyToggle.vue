@@ -25,7 +25,7 @@
               :class="[
                 'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-colors duration-200',
                 option.disabled
-                  ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
+                  ? 'opacity-40 blur-sm cursor-not-allowed'
                   : isActive(option.value)
                     ? 'text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -47,7 +47,7 @@
         :class="[
           'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-colors duration-200',
           option.disabled
-            ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
+            ? 'opacity-40 blur-sm cursor-not-allowed'
             : isActive(option.value)
               ? 'text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground',

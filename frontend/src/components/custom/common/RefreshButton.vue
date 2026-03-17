@@ -5,15 +5,15 @@
     @mouseleave="handleLeave"
     :disabled="disabled || loading"
     :class="[
-      'inline-flex h-8 w-8 items-center justify-center rounded-md',
+      'inline-flex h-8 w-8 items-center justify-center rounded-full',
       'transition-all duration-200 ease-out',
-      'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
+      'hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
       'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100',
-      variant === 'ghost' 
-        ? 'hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+      variant === 'ghost'
+        ? 'bg-card/40 backdrop-blur-sm border border-border/20 text-muted-foreground hover:bg-card/70 hover:text-foreground hover:border-border/40'
         : variant === 'subtle'
-        ? 'bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground'
-        : 'bg-muted hover:bg-muted/80 text-foreground'
+        ? 'bg-card/50 backdrop-blur-sm border border-border/25 text-muted-foreground hover:bg-card/75 hover:text-foreground hover:border-border/45 shadow-sm'
+        : 'bg-card/60 backdrop-blur-sm border border-border/30 text-foreground hover:bg-card/85 hover:border-border/50 shadow-sm'
     ]"
     :title="title || 'Refresh'"
   >

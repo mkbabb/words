@@ -3,7 +3,7 @@
     v-bind="delegatedProps"
     :class="
       cn(
-        'transition-smooth relative inline-grid h-12 auto-cols-auto items-center justify-center rounded-xl border border-white/30 bg-white/20 p-1 shadow-lg backdrop-blur-sm dark:border-white/20 dark:bg-white/10',
+        'transition-smooth relative inline-grid h-12 auto-cols-auto items-center justify-center rounded-2xl border border-white/30 bg-white/20 p-1 shadow-lg backdrop-blur-sm dark:border-white/20 dark:bg-white/10',
         props.class
       )
     "
@@ -11,7 +11,7 @@
     <!-- Animated background slider -->
     <div
       ref="backgroundSlider"
-      class="bg-primary/10 absolute top-0 left-0 rounded-lg shadow-sm transition-all duration-300 ease-out inset-2 mt-2 z-[1]"
+      class="bg-primary/10 absolute top-0 left-0 rounded-xl shadow-sm transition-all duration-300 ease-out inset-2 mt-2 z-0"
       :style="backgroundStyle"
     />
 

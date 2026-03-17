@@ -11,7 +11,7 @@
         role="alert"
         aria-live="polite"
         :class="[
-          'cartoon-shadow-sm rounded-xl p-4 backdrop-blur-xl border-2',
+          'shadow-cartoon-sm rounded-2xl p-4 backdrop-blur-xl border-2',
           'transition-all duration-300 hover-lift cursor-pointer',
           notificationClasses[notification.type]
         ]"

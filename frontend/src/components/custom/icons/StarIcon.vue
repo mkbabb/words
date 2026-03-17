@@ -50,3 +50,68 @@ const starClasses = computed(() => {
     }
 });
 </script>
+
+<style>
+/* Star shimmer animations (colocated — sole consumer) */
+.star-shimmer-gold {
+    animation: star-shimmer-gold 4s ease-in-out infinite;
+}
+
+.star-shimmer-silver {
+    animation: star-shimmer-silver 5s ease-in-out infinite;
+}
+
+.star-shimmer-bronze {
+    animation: star-shimmer-bronze 4.5s ease-in-out infinite;
+}
+
+@keyframes star-shimmer-gold {
+    0%,
+    80% {
+        filter: brightness(1) saturate(1);
+    }
+    90% {
+        filter: brightness(1.4) saturate(1.3)
+            drop-shadow(0 0 8px rgb(251, 191, 36));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@keyframes star-shimmer-silver {
+    0%,
+    75% {
+        filter: brightness(1) saturate(1);
+    }
+    85% {
+        filter: brightness(1.3) saturate(1.2)
+            drop-shadow(0 0 6px rgb(203, 213, 225));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@keyframes star-shimmer-bronze {
+    0%,
+    85% {
+        filter: brightness(1) saturate(1);
+    }
+    92% {
+        filter: brightness(1.3) saturate(1.2)
+            drop-shadow(0 0 7px rgb(217, 119, 6));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .star-shimmer-gold,
+    .star-shimmer-silver,
+    .star-shimmer-bronze {
+        animation: none;
+    }
+}
+</style>

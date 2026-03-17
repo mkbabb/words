@@ -80,7 +80,7 @@
                 <!-- Priority badge (top-left overlay) -->
                 <div
                     v-if="isActive(option.field)"
-                    class="absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground shadow-sm"
+                    class="absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-micro font-bold text-primary-foreground shadow-sm"
                 >
                     {{ getActiveIndex(option.field) + 1 }}
                 </div>

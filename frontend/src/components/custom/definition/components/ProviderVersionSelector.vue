@@ -4,7 +4,7 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <h3 class="text-sm font-semibold">Re-synthesize from Providers</h3>
-                <Badge v-if="currentVersion" variant="secondary" class="font-mono text-[10px]">
+                <Badge v-if="currentVersion" variant="secondary" class="font-mono text-micro">
                     v{{ currentVersion }}
                 </Badge>
             </div>
@@ -55,7 +55,7 @@
                         <Badge
                             v-if="hasDuplicateProvider(provider.name)"
                             variant="outline"
-                            class="font-mono text-[10px] text-muted-foreground"
+                            class="font-mono text-micro text-muted-foreground"
                         >
                             #{{ idx + 1 }}
                         </Badge>
@@ -83,7 +83,7 @@
                     </Select>
                     <span
                         v-else-if="selectedProviders.has(provider.uniqueKey)"
-                        class="text-[10px] text-muted-foreground"
+                        class="text-micro text-muted-foreground"
                     >
                         No versions
                     </span>
@@ -92,7 +92,7 @@
                 <!-- Definition count hint -->
                 <div
                     v-if="selectedProviders.has(provider.uniqueKey) && provider.definitionCount > 0"
-                    class="border-t border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground"
+                    class="border-t border-border/40 px-3 py-1.5 text-micro text-muted-foreground"
                 >
                     {{ provider.definitionCount }} definition{{ provider.definitionCount !== 1 ? 's' : '' }}
                 </div>

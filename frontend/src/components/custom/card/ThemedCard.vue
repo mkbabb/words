@@ -1,7 +1,7 @@
 <template>
   <Card
     :class="[
-      'themed-card themed-shadow-lg',
+      'themed-card shadow-cartoon-lg',
       className,
     ]"
     :data-theme="variant || 'default'"

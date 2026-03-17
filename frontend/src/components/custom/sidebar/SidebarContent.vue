@@ -36,7 +36,7 @@
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="item.type === 'lookup' ? handleCollapsedWordClick(item.word!) : handleCollapsedAIClick(item.query!)"
-                                class="flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
                                 :class="{ 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20': item.type === 'ai' }"
                             >
                                 <template v-if="item.type === 'lookup'">
@@ -73,7 +73,7 @@
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="handleCollapsedWordlistClick(wordlist.id)"
-                                class="flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
                                 :class="{ 'bg-primary/10 border-primary/20 hover:bg-primary/20': wordlistMode.selectedWordlist === wordlist.id }"
                             >
                                 {{ wordlist.name.substring(0, 2).toUpperCase() }}
@@ -101,7 +101,7 @@
                             <TooltipTrigger as-child>
                                 <button 
                                     @click="ui.setSidebarCollapsed(false)"
-                                    class="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-muted/50 transition-colors"
+                                    class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl hover:bg-muted/50 transition-colors"
                                 >
                                     <FileText :size="18" class="text-muted-foreground" />
                                 </button>

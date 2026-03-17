@@ -24,7 +24,7 @@
                     >
                         <template #display>
                             <h4
-                                class="inline-block cursor-help rounded-md border border-border/50 bg-muted/30 px-3 py-1.5 text-sm font-semibold tracking-wide uppercase transition-all duration-200 hover:border-border hover:bg-muted/50"
+                                class="inline-block cursor-help rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5 text-sm font-semibold tracking-wide uppercase transition-all duration-200 hover:border-border hover:bg-muted/50"
                             >
                                 {{ cluster.clusterName }}
                             </h4>
@@ -34,8 +34,8 @@
                 <HoverCardContent
                     :class="
                         cn(
-                            'themed-hovercard z-[80] w-96',
-                            cardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                            'themed-hovercard z-hovercard w-96',
+                            cardVariant !== 'default' ? 'shadow-cartoon-sm' : ''
                         )
                     "
                     :data-theme="cardVariant || 'default'"

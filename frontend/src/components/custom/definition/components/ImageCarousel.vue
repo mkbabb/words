@@ -16,22 +16,6 @@
                 @init-api="onCarouselInit"
             >
                 <CarouselContent class="-ml-1">
-                    <!-- Upload box as first item in edit mode -->
-                    <CarouselItem v-if="editMode" key="upload-box" class="pl-1">
-                        <div
-                            class="relative h-32 overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/10 sm:h-40 md:h-48"
-                        >
-                            <ImageUploader
-                                :synth-entry-id="synthEntryId"
-                                class="h-full w-full"
-                                size="lg"
-                                variant="empty"
-                                @upload-success="handleUploadSuccess"
-                                @images-updated="handleImagesUpdated"
-                            />
-                        </div>
-                    </CarouselItem>
-
                     <!-- Regular image items -->
                     <CarouselItem
                         v-for="(image, index) in images"
@@ -160,7 +144,7 @@
                                     class="absolute inset-0 flex items-center justify-center bg-muted/10"
                                 >
                                     <svg
-                                        class="h-6 w-6 text-muted-foreground/40"
+                                        class="h-6 w-6 text-muted-foreground/50"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -234,7 +218,6 @@ import {
     CarouselPrevious,
 } from '@/components/ui/carousel';
 import type { CarouselApi } from '@/components/ui/carousel';
-import ImageUploader from './ImageUploader.vue';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 import { mediaApi } from '@/api/media';
@@ -266,9 +249,7 @@ const deletingImages = ref(new Set<string>()); // Track images being deleted
 
 // Computed properties
 const totalCarouselItems = computed(() => {
-    const imageCount = props.images?.length || 0;
-    const uploadBoxCount = props.editMode ? 1 : 0;
-    return imageCount + uploadBoxCount;
+    return props.images?.length || 0;
 });
 
 // Lazy loading state - optimize bandwidth by only loading visible + adjacent images
@@ -289,12 +270,7 @@ const isImageLoaded = (index: number): boolean => {
 const updateVisibleRange = () => {
     if (!props.images || props.images.length === 0) return;
 
-    // Account for upload box offset in edit mode
-    const imageIndexOffset = props.editMode ? 1 : 0;
-    const currentImageIndex = currentIndex.value - imageIndexOffset;
-
-    // Only calculate range if we're viewing actual images (not upload box)
-    if (currentImageIndex < 0) return;
+    const currentImageIndex = currentIndex.value;
 
     const buffer = 1; // Load 1 image before and after current
     const start = Math.max(0, currentImageIndex - buffer);
@@ -339,15 +315,6 @@ const handleImageError = (event: Event, index: number) => {
 
 // handleImageClick removed - not used in template
 
-const handleUploadSuccess = (newImages: ImageMedia[]) => {
-    emit('images-updated', newImages);
-};
-
-const handleImagesUpdated = () => {
-    // Pass the event up to the parent component (DefinitionDisplay)
-    // The parent will handle refreshing the synthesized entry
-    emit('images-updated', []);
-};
 
 const handleDeleteImage = async (imageId: string, index: number) => {
     // Prevent duplicate deletion requests

@@ -31,12 +31,12 @@
             >
                 <span
                     v-if="etymology.language"
-                    class="text-muted-foreground/80"
+                    class="text-muted-foreground/70"
                 >
                     <span class="font-medium">Origin:</span>
                     {{ etymology.language }}
                 </span>
-                <span v-if="etymology.period" class="text-muted-foreground/80">
+                <span v-if="etymology.period" class="text-muted-foreground/70">
                     <span class="font-medium">Period:</span>
                     {{ etymology.period }}
                 </span>

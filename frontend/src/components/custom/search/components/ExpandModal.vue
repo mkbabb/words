@@ -15,7 +15,7 @@
                 <!-- Modal Content -->
                 <div
                     ref="modalContent"
-                    class="cartoon-shadow-lg relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background p-6 shadow-2xl"
+                    class="shadow-cartoon-lg relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl p-6 shadow-2xl"
                     @click.stop
                 >
                     <!-- Header -->
