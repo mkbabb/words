@@ -10,7 +10,7 @@ from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
-from floridify.search.semantic.core import SemanticSearch
+from floridify.search.semantic.search import SemanticSearch
 
 
 @pytest.mark.semantic

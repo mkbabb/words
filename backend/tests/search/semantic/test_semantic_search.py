@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.models.dictionary import Definition, DictionaryProvider, Language, Word
-from floridify.search.semantic.core import SemanticSearch
+from floridify.search.semantic.search import SemanticSearch
 
 
 @pytest_asyncio.fixture
@@ -127,17 +127,14 @@ class TestSemanticSearch:
 
     @pytest.mark.asyncio
     async def test_embedding_generation(self, semantic_engine: SemanticSearch, test_db):
-        """Test embedding generation for text."""
-        text = "feeling happy and content"
+        """Test that sentence embeddings are generated after initialization."""
+        await semantic_engine.initialize()
 
-        with patch.object(semantic_engine, "_encode") as mock_embed:
-            mock_embed.return_value = np.array([[0.1] * 768])  # Standard embedding size
-
-            embedding = semantic_engine._encode([text])
-
-            assert embedding is not None
-            assert embedding.shape == (1, 768)
-            assert isinstance(embedding, np.ndarray)
+        # After init, the engine should have precomputed embeddings for the corpus
+        assert semantic_engine.sentence_embeddings is not None
+        assert isinstance(semantic_engine.sentence_embeddings, np.ndarray)
+        assert semantic_engine.sentence_embeddings.shape[0] > 0   # At least one word embedded
+        assert semantic_engine.sentence_embeddings.shape[1] > 0   # Non-zero embedding dimension
 
     @pytest.mark.asyncio
     async def test_search_with_threshold(
@@ -205,21 +202,12 @@ class TestSemanticSearch:
 
     @pytest.mark.asyncio
     async def test_batch_embedding(self, semantic_engine: SemanticSearch, test_db):
-        """Test batch embedding generation."""
-        texts = [
-            "happy and joyful",
-            "sad and sorrowful",
-            "angry and furious",
-            "calm and peaceful",
-        ]
+        """Test that corpus embeddings cover the full vocabulary."""
+        await semantic_engine.initialize()
 
-        with patch.object(semantic_engine, "_encode") as mock_embed:
-            mock_embeddings = np.random.rand(len(texts), 768)
-            mock_embed.return_value = mock_embeddings
-
-            embeddings = semantic_engine._encode(texts)
-
-            assert embeddings.shape == (4, 768)
+        assert semantic_engine.sentence_embeddings is not None
+        vocab_size = len(semantic_engine.corpus.vocabulary)
+        assert semantic_engine.sentence_embeddings.shape[0] == vocab_size
 
     @pytest.mark.asyncio
     async def test_search_with_filters(
@@ -301,10 +289,11 @@ class TestSemanticSearch:
         """Test handling of invalid embedding dimensions."""
         await semantic_engine.initialize()
 
-        # Mock encode to return wrong dimensions
-        with patch.object(semantic_engine, "_encode") as mock_embed:
-            # Return wrong dimension
-            mock_embed.return_value = np.array([[0.1] * 512])  # Wrong size
+        # Mock the encoder's encode method to return wrong dimensions.
+        # SemanticSearch delegates encoding to self._encoder.encode().
+        with patch.object(semantic_engine._encoder, "encode") as mock_embed:
+            # Return wrong dimension (e.g. 3D instead of expected 512D)
+            mock_embed.return_value = np.array([[0.1] * 3])
 
             # Search should raise RuntimeError for dimension mismatch
             with pytest.raises(RuntimeError, match="Semantic search failed"):

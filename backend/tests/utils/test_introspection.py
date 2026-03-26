@@ -8,9 +8,9 @@ from pydantic import BaseModel
 
 from floridify.caching.models import BaseVersionedData
 from floridify.corpus.core import Corpus
-from floridify.search.search_index import SearchIndex
-from floridify.search.semantic.models import SemanticIndex
-from floridify.search.trie_index import TrieIndex
+from floridify.search.index import SearchIndex
+from floridify.search.semantic.index import SemanticIndex
+from floridify.search.trie.index import TrieIndex
 from floridify.utils.introspection import extract_metadata_params, get_subclass_fields
 
 

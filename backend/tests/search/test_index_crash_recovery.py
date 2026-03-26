@@ -14,10 +14,10 @@ from beanie import PydanticObjectId
 from floridify.caching.models import VersionConfig
 from floridify.corpus.core import Corpus
 from floridify.models.base import Language
-from floridify.search.search_index import SearchIndex
-from floridify.search.semantic.core import SemanticSearch
-from floridify.search.semantic.models import SemanticIndex
-from floridify.search.trie_index import TrieIndex
+from floridify.search.index import SearchIndex
+from floridify.search.semantic.index import SemanticIndex
+from floridify.search.semantic.search import SemanticSearch
+from floridify.search.trie.index import TrieIndex
 from floridify.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -83,62 +83,38 @@ class TestCrashRecovery:
     @pytest.mark.asyncio
     async def test_recovery_from_corrupted_embeddings(self, test_corpus, mock_sentence_transformer):
         """Test recovery when embeddings data is corrupted."""
-        # Create and save semantic index
+        # Create a semantic index without binary data
         semantic_index = SemanticIndex(
             corpus_uuid=test_corpus.corpus_uuid,
             corpus_name=test_corpus.corpus_name,
             vocabulary_hash=test_corpus.vocabulary_hash,
             model_name="test_model",
-            vocabulary=TEST_VOCABULARY,
-            lemmatized_vocabulary=TEST_LEMMAS,
         )
 
-        # Create fake embeddings in the current compressed format
-        fake_embeddings = np.random.randn(len(TEST_VOCABULARY), 384).astype(np.float32)
-        embeddings_bytes = pickle.dumps(fake_embeddings)
-        embeddings_compressed = gzip.compress(embeddings_bytes, compresslevel=1)
+        # _load_index_from_data should raise when binary_data is missing (corrupt/incomplete)
+        semantic_search = SemanticSearch(index=semantic_index, corpus=test_corpus)
 
-        # Build a FAISS index for complete binary_data
-        index = faiss.IndexFlatL2(384)
-        index.add(fake_embeddings)
-        with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
-            faiss.write_index(index, tmp.name)
-            with open(tmp.name, "rb") as f:
-                index_bytes = f.read()
-        index_compressed = gzip.compress(index_bytes, compresslevel=1)
+        with pytest.raises(RuntimeError) as exc_info:
+            semantic_search._load_index_from_data(semantic_index)
 
-        binary_data = {
-            "embeddings_compressed_bytes": embeddings_compressed,
-            "embeddings_compressed": "gzip",
-            "index_compressed_bytes": index_compressed,
-            "index_compressed": "gzip",
-        }
+        assert "missing binary_data" in str(exc_info.value)
 
-        await semantic_index.save(binary_data=binary_data)
+        # Also test with binary_data present but containing corrupted pickle data
+        semantic_index_with_bad_data = SemanticIndex(
+            corpus_uuid=test_corpus.corpus_uuid,
+            corpus_name=test_corpus.corpus_name,
+            vocabulary_hash=test_corpus.vocabulary_hash,
+            model_name="test_model",
+            binary_data={
+                "embeddings_compressed_bytes": gzip.compress(b"not_valid_pickle"),
+                "embeddings_compressed": "gzip",
+                "index_compressed_bytes": gzip.compress(b"not_valid_faiss"),
+                "index_compressed": "gzip",
+            },
+        )
 
-        # Mock model loading and corrupted binary data
-        with patch(
-            "floridify.search.semantic.core.get_cached_model",
-            return_value=mock_sentence_transformer,
-        ):
-            with patch(
-                "floridify.search.semantic.core.SemanticSearch._load_index_from_data"
-            ) as mock_load:
-                # Make it raise an error as if data is corrupted
-                mock_load.side_effect = RuntimeError(
-                    "Corrupted embeddings data: Invalid pickle data"
-                )
-
-                semantic_search = await SemanticSearch.from_corpus(
-                    corpus=test_corpus,
-                    model_name="test_model",
-                )
-
-                # Should handle corruption gracefully
-                with pytest.raises(RuntimeError) as exc_info:
-                    semantic_search._load_index_from_data(semantic_index)
-
-                assert "Corrupted embeddings data" in str(exc_info.value)
+        with pytest.raises(Exception):
+            semantic_search._load_index_from_data(semantic_index_with_bad_data)
 
     @pytest.mark.asyncio
     async def test_partial_save_detection(self, test_corpus):
@@ -238,11 +214,11 @@ class TestCrashRecovery:
         """Test recovery when index building is interrupted."""
         # Mock model loading and an interruption during embedding generation
         with patch(
-            "floridify.search.semantic.core.get_cached_model",
+            "floridify.search.semantic.encoder.get_cached_model",
             return_value=mock_sentence_transformer,
         ):
             with patch(
-                "floridify.search.semantic.core.SemanticSearch._build_embeddings"
+                "floridify.search.semantic.builder.SemanticEmbeddingBuilder._build_embeddings"
             ) as mock_build:
                 mock_build.side_effect = KeyboardInterrupt("User cancelled")
 
@@ -358,7 +334,7 @@ class TestErrorPropagation:
     async def test_semantic_search_build_failure(self, test_corpus, mock_sentence_transformer):
         """Test that semantic search build failures are handled properly."""
         # Mock model loading failure
-        with patch("floridify.search.semantic.core.get_cached_model") as mock_model:
+        with patch("floridify.search.semantic.encoder.get_cached_model") as mock_model:
             mock_model.side_effect = RuntimeError("Model file corrupted")
 
             # Should propagate the error with context

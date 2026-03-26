@@ -15,9 +15,9 @@ from floridify.corpus.core import Corpus
 from floridify.corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
-from floridify.search.search_index import SearchIndex
-from floridify.search.semantic.models import SemanticIndex
-from floridify.search.trie_index import TrieIndex
+from floridify.search.index import SearchIndex
+from floridify.search.semantic.index import SemanticIndex
+from floridify.search.trie.index import TrieIndex
 
 
 class TestCascadeDeletion:

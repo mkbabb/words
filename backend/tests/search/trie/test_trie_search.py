@@ -8,7 +8,7 @@ import pytest_asyncio
 from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
-from floridify.search.trie import TrieSearch
+from floridify.search.trie.search import TrieSearch
 
 
 @pytest_asyncio.fixture
@@ -59,14 +59,13 @@ async def trie_corpus(test_db):
 @pytest_asyncio.fixture
 async def trie_search(trie_corpus):
     """Create TrieSearch instance with corpus."""
-    from floridify.search.trie_index import TrieIndex
+    from floridify.search.trie.index import TrieIndex
 
     # Create trie index from corpus
     index = await TrieIndex.get_or_create(corpus=trie_corpus)
 
-    # Create trie search with index
+    # Create trie search with index (auto-initializes via _load_from_index in __init__)
     search = TrieSearch(index=index)
-    await search.initialize()
     return search
 
 
@@ -189,7 +188,7 @@ class TestTrieSearch:
     @pytest.mark.asyncio
     async def test_trie_index_creation(self, test_db):
         """Test creating trie index from corpus."""
-        from floridify.search.trie_index import TrieIndex
+        from floridify.search.trie.index import TrieIndex
 
         vocabulary = ["test", "testing", "tester"]
 
@@ -225,13 +224,12 @@ class TestTrieSearch:
         manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
-        from floridify.search.trie_index import TrieIndex
+        from floridify.search.trie.index import TrieIndex
 
         # Create index from empty corpus
         index = await TrieIndex.get_or_create(corpus=saved_corpus)
 
         search = TrieSearch(index=index)
-        await search.initialize()
 
         results = search.search_prefix("test")
         assert len(results) == 0

@@ -4,6 +4,7 @@ Tests CRUD operations, file upload, spaced repetition, learning analytics, and s
 
 import asyncio
 import io
+from pathlib import Path
 
 from httpx import AsyncClient
 
@@ -197,6 +198,32 @@ class TestWordlistPipelineAPI:
         result = body["data"]
         assert result["name"] == "Uploaded List"
         assert result["word_count"] == 4
+
+    async def test_upload_wordlist_v2_preserves_frequency_counts(
+        self,
+        async_client: AsyncClient,
+    ):
+        """Test the canonical words-v2 file preserves total frequency counts."""
+        path = Path("backend/data/words-v2.txt")
+        assert path.exists()
+
+        with path.open("rb") as file_data:
+            files = {"file": ("words-v2.txt", file_data, "text/plain")}
+            response = await async_client.post(
+                "/api/v1/wordlists/upload?name=Words+V2+Upload",
+                files=files,
+            )
+
+        assert response.status_code == 201
+        body = response.json()
+        result = body["data"]
+        metadata = body["metadata"]
+
+        assert result["total_words"] == 2268
+        assert result["unique_words"] == 1852
+        assert metadata["total_words"] == 2268
+        assert metadata["unique_words"] == 1852
+        assert metadata["parsed_words"] == 2268
 
     async def test_upload_wordlist_streaming(self, async_client: AsyncClient):
         """Test streaming wordlist upload with progress."""

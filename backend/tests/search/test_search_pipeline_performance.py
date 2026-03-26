@@ -12,7 +12,7 @@ from floridify.audit import (
     build_semantic_fixture,
     install_fake_semantic_encoder,
 )
-from floridify.search.bloom import BloomFilter
+from floridify.search.trie.bloom import BloomFilter
 
 
 def _assert_fast_enough(case_name: str, p95_ms: float, ceiling_ms: float) -> None:

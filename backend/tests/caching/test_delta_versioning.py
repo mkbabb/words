@@ -398,8 +398,10 @@ class TestDeltaConfig:
         assert DELTA_CONFIG.enabled is True
 
     def test_config_immutable(self):
-        """DeltaConfig is frozen (immutable)."""
-        with pytest.raises(AttributeError):
+        """DeltaConfig is frozen (immutable via Pydantic frozen model)."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             DELTA_CONFIG.enabled = False  # type: ignore[misc]
 
     def test_custom_config(self):

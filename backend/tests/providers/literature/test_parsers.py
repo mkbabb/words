@@ -207,20 +207,19 @@ class TestParseEPUB:
         assert "<body>" not in result
         assert "<p>" not in result
 
-    def test_parse_epub_with_dict_content_key(self) -> None:
-        """Test EPUB parsing with dict containing 'content' key."""
-        result = parse_epub({"content": "Fallback text"})
-        assert result == "Fallback text"
+    def test_parse_epub_rejects_dict(self) -> None:
+        """Test EPUB parsing raises ParseError for dict input."""
+        from floridify.api.core.exceptions import ParseError
 
-    def test_parse_epub_with_dict_fallback(self) -> None:
-        """Test EPUB parsing falls back to text parser for plain dict."""
-        result = parse_epub({"text": "Text content"})
-        assert result == "Text content"
+        with pytest.raises(ParseError):
+            parse_epub({"content": "Fallback text"})
 
-    def test_parse_epub_with_string_fallback(self) -> None:
-        """Test EPUB parsing falls back to text parser for string."""
-        result = parse_epub("Plain text string")
-        assert result == "Plain text string"
+    def test_parse_epub_rejects_string(self) -> None:
+        """Test EPUB parsing raises ParseError for string input."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_epub("Plain text string")
 
     def test_parse_epub_with_corrupt_file(self) -> None:
         """Test EPUB parsing handles corrupt files gracefully."""
@@ -228,14 +227,18 @@ class TestParseEPUB:
         with open(corrupt_path, "rb") as f:
             content = f.read()
 
-        # Should fall back to text parser without crashing
-        result = parse_epub(content)
-        assert isinstance(result, str)
+        # Corrupt file should raise ParseError
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_epub(content)
 
     def test_parse_epub_with_invalid_bytes(self) -> None:
-        """Test EPUB parsing with completely invalid bytes."""
-        result = parse_epub(b"\x00\xff\xfe\xfd")
-        assert isinstance(result, str)
+        """Test EPUB parsing raises ParseError for invalid bytes."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_epub(b"\x00\xff\xfe\xfd")
 
 
 class TestParsePDF:
@@ -278,35 +281,37 @@ class TestParsePDF:
         # Should not have excessive whitespace
         assert "\n\n\n\n" not in result
 
-    def test_parse_pdf_with_dict_content_key(self) -> None:
-        """Test PDF parsing with dict containing 'content' key."""
-        result = parse_pdf({"content": "Fallback text"})
-        assert result == "Fallback text"
+    def test_parse_pdf_rejects_dict(self) -> None:
+        """Test PDF parsing raises ParseError for dict input."""
+        from floridify.api.core.exceptions import ParseError
 
-    def test_parse_pdf_with_dict_fallback(self) -> None:
-        """Test PDF parsing falls back to text parser for plain dict."""
-        result = parse_pdf({"text": "Text content"})
-        assert result == "Text content"
+        with pytest.raises(ParseError):
+            parse_pdf({"content": "Fallback text"})
 
-    def test_parse_pdf_with_string_fallback(self) -> None:
-        """Test PDF parsing falls back to text parser for string."""
-        result = parse_pdf("Plain text string")
-        assert result == "Plain text string"
+    def test_parse_pdf_rejects_string(self) -> None:
+        """Test PDF parsing raises ParseError for string input."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_pdf("Plain text string")
 
     def test_parse_pdf_with_corrupt_file(self) -> None:
-        """Test PDF parsing handles corrupt files gracefully."""
+        """Test PDF parsing raises ParseError for corrupt files."""
         corrupt_path = FIXTURES_DIR / "corrupt.pdf"
         with open(corrupt_path, "rb") as f:
             content = f.read()
 
-        # Should fall back to text parser without crashing
-        result = parse_pdf(content)
-        assert isinstance(result, str)
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_pdf(content)
 
     def test_parse_pdf_with_invalid_bytes(self) -> None:
-        """Test PDF parsing with completely invalid bytes."""
-        result = parse_pdf(b"\x00\xff\xfe\xfd")
-        assert isinstance(result, str)
+        """Test PDF parsing raises ParseError for invalid bytes."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_pdf(b"\x00\xff\xfe\xfd")
 
 
 class TestExtractMetadata:
@@ -403,43 +408,55 @@ class TestParserIntegration:
         # Should produce valid text
         assert isinstance(text, str)
 
-    def test_all_parsers_return_strings(self) -> None:
-        """Test that all parsers consistently return strings."""
+    def test_text_parsers_return_strings(self) -> None:
+        """Test that text-based parsers consistently return strings."""
         test_input = "Test content"
 
         assert isinstance(parse_text(test_input), str)
         assert isinstance(parse_markdown(test_input), str)
         assert isinstance(parse_html(test_input), str)
-        assert isinstance(parse_epub(test_input), str)
-        assert isinstance(parse_pdf(test_input), str)
 
-    def test_all_parsers_handle_empty_input(self) -> None:
-        """Test that all parsers handle empty input gracefully."""
+    def test_binary_parsers_reject_strings(self) -> None:
+        """Test that binary parsers (epub, pdf) reject string input."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_epub("Test content")
+        with pytest.raises(ParseError):
+            parse_pdf("Test content")
+
+    def test_text_parsers_handle_empty_input(self) -> None:
+        """Test that text parsers handle empty input gracefully."""
         assert parse_text("") == ""
         assert parse_markdown("") == ""
         assert parse_html("") == ""
-        assert isinstance(parse_epub(""), str)
-        assert isinstance(parse_pdf(""), str)
+
+    def test_binary_parsers_reject_empty_strings(self) -> None:
+        """Test that binary parsers reject empty string input."""
+        from floridify.api.core.exceptions import ParseError
+
+        with pytest.raises(ParseError):
+            parse_epub("")
+        with pytest.raises(ParseError):
+            parse_pdf("")
 
 
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
-    def test_parse_epub_without_ebooklib(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test EPUB parsing when ebooklib is not available."""
+    def test_parse_epub_rejects_non_bytes(self) -> None:
+        """Test EPUB parsing raises ParseError for non-bytes input."""
+        from floridify.api.core.exceptions import ParseError
 
-        def mock_import_error(*args, **kwargs):
-            raise ImportError("ebooklib not found")
+        with pytest.raises(ParseError):
+            parse_epub({"content": "fallback"})
 
-        # This is tricky to test properly, but we can verify fallback behavior
-        result = parse_epub({"content": "fallback"})
-        assert result == "fallback"
+    def test_parse_pdf_rejects_non_bytes(self) -> None:
+        """Test PDF parsing raises ParseError for non-bytes input."""
+        from floridify.api.core.exceptions import ParseError
 
-    def test_parse_pdf_without_pypdf(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test PDF parsing when pypdf is not available."""
-        # Similar to above - verify fallback behavior
-        result = parse_pdf({"content": "fallback"})
-        assert result == "fallback"
+        with pytest.raises(ParseError):
+            parse_pdf({"content": "fallback"})
 
     def test_parsers_with_none_input(self) -> None:
         """Test parsers handle None-ish inputs."""

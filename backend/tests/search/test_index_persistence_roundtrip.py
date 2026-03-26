@@ -14,9 +14,9 @@ from floridify.caching.manager import get_version_manager
 from floridify.caching.models import ResourceType, VersionConfig
 from floridify.corpus.core import Corpus
 from floridify.models.base import Language
-from floridify.search.search_index import SearchIndex
-from floridify.search.semantic.models import SemanticIndex
-from floridify.search.trie_index import TrieIndex
+from floridify.search.index import SearchIndex
+from floridify.search.semantic.index import SemanticIndex, _build_resource_id
+from floridify.search.trie.index import TrieIndex
 
 
 @pytest.mark.asyncio
@@ -102,7 +102,7 @@ async def test_semantic_index_roundtrip_with_binary_data(test_db):
     np.testing.assert_array_almost_equal(restored, embeddings)
 
     manager = get_version_manager()
-    resource_id = f"{corpus.corpus_uuid}:semantic:roundtrip-model:{corpus.vocabulary_hash[:8]}"
+    resource_id = _build_resource_id(corpus.corpus_uuid, "roundtrip-model", corpus.vocabulary_hash)
     versions = await manager.list_versions(resource_id, ResourceType.SEMANTIC)
     assert len(versions) == 1
     assert versions[0].content_location is not None

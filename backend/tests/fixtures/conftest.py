@@ -11,67 +11,6 @@ import pytest
 import pytest_asyncio
 
 
-# Additional fixtures for API tests
-@pytest_asyncio.fixture
-async def async_client(test_db):
-    """Create async FastAPI test client.
-
-    Creates a test-specific app without BaseHTTPMiddleware-based middleware
-    to avoid event loop conflicts with Motor/Beanie. Starlette's
-    BaseHTTPMiddleware runs handlers in a TaskGroup that causes
-    'Future attached to a different loop' errors with async MongoDB drivers.
-    """
-    from fastapi import FastAPI
-    from httpx import ASGITransport, AsyncClient
-
-    from floridify.api.main import API_V1_PREFIX
-    from floridify.api.routers import (
-        ai,
-        cache,
-        config,
-        corpus,
-        database,
-        health,
-        lookup,
-        providers,
-        search,
-        suggestions,
-        word_versions,
-        wordlist_reviews,
-        wordlist_search,
-        wordlist_words,
-        wordlists,
-    )
-
-    # Create a minimal test app without BaseHTTPMiddleware
-    test_app = FastAPI(title="Test App")
-
-    # Register the same routers as the main app
-    test_app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
-    test_app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
-    test_app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
-    test_app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
-    test_app.include_router(
-        wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"]
-    )
-    test_app.include_router(
-        wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"]
-    )
-    test_app.include_router(database, prefix=API_V1_PREFIX, tags=["database"])
-    test_app.include_router(providers, prefix=API_V1_PREFIX, tags=["providers"])
-    test_app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
-    test_app.include_router(cache, prefix=API_V1_PREFIX, tags=["cache"])
-    test_app.include_router(config, prefix=API_V1_PREFIX, tags=["config"])
-    test_app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
-    test_app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
-    test_app.include_router(word_versions, prefix=f"{API_V1_PREFIX}/words", tags=["word-versions"])
-    test_app.include_router(health, prefix="", tags=["health"])
-
-    transport = ASGITransport(app=test_app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
-
-
 @pytest.fixture
 def performance_thresholds():
     """Define performance thresholds for various operations."""

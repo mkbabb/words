@@ -14,8 +14,8 @@ import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
 from floridify.models.base import Language
-from floridify.search.fuzzy import FuzzySearch
-from floridify.search.utils import apply_length_correction
+from floridify.search.fuzzy.search import FuzzySearch
+from floridify.search.fuzzy.scoring import apply_length_correction
 
 
 class TestBigramCandidateSelection:

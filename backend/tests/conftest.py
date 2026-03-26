@@ -97,9 +97,9 @@ def get_document_models():
     from floridify.providers.dictionary.models import DictionaryProviderEntry
     from floridify.providers.language.models import LanguageEntry
     from floridify.providers.literature.models import LiteratureEntry
-    from floridify.search.search_index import SearchIndex
-    from floridify.search.semantic.models import SemanticIndex
-    from floridify.search.trie_index import TrieIndex
+    from floridify.search.index import SearchIndex
+    from floridify.search.semantic.index import SemanticIndex
+    from floridify.search.trie.index import TrieIndex
     from floridify.wordlist.models import WordList
 
     return [
@@ -135,7 +135,7 @@ def get_document_models():
 @pytest_asyncio.fixture(scope="function")
 async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient]:
     """Create MongoDB client for test."""
-    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
+    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=5000)
     try:
         # Test connection
         await client.admin.command("ping")
@@ -149,7 +149,7 @@ async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClie
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def mongodb_client_session(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient]:
     """Create session-scoped MongoDB client for expensive setup (like semantic indices)."""
-    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
+    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=5000)
     try:
         # Test connection
         await client.admin.command("ping")
@@ -216,6 +216,23 @@ def anyio_backend():
 def pytest_configure(config):
     """Configure pytest with asyncio markers."""
     config.addinivalue_line("markers", "asyncio: mark test as requiring asyncio")
+
+
+def pytest_sessionstart(session):
+    """Reset the benchmark collector at the start of each session."""
+    from floridify.audit.bench import reset_collected_cases
+
+    reset_collected_cases()
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Print a benchmark summary table if any benchmarks were collected."""
+    from floridify.audit.bench import format_table, get_collected_cases
+
+    cases = get_collected_cases()
+    if cases:
+        terminalreporter.section("benchmark results")
+        terminalreporter.write_line(format_table(cases))
 
 
 # Helper functions for API tests
