@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch, type Ref } from 'vue';
+import { ref, computed, type Ref } from 'vue';
 import { useAuth, useUser } from '@clerk/vue';
-import { usersApi } from '@/api/users';
 import { setAuthTokenGetter } from '@/api/core';
 import type { UserProfile, UserRole } from '@/types/api/models';
 
@@ -63,18 +62,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function fetchProfile(): Promise<void> {
-    if (!isSignedIn.value) return;
-    profileLoading.value = true;
-    profileError.value = null;
-    try {
-      profile.value = await usersApi.getProfile();
-    } catch (e: any) {
-      profileError.value = e.message || 'Failed to load profile';
-      profile.value = null;
-    } finally {
-      profileLoading.value = false;
-    }
+  // Pure state setters — API calls live in useAuthProfile composable
+  function setProfile(value: UserProfile | null): void {
+    profile.value = value;
+  }
+
+  function setProfileLoading(value: boolean): void {
+    profileLoading.value = value;
+  }
+
+  function setProfileError(value: string | null): void {
+    profileError.value = value;
   }
 
   function clearProfile(): void {
@@ -83,14 +81,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   setAuthTokenGetter(getAuthToken);
-
-  watch(isSignedIn, async (signedIn) => {
-    if (signedIn) {
-      await fetchProfile();
-    } else {
-      clearProfile();
-    }
-  }, { immediate: true });
 
   return {
     profile,
@@ -102,7 +92,9 @@ export const useAuthStore = defineStore('auth', () => {
     role,
     user,
     getAuthToken,
-    fetchProfile,
+    setProfile,
+    setProfileLoading,
+    setProfileError,
     clearProfile,
   };
 });

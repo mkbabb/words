@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { generateId } from '@/utils'
-import { suggestionsApi } from '@/api'
-import { useAuthStore } from '@/stores/auth'
-import { logger } from '@/utils/logger'
 import type {
   SearchHistory,
   LookupHistory,
@@ -37,12 +34,6 @@ export const useHistoryStore = defineStore('history', () => {
     lastWord: null as string | null,
     timestamp: null as number | null,
   })
-
-  // ==========================================================================
-  // NON-PERSISTED STATE
-  // ==========================================================================
-  
-  const isLoadingSuggestions = ref(false)
 
   // ==========================================================================
   // COMPUTED PROPERTIES
@@ -160,14 +151,14 @@ export const useHistoryStore = defineStore('history', () => {
   const addToLookupHistory = (word: string, entry: SynthesizedDictionaryEntry) => {
     const historyEntry: LookupHistory = {
       id: generateId(),
-      word: word.toLowerCase().trim(), // Normalize for consistency
+      word: (word ?? '').toLowerCase().trim(), // Normalize for consistency
       timestamp: new Date(),
       entry,
     }
 
     // Remove existing entry for same word
     const existingIndex = lookupHistory.value.findIndex(
-      (lookup) => lookup.word.toLowerCase() === word.toLowerCase()
+      (lookup) => lookup.word?.toLowerCase() === word?.toLowerCase()
     )
     if (existingIndex >= 0) {
       lookupHistory.value.splice(existingIndex, 1)
@@ -179,15 +170,6 @@ export const useHistoryStore = defineStore('history', () => {
     // Keep only last 25 lookups (entries are large SynthesizedDictionaryEntry objects)
     if (lookupHistory.value.length > 25) {
       lookupHistory.value = lookupHistory.value.slice(0, 25)
-    }
-
-    // Refresh vocabulary suggestions with new history, but throttle it
-    const FIVE_MINUTES = 5 * 60 * 1000
-    const cache = suggestionsCache.value
-    const shouldRefresh = !cache.timestamp || Date.now() - cache.timestamp > FIVE_MINUTES
-    
-    if (shouldRefresh) {
-      refreshVocabularySuggestions()
     }
   }
 
@@ -223,71 +205,16 @@ export const useHistoryStore = defineStore('history', () => {
     aiQueryHistory.value = []
   }
 
-  // Vocabulary suggestions management
-  const refreshVocabularySuggestions = async (forceRefresh = false) => {
-    // Suggestions endpoint requires authentication
-    const auth = useAuthStore()
-    if (!auth.isAuthenticated) return
-
-    const ONE_HOUR = 60 * 60 * 1000
-    const currentWord = lookupHistory.value[0]?.word // Most recent lookup
-    const cache = suggestionsCache.value
-
-    // Prevent concurrent calls
-    if (isLoadingSuggestions.value && !forceRefresh) {
-      return // Already loading, skip this call
-    }
-
-    // Use cache if conditions are met
-    if (
-      !forceRefresh &&
-      cache.suggestions.length > 0 &&
-      cache.timestamp &&
-      Date.now() - cache.timestamp < ONE_HOUR &&
-      currentWord === cache.lastWord
-    ) {
-      return // Use cached suggestions
-    }
-
-    isLoadingSuggestions.value = true
-    try {
-      const recentWords = recentLookupWords.value.slice(0, 10)
-
-      const response = await suggestionsApi.getVocabulary(recentWords)
-
-      const newSuggestions = response.words.map((word) => ({
-        word,
-        reasoning: '',
-        difficulty_level: 0,
-        semantic_category: '',
-      }))
-
-      // Update cache
-      suggestionsCache.value = {
-        suggestions: newSuggestions,
-        lastWord: currentWord,
-        timestamp: Date.now(),
-      }
-    } catch (error) {
-      logger.error('Failed to get vocabulary suggestions:', error)
-      // Don't clear cache on error - keep using old suggestions
-    } finally {
-      isLoadingSuggestions.value = false
-    }
-  }
-
-  const getHistoryBasedSuggestions = async (): Promise<string[]> => {
-    const auth = useAuthStore()
-    if (!auth.isAuthenticated) return []
-
-    try {
-      const recentWords = recentLookupWords.value.slice(0, 10)
-      const response = await suggestionsApi.getVocabulary(recentWords)
-      return response.words
-    } catch (error) {
-      logger.error('Failed to get history-based suggestions:', error)
-      // Fallback to simple word list from history
-      return recentLookupWords.value.slice(0, 4)
+  // Suggestions cache setter — API calls live in useVocabularySuggestions composable
+  const setSuggestionsCache = (cache: {
+    suggestions: VocabularySuggestion[]
+    lastWord: string | null | undefined
+    timestamp: number | null
+  }) => {
+    suggestionsCache.value = {
+      suggestions: cache.suggestions,
+      lastWord: cache.lastWord ?? null,
+      timestamp: cache.timestamp,
     }
   }
 
@@ -386,14 +313,14 @@ export const useHistoryStore = defineStore('history', () => {
     searchHistory,
     lookupHistory,
     aiQueryHistory,
+    suggestionsCache,
     vocabularySuggestions,
-    isLoadingSuggestions: readonly(isLoadingSuggestions),
-    
+
     // Computed
     recentSearches,
     recentLookups,
     recentLookupWords,
-    
+
     // Actions
     addToHistory,
     clearSearchHistory,
@@ -401,8 +328,7 @@ export const useHistoryStore = defineStore('history', () => {
     clearLookupHistory,
     addToAIQueryHistory,
     clearAIQueryHistory,
-    refreshVocabularySuggestions,
-    getHistoryBasedSuggestions,
+    setSuggestionsCache,
     clearSuggestionsCache,
     invalidateSuggestionsCache,
     getSearchHistoryByQuery,

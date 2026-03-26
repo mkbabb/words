@@ -79,11 +79,19 @@ export interface DictionaryEntryResponse {
 }
 
 // Search Response Types
+export interface MatchDetail {
+    method: SearchMethod;
+    score: number;
+}
+
 export interface SearchResult {
     word: string;
     score: number; // 0.0-1.0
     method: SearchMethod;
-    is_phrase: boolean;
+    lemmatized_word?: string | null;
+    language?: string | null;
+    matches?: MatchDetail[];
+    metadata?: Record<string, unknown> | null;
 }
 
 export interface SearchResponse {
@@ -91,6 +99,8 @@ export interface SearchResponse {
     results: SearchResult[];
     total_found: number;
     languages: Language[];
+    mode: string;
+    metadata?: Record<string, unknown>;
 }
 
 // Streaming Progress Types

@@ -6,12 +6,14 @@ export interface UseDockStateOptions {
     collapseDelay?: number;
     /** Root element ref — used for contains() checks */
     rootEl: Ref<HTMLElement | null>;
+    /** When true, disables click-away collapse (for inline toolbars, not floating docks) */
+    persistent?: boolean;
 }
 
 export type DockState = "collapsed" | "hover" | "pinned";
 
 export function useDockState(options: UseDockStateOptions) {
-    const { collapseDelay = 2500, rootEl } = options;
+    const { collapseDelay = 2500, rootEl, persistent = false } = options;
 
     const state = ref<DockState>("collapsed");
     const expanded = ref(false);
@@ -54,8 +56,8 @@ export function useDockState(options: UseDockStateOptions) {
         syncDerived();
     }
 
-    function expand() {
-        if (ignoreEvents) return;
+    function expand(force = false) {
+        if (ignoreEvents && !force) return;
         clearTimer();
         state.value = "hover";
         syncDerived();
@@ -150,28 +152,30 @@ export function useDockState(options: UseDockStateOptions) {
         collapse();
     }
 
-    watch(expanded, (isExpanded) => {
-        if (isExpanded) {
-            // Defer attachment so the opening click doesn't immediately close
-            nextTick(() => {
-                document.addEventListener(
-                    "pointerdown",
-                    onPointerDownOutside,
-                    true,
-                );
-                removeClickAway = () => {
-                    document.removeEventListener(
+    // Click-away: skip for persistent docks (inline toolbars)
+    if (!persistent) {
+        watch(expanded, (isExpanded) => {
+            if (isExpanded) {
+                nextTick(() => {
+                    document.addEventListener(
                         "pointerdown",
                         onPointerDownOutside,
                         true,
                     );
-                    removeClickAway = null;
-                };
-            });
-        } else {
-            removeClickAway?.();
-        }
-    });
+                    removeClickAway = () => {
+                        document.removeEventListener(
+                            "pointerdown",
+                            onPointerDownOutside,
+                            true,
+                        );
+                        removeClickAway = null;
+                    };
+                });
+            } else {
+                removeClickAway?.();
+            }
+        });
+    }
 
     // Cleanup
     onUnmounted(() => {

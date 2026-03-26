@@ -120,7 +120,7 @@ export const useContentStore = defineStore('content', () => {
       definitionError.value = null
       // Add to lookup history when a new entry is set
       const historyStore = useHistoryStore()
-      historyStore.addToLookupHistory(entry.word, entry)
+      if (entry.word) historyStore.addToLookupHistory(entry.word, entry)
     }
   }
   

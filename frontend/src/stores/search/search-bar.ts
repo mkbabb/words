@@ -154,10 +154,11 @@ export const useSearchBarStore = defineStore(
         
         const setMode = async (newMode: SearchMode, currentQuery?: string) => {
             if (newMode !== searchMode.value) {
-                // Save current query if provided
-                if (currentQuery !== undefined) {
-                    saveCurrentQuery(currentQuery);
-                }
+                // Persist the active query for the mode we are leaving so
+                // mode switches can restore the exact text the user had typed.
+                const outgoingQuery =
+                    currentQuery !== undefined ? currentQuery : searchQuery.value;
+                saveCurrentQuery(outgoingQuery);
                 
                 // Execute exit handler for previous mode
                 const previousModeStore = modeStores[searchMode.value];
@@ -175,14 +176,19 @@ export const useSearchBarStore = defineStore(
                     await newModeStore.handler.onEnter(previousMode.value);
                 }
 
-                // Clear previous mode results so they don't bleed into new mode
+                // Clear previous mode results so they don't bleed into new mode.
+                // Wordlist results are also cleared — they'll be re-fetched on re-entry.
+                // Keeping 1000+ stale results causes severe jank when switching back
+                // (the virtualizer renders them all before the fresh fetch arrives).
                 previousModeStore?.clearResults?.();
 
                 // Trigger mode switch animation
                 triggerModeSwitchAnimation();
 
-                // Return saved query for the new mode
-                return getSavedQuery(newMode);
+                // Restore the target mode query immediately so mode-switch
+                // callers don't need to duplicate query restoration logic.
+                searchQuery.value = getSavedQuery(newMode);
+                return searchQuery.value;
             }
             return '';
         };

@@ -10,8 +10,50 @@ import type {
   WordListsResponse,
   WordListSearchResponse,
   WordListStats,
+  WordlistEntryInput,
 } from '@/types/wordlist';
 import type { ListResponse } from '@/types/api';
+
+// -- Reconcile preview types (mirrors backend ReconcilePreviewResponse) --
+
+export interface ReconcileCandidate {
+  word: string;
+  word_id: string | null;
+  score: number;
+  method: string;
+  lemmatized_word: string | null;
+  already_in_wordlist: boolean;
+}
+
+export interface ReconcilePreviewItem {
+  source_text: string;
+  resolved_text: string | null;
+  frequency: number;
+  notes: string | null;
+  tags: string[];
+  status: 'exact' | 'ambiguous' | 'unresolved';
+  exact_match: boolean;
+  candidates: ReconcileCandidate[];
+}
+
+export interface ReconcilePreviewSummary {
+  total_entries: number;
+  total_frequency: number;
+  exact_entries: number;
+  ambiguous_entries: number;
+  unresolved_entries: number;
+  exact_frequency: number;
+  ambiguous_frequency: number;
+  unresolved_frequency: number;
+}
+
+export interface ReconcilePreviewResponse {
+  exact: ReconcilePreviewItem[];
+  ambiguous: ReconcilePreviewItem[];
+  unresolved: ReconcilePreviewItem[];
+  summary: ReconcilePreviewSummary;
+  metadata: Record<string, any>;
+}
 
 export const wordlistApi = {
   // Get all wordlists
@@ -30,7 +72,7 @@ export const wordlistApi = {
   async createWordlist(data: {
     name: string;
     description?: string;
-    words?: string[];
+    words?: Array<string | WordlistEntryInput>;
     tags?: string[];
     is_public?: boolean;
     owner_id?: string;
@@ -179,7 +221,7 @@ export const wordlistApi = {
   },
 
   // Add words to wordlist
-  async addWords(id: string, words: string[]): Promise<WordListResponse> {
+  async addWords(id: string, words: Array<string | WordlistEntryInput>): Promise<WordListResponse> {
     const response = await api.post<WordListResponse>(`/wordlists/${id}/words`, { words });
     return response.data;
   },
@@ -200,7 +242,10 @@ export const wordlistApi = {
       offset: searchParams.offset || 0,
       limit: searchParams.limit || 20,
     };
-    
+
+    // Add search mode if specified
+    if (searchParams.mode) params.mode = searchParams.mode;
+
     // Add optional filtering parameters only if they are defined
     if (searchParams.mastery_levels) params.mastery_levels = searchParams.mastery_levels;
     if (searchParams.hot_only !== undefined) params.hot_only = searchParams.hot_only;
@@ -208,8 +253,29 @@ export const wordlistApi = {
     if (searchParams.min_views !== undefined) params.min_views = searchParams.min_views;
     if (searchParams.max_views !== undefined) params.max_views = searchParams.max_views;
     if (searchParams.reviewed !== undefined) params.reviewed = searchParams.reviewed;
-    
+
     const response = await api.post(`/wordlists/${id}/search`, null, { params });
+    return response.data as WordListSearchResponse;
+  },
+
+  // Search words across ALL user wordlists
+  async searchAllWordlists(query: string, params?: {
+    max_results?: number;
+    min_score?: number;
+    mode?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<WordListSearchResponse> {
+    const queryParams: Record<string, any> = {
+      query,
+      max_results: params?.max_results || 50,
+      min_score: params?.min_score || 0.4,
+      offset: params?.offset || 0,
+      limit: params?.limit || 20,
+    };
+    if (params?.mode) queryParams.mode = params.mode;
+
+    const response = await api.post('/wordlists/search-all', null, { params: queryParams });
     return response.data as WordListSearchResponse;
   },
 
@@ -350,6 +416,22 @@ export const wordlistApi = {
     const response = await api.patch(
       `/wordlists/${wordlistId}/words/${encodeURIComponent(wordText)}`,
       updates
+    );
+    return response.data;
+  },
+
+  // Preview reconciliation candidates for parsed entries before upload
+  async reconcilePreview(
+    entries: Array<string | { source_text: string; resolved_text?: string; frequency?: number; notes?: string; tags?: string[] }>,
+    wordlistId?: string,
+  ): Promise<ReconcilePreviewResponse> {
+    const params: Record<string, string> = {};
+    if (wordlistId) params.wordlist_id = wordlistId;
+
+    const response = await api.post<ReconcilePreviewResponse>(
+      '/wordlists/reconcile-preview',
+      { entries },
+      { params },
     );
     return response.data;
   },

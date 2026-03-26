@@ -17,13 +17,12 @@ import {
     type WordlistPanelFilters,
     type SortCriterion,
 } from '@/stores/types/constants';
-import { wordlistApi } from '@/api';
-
+import { useWindowedStore } from '@/composables/virtual';
 /**
  * Unified wordlist mode store — pure state management only.
  *
- * API calls (getWordlistWords, searchWordlist, loadMore) have been moved
- * to useSearchOrchestrator.
+ * API calls (getWordlistWords, searchWordlist, loadMore, fetchAllWordlists)
+ * have been moved to useSearchOrchestrator / useWordlistData composables.
  */
 export const useWordlistMode = defineStore(
     'wordlistMode',
@@ -42,6 +41,7 @@ export const useWordlistMode = defineStore(
         // SEARCH BAR STATE
         // ==========================================================================
 
+        const searchMode = ref<'smart' | 'exact' | 'fuzzy' | 'semantic'>('smart');
         const batchMode = ref(false);
         const processingQueue = ref<string[]>([]);
 
@@ -59,44 +59,43 @@ export const useWordlistMode = defineStore(
         const allWordlists = shallowRef<WordList[]>([]);
         const wordlistsLoading = ref(false);
 
-        const fetchAllWordlists = async () => {
-            if (wordlistsLoading.value) return;
-            wordlistsLoading.value = true;
-            try {
-                const response = await wordlistApi.getWordlists({ limit: 50 });
-                allWordlists.value = response.items.map((wl: any) => ({
-                    id: wl._id || wl.id,
-                    name: wl.name,
-                    description: wl.description,
-                    hash_id: wl.hash_id,
-                    words: wl.words || [],
-                    total_words: wl.total_words,
-                    unique_words: wl.unique_words,
-                    learning_stats: wl.learning_stats,
-                    last_accessed: wl.last_accessed,
-                    created_at: wl.created_at,
-                    updated_at: wl.updated_at,
-                    metadata: wl.metadata || {},
-                    tags: wl.tags || [],
-                    is_public: wl.is_public || false,
-                    owner_id: wl.owner_id,
-                }));
-            } catch {
-                // Silently degrade
-            } finally {
-                wordlistsLoading.value = false;
-            }
+        // Dashboard-specific sort/filter state (no wordlist selected)
+        const dashboardSortBy = ref<string>('last_accessed');
+        const dashboardSelectedTags = ref<Set<string>>(new Set());
+
+        // Pure state setters — API calls live in useWordlistData composable
+        const setAllWordlists = (wordlists: WordList[]) => {
+            allWordlists.value = wordlists;
+        };
+
+        const setWordlistsLoading = (loading: boolean) => {
+            wordlistsLoading.value = loading;
+        };
+
+        const setDashboardSortBy = (sort: string) => {
+            dashboardSortBy.value = sort;
+        };
+
+        const toggleDashboardTag = (tag: string) => {
+            const next = new Set(dashboardSelectedTags.value);
+            if (next.has(tag)) next.delete(tag);
+            else next.add(tag);
+            dashboardSelectedTags.value = next;
         };
 
         // ==========================================================================
         // RESULTS STATE
         // ==========================================================================
 
-        const results = shallowRef<WordListItem[]>([]);
+        const wordWindow = useWindowedStore<WordListItem>({ maxResident: 500 });
+        const results = wordWindow.items;
+        const windowStart = wordWindow.windowStart;
+        const storeGeneration = wordWindow.generation;
+        const resultsVersion = ref(0);
 
         const pagination = ref({
             offset: 0,
-            limit: 100,
+            limit: 50,
             total: 0,
             hasMore: false,
         });
@@ -203,6 +202,10 @@ export const useWordlistMode = defineStore(
         // SEARCH BAR ACTIONS
         // ==========================================================================
 
+        const setSearchMode = (mode: 'smart' | 'exact' | 'fuzzy' | 'semantic') => {
+            searchMode.value = mode;
+        };
+
         const toggleBatchMode = () => {
             batchMode.value = !batchMode.value;
             if (!batchMode.value) {
@@ -269,18 +272,36 @@ export const useWordlistMode = defineStore(
         // ==========================================================================
 
         const setResults = (newResults: WordListItem[], replace = true) => {
-            if (replace) {
-                results.value = [...newResults];
-            } else {
-                results.value = [...results.value, ...newResults];
-            }
+            wordWindow.set(newResults, replace);
+            resultsVersion.value += 1;
+        };
+
+        /**
+         * Append items only if no window reset has happened since the fetch started.
+         * Returns false if the append was rejected (stale fetch after backward scroll).
+         */
+        const appendIfCurrent = (newResults: WordListItem[], expectedGeneration: number): boolean => {
+            const accepted = wordWindow.appendIfCurrent(newResults, expectedGeneration);
+            if (accepted) resultsVersion.value += 1;
+            return accepted;
+        };
+
+        /** Prepend items before the current window (backward scroll re-fetch). */
+        const prependResults = (newResults: WordListItem[], newWindowStart: number) => {
+            wordWindow.prepend(newResults, newWindowStart);
+            resultsVersion.value += 1;
+        };
+
+        const setWindowStart = (offset: number) => {
+            wordWindow.windowStart.value = offset;
         };
 
         const clearResults = () => {
-            results.value = [];
+            wordWindow.clear();
+            resultsVersion.value += 1;
             pagination.value = {
                 offset: 0,
-                limit: 100,
+                limit: 50,
                 total: 0,
                 hasMore: false,
             };
@@ -409,7 +430,8 @@ export const useWordlistMode = defineStore(
             wordlistFilters.value = DEFAULT_WORDLIST_FILTERS;
             wordlistSortCriteria.value = [];
 
-            // Reset search bar
+            // Reset search mode + bar
+            searchMode.value = 'smart';
             batchMode.value = false;
             processingQueue.value = [];
 
@@ -458,7 +480,16 @@ export const useWordlistMode = defineStore(
             // Shared wordlists
             allWordlists,
             wordlistsLoading: readonly(wordlistsLoading),
-            fetchAllWordlists,
+            dashboardSortBy,
+            dashboardSelectedTags,
+            setDashboardSortBy,
+            toggleDashboardTag,
+            setAllWordlists,
+            setWordlistsLoading,
+
+            // Search Mode
+            searchMode,
+            setSearchMode,
 
             // Search Bar State
             batchMode: readonly(batchMode),
@@ -470,6 +501,9 @@ export const useWordlistMode = defineStore(
 
             // Results State
             results: readonly(results),
+            resultsVersion: readonly(resultsVersion),
+            windowStart: readonly(windowStart),
+            storeGeneration: readonly(storeGeneration),
             pagination: readonly(pagination),
             currentWordlistId: readonly(currentWordlistId),
             currentQuery: readonly(currentQuery),
@@ -506,6 +540,9 @@ export const useWordlistMode = defineStore(
 
             // Results Operations
             setResults,
+            appendIfCurrent,
+            prependResults,
+            setWindowStart,
             clearResults,
             setCurrentWordlistId,
             setCurrentQuery,
@@ -542,6 +579,7 @@ export const useWordlistMode = defineStore(
                 'selectedWordlist',
                 'wordlistFilters',
                 'wordlistSortCriteria',
+                'searchMode',
                 'viewMode',
                 'itemsPerPage',
                 'filters',

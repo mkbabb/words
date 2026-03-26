@@ -41,6 +41,12 @@ export const usersApi = {
     return data;
   },
 
+  /** Get aggregated global learning stats across all wordlists */
+  async getLearningStats(): Promise<any> {
+    const { data } = await api.get('/users/me/learning-stats');
+    return data;
+  },
+
   // --- Admin endpoints ---
 
   /** List all users (admin only) */

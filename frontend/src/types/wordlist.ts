@@ -176,6 +176,14 @@ export interface ParsedWord {
   mastery?: MasteryLevel;
 }
 
+export interface WordlistEntryInput {
+  source_text: string;
+  resolved_text?: string;
+  frequency?: number;
+  notes?: string;
+  tags?: string[];
+}
+
 // Upload progress types
 export interface UploadProgress {
   stage: 'parsing' | 'validating' | 'uploading' | 'complete';
@@ -250,14 +258,14 @@ export interface SortOption {
 export interface CreateWordListRequest {
   name: string;
   description?: string;
-  words: string[];
+  words: Array<string | WordlistEntryInput>;
   tags?: string[];
   is_public?: boolean;
   owner_id?: string;
 }
 
 export interface AddWordsRequest {
-  words: string[];
+  words: Array<string | WordlistEntryInput>;
 }
 
 export interface WordListsResponse {
@@ -293,14 +301,13 @@ export interface WordListStats {
   hot_words: WordListItem[];
 }
 
-export interface WordListSearchItem {
+export interface WordListSearchItem extends Partial<WordListItem> {
   word: string;
   score: number;
-  mastery_level: MasteryLevel;
-  review_count: number;
-  notes?: string;
-  tags: string[];
-  frequency?: number;
+  method?: string;
+  matches?: Array<{ method: string; score: number }>;
+  wordlist_id?: string;
+  wordlist_name?: string;
 }
 
 export interface WordListSearchResponse {
@@ -334,7 +341,8 @@ export interface WordListSearchQueryParams extends WordListQueryParams {
   query: string;
   max_results?: number;
   min_score?: number;
-  
+  mode?: 'smart' | 'exact' | 'fuzzy' | 'semantic';
+
   // Override default sort to use relevance for search
   sort_by?: 'relevance' | 'added_at' | 'last_visited' | 'mastery_level' | 'view_count';
 }

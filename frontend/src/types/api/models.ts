@@ -24,12 +24,22 @@ export enum DictionaryProvider {
     SYNTHESIS = 'synthesis',
 }
 
+// SearchMethod: what method produced the result (on each SearchResult)
 export enum SearchMethod {
     EXACT = 'exact',
     PREFIX = 'prefix',
+    SUBSTRING = 'substring',
     FUZZY = 'fuzzy',
     SEMANTIC = 'semantic',
     AUTO = 'auto',
+}
+
+// SearchMode: what the user requested (query parameter)
+export enum SearchMode {
+    SMART = 'smart',
+    EXACT = 'exact',
+    FUZZY = 'fuzzy',
+    SEMANTIC = 'semantic',
 }
 
 // Base Metadata

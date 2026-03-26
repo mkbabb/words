@@ -4,29 +4,27 @@ import { logger } from '@/utils/logger';
 
 export const searchApi = {
   // Search for words using query parameter - GET /search
+  // Defaults are owned by the backend (SearchParams in models/parameters.py).
+  // Only send parameters the caller explicitly provides — omitted params use
+  // backend defaults (mode=smart, min_score=0.3, max_results=20).
   async search(query: string, options?: {
     max_results?: number;
     min_score?: number;
     mode?: string;
+    languages?: string[];
+    corpus_name?: string;
     signal?: AbortSignal;
   }): Promise<SearchResult[]> {
     try {
-      // Progressive search parameters based on query length
-      const getSearchParams = (q: string) => {
-        const length = q.trim().length;
-        return {
-          max_results: options?.max_results || (length <= 4 ? 12 : 8),
-          min_score: options?.min_score || (length <= 4 ? 0.2 : length <= 6 ? 0.25 : 0.3),
-          mode: options?.mode || 'smart',
-        };
-      };
+      const params: Record<string, unknown> = { q: query };
+      if (options?.max_results != null) params.max_results = options.max_results;
+      if (options?.min_score != null) params.min_score = options.min_score;
+      if (options?.mode != null) params.mode = options.mode;
+      if (options?.languages) params.languages = options.languages;
+      if (options?.corpus_name) params.corpus_name = options.corpus_name;
 
-      const params = getSearchParams(query);
       const response = await api.get<SearchResponse>(`/search`, {
-        params: {
-          q: query,
-          ...params,
-        },
+        params,
         signal: options?.signal,
       });
       return response.data.results || [];
@@ -50,11 +48,10 @@ export const searchApi = {
     min_score?: number;
   }): Promise<SearchResult[]> {
     try {
-      const params = {
-        max_results: options?.max_results || 10,
-        min_score: options?.min_score || 0.3,
-      };
-      
+      const params: Record<string, unknown> = {};
+      if (options?.max_results != null) params.max_results = options.max_results;
+      if (options?.min_score != null) params.min_score = options.min_score;
+
       const response = await api.get<SearchResponse>(`/search/${encodeURIComponent(query)}`, {
         params
       });
@@ -70,10 +67,9 @@ export const searchApi = {
     max_results?: number;
   }): Promise<string[]> {
     try {
-      const params = {
-        max_results: options?.max_results || 10,
-      };
-      
+      const params: Record<string, unknown> = {};
+      if (options?.max_results != null) params.max_results = options.max_results;
+
       const response = await api.get<{ suggestions: string[] }>(`/search/${encodeURIComponent(query)}/suggestions`, {
         params
       });
@@ -90,39 +86,37 @@ export const searchApi = {
     return data;
   },
 
-  // Rebuild search index with unified corpus management - POST /search/rebuild
+  // Rebuild search index - POST /search/rebuild
+  // Isomorphic to backend RebuildIndexRequest (search/models.py)
   async rebuildIndex(options?: {
+    corpus_name?: string;
+    corpus_uuid?: string;
     languages?: string[];
-    corpus_types?: string[];
-    rebuild_all_corpora?: boolean;
-    rebuild_semantic?: boolean;
-    semantic_force_rebuild?: boolean;
-    quantization_type?: string;
-    auto_semantic_small_corpora?: boolean;
-    clear_existing_cache?: boolean;
-    force_download?: boolean;
+    components?: string[];
+    clear_caches?: boolean;
+    clean_gridfs?: boolean;
   }): Promise<{
     status: string;
-    languages: string[];
     message: string;
+    corpus_name: string;
+    corpus_uuid?: string;
+    components_rebuilt: string[];
+    vocabulary_size: number;
+    caches_cleared: Record<string, number>;
+    gridfs_cleaned: number;
     total_time_seconds: number;
-    corpus_results: Record<string, any>;
-    corpus_manager_stats: Record<string, any>;
+    semantic_info: Record<string, any>;
   }> {
     try {
-      const requestData = {
-        languages: options?.languages || ['en'],
-        corpus_types: options?.corpus_types || ['language_search'],
-        rebuild_all_corpora: options?.rebuild_all_corpora || false,
-        rebuild_semantic: options?.rebuild_semantic ?? true,
-        semantic_force_rebuild: options?.semantic_force_rebuild || false,
-        quantization_type: options?.quantization_type || 'binary',
-        auto_semantic_small_corpora: options?.auto_semantic_small_corpora ?? true,
-        clear_existing_cache: options?.clear_existing_cache || false,
-        force_download: options?.force_download ?? true,
-      };
-      
-      const response = await api.post('/search/rebuild', requestData);
+      const body: Record<string, unknown> = {};
+      if (options?.corpus_name != null) body.corpus_name = options.corpus_name;
+      if (options?.corpus_uuid != null) body.corpus_uuid = options.corpus_uuid;
+      if (options?.languages != null) body.languages = options.languages;
+      if (options?.components != null) body.components = options.components;
+      if (options?.clear_caches != null) body.clear_caches = options.clear_caches;
+      if (options?.clean_gridfs != null) body.clean_gridfs = options.clean_gridfs;
+
+      const response = await api.post('/search/rebuild', body);
       return response.data;
     } catch (error) {
       logger.error('Rebuild index API error:', error);

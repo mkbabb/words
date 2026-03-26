@@ -14,6 +14,40 @@ export function useWordlistContentState() {
   const currentWordlist = shallowRef<WordList | null>(null)
   const processingQueue = ref<string[]>([])
   const batchResults = shallowRef<Map<string, SynthesizedDictionaryEntry>>(new Map())
+
+  // Review session state
+  const reviewSessionState = ref<{
+    sessionId: string | null
+    words: any[]
+    currentIndex: number
+    results: any[]
+    startedAt: string | null
+    estimatedTimeMinutes: number
+    difficultyDistribution: Record<string, number>
+  }>({
+    sessionId: null,
+    words: [],
+    currentIndex: 0,
+    results: [],
+    startedAt: null,
+    estimatedTimeMinutes: 0,
+    difficultyDistribution: {},
+  })
+
+  // Batch progress tracking
+  const batchProgress = ref<{
+    totalWords: number
+    processedWords: number
+    startTime: number | null
+    estimatedEta: number | null
+    retryCount: number
+  }>({
+    totalWords: 0,
+    processedWords: 0,
+    startTime: null,
+    estimatedEta: null,
+    retryCount: 0,
+  })
   
   // ==========================================================================
   // ACTIONS
@@ -50,6 +84,58 @@ export function useWordlistContentState() {
   const clearBatchResults = () => {
     batchResults.value = new Map()
   }
+
+  // Review session actions
+  const setReviewSession = (session: Partial<typeof reviewSessionState.value>) => {
+    reviewSessionState.value = { ...reviewSessionState.value, ...session }
+  }
+
+  const advanceReviewIndex = () => {
+    if (reviewSessionState.value.currentIndex < reviewSessionState.value.words.length - 1) {
+      reviewSessionState.value.currentIndex++
+    }
+  }
+
+  const addReviewResult = (result: any) => {
+    reviewSessionState.value.results = [...reviewSessionState.value.results, result]
+  }
+
+  const resetReviewSession = () => {
+    reviewSessionState.value = {
+      sessionId: null,
+      words: [],
+      currentIndex: 0,
+      results: [],
+      startedAt: null,
+      estimatedTimeMinutes: 0,
+      difficultyDistribution: {},
+    }
+  }
+
+  // Batch progress actions
+  const setBatchProgress = (progress: Partial<typeof batchProgress.value>) => {
+    batchProgress.value = { ...batchProgress.value, ...progress }
+  }
+
+  const incrementBatchProgress = () => {
+    batchProgress.value.processedWords++
+    if (batchProgress.value.startTime && batchProgress.value.totalWords > 0) {
+      const elapsed = Date.now() - batchProgress.value.startTime
+      const rate = batchProgress.value.processedWords / elapsed
+      const remaining = batchProgress.value.totalWords - batchProgress.value.processedWords
+      batchProgress.value.estimatedEta = remaining / rate
+    }
+  }
+
+  const resetBatchProgress = () => {
+    batchProgress.value = {
+      totalWords: 0,
+      processedWords: 0,
+      startTime: null,
+      estimatedEta: null,
+      retryCount: 0,
+    }
+  }
   
   const getState = (): WordlistContentState => ({
     currentWordlist: currentWordlist.value,
@@ -67,6 +153,8 @@ export function useWordlistContentState() {
     currentWordlist.value = null
     processingQueue.value = []
     batchResults.value = new Map()
+    resetReviewSession()
+    resetBatchProgress()
   }
   
   // ==========================================================================
@@ -78,10 +166,12 @@ export function useWordlistContentState() {
     },
 
     onExit: async (_nextMode: SearchMode) => {
-      // Clear batch results when leaving
+      // Clear batch results and review session when leaving
       clearBatchResults()
+      resetReviewSession()
+      resetBatchProgress()
     },
-    
+
     getDefaultState: () => ({
       currentWordlist: null,
       processingQueue: [],
@@ -98,7 +188,9 @@ export function useWordlistContentState() {
     currentWordlist: readonly(currentWordlist),
     processingQueue: readonly(processingQueue),
     batchResults: readonly(batchResults),
-    
+    reviewSessionState: readonly(reviewSessionState),
+    batchProgress: readonly(batchProgress),
+
     // Actions
     setCurrentWordlist,
     addToProcessingQueue,
@@ -107,12 +199,23 @@ export function useWordlistContentState() {
     setBatchResult,
     getBatchResult,
     clearBatchResults,
-    
+
+    // Review session actions
+    setReviewSession,
+    advanceReviewIndex,
+    addReviewResult,
+    resetReviewSession,
+
+    // Batch progress actions
+    setBatchProgress,
+    incrementBatchProgress,
+    resetBatchProgress,
+
     // State management
     getState,
     setState,
     reset,
-    
+
     // Mode handler
     handler
   }
