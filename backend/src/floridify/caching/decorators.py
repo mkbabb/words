@@ -67,8 +67,9 @@ def _efficient_cache_key_parts(
     return tuple(key_parts)
 
 
-# Global deduplication state (thread-safe via GIL)
+# Global deduplication state — protected by _active_calls_lock for async safety.
 _active_calls: dict[str, asyncio.Future[Any]] = {}
+_active_calls_lock: asyncio.Lock = asyncio.Lock()
 
 
 def cached_api_call(
@@ -322,15 +323,19 @@ def deduplicated(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable
         key_parts = _efficient_cache_key_parts(func, args, kwargs)
         cache_key = _generate_cache_key(key_parts)
 
-        # Check if this call is already in progress
-        if cache_key in _active_calls:
-            logger.debug(f"🔄 Deduplicating call to {func.__name__} - waiting for existing call")
-            # Wait for the existing call to complete
-            return await _active_calls[cache_key]
+        # Atomically check-then-add under lock
+        async with _active_calls_lock:
+            if cache_key in _active_calls:
+                existing_future = _active_calls[cache_key]
+                logger.debug(f"🔄 Deduplicating call to {func.__name__} - waiting for existing call")
+            else:
+                existing_future = None
+                future: asyncio.Future[Any] = asyncio.Future()
+                _active_calls[cache_key] = future
 
-        # Create a future for this call
-        future: asyncio.Future[Any] = asyncio.Future()
-        _active_calls[cache_key] = future
+        # Await outside the lock to avoid blocking other callers
+        if existing_future is not None:
+            return await existing_future
 
         try:
             # Execute the function
@@ -345,8 +350,8 @@ def deduplicated(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable
             future.set_exception(e)
             raise
         finally:
-            # Clean up - use pop() to avoid KeyError races
-            _active_calls.pop(cache_key, None)
+            async with _active_calls_lock:
+                _active_calls.pop(cache_key, None)
 
     return wrapper
 
@@ -403,16 +408,21 @@ def cached_api_call_with_dedup(
                 key_parts = (*key_parts, headers)
             cache_key = _generate_cache_key(key_parts)
 
-            # Check for existing calls first (deduplication)
-            if cache_key in _active_calls:
-                logger.debug(
-                    f"🔄 Deduplicating API call to {func.__name__} - waiting for existing call",
-                )
-                return cast("R", await _active_calls[cache_key])
+            # Atomically check-then-add under lock
+            async with _active_calls_lock:
+                if cache_key in _active_calls:
+                    existing_future = _active_calls[cache_key]
+                    logger.debug(
+                        f"🔄 Deduplicating API call to {func.__name__} - waiting for existing call",
+                    )
+                else:
+                    existing_future = None
+                    future: asyncio.Future[R] = asyncio.Future()
+                    _active_calls[cache_key] = future
 
-            # Create future for deduplication
-            future: asyncio.Future[R] = asyncio.Future()
-            _active_calls[cache_key] = future
+            # Await outside the lock to avoid blocking other callers
+            if existing_future is not None:
+                return cast("R", await existing_future)
 
             try:
                 # Get unified cache
@@ -458,8 +468,8 @@ def cached_api_call_with_dedup(
                 raise
 
             finally:
-                # Clean up deduplication state - use pop() to avoid KeyError races
-                _active_calls.pop(cache_key, None)
+                async with _active_calls_lock:
+                    _active_calls.pop(cache_key, None)
 
         return wrapper
 

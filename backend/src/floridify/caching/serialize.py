@@ -9,12 +9,12 @@ from __future__ import annotations
 import hashlib
 import json
 import zlib
-from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from beanie import PydanticObjectId
+from pydantic import BaseModel, ConfigDict
 
 from .utils import json_encoder
 
@@ -57,12 +57,10 @@ def encode_for_json(obj: Any) -> str:
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
-@dataclass(frozen=True)
-class CacheStats:
+class CacheStats(BaseModel):
     """Immutable cache statistics.
 
-    Uses frozen dataclass for immutability and functional updates.
-    All mutations create new instances via dataclasses.replace().
+    Frozen Pydantic model — all mutations create new instances via model_copy().
 
     Attributes:
         hits: Number of cache hits
@@ -80,25 +78,26 @@ class CacheStats:
         10
     """
 
+    model_config = ConfigDict(frozen=True)
+
     hits: int = 0
     misses: int = 0
     evictions: int = 0
 
     def increment_hits(self) -> CacheStats:
         """Create new stats with hits incremented by 1."""
-        return replace(self, hits=self.hits + 1)
+        return self.model_copy(update={"hits": self.hits + 1})
 
     def increment_misses(self) -> CacheStats:
         """Create new stats with misses incremented by 1."""
-        return replace(self, misses=self.misses + 1)
+        return self.model_copy(update={"misses": self.misses + 1})
 
     def increment_evictions(self, count: int = 1) -> CacheStats:
         """Create new stats with evictions incremented by count."""
-        return replace(self, evictions=self.evictions + count)
+        return self.model_copy(update={"evictions": self.evictions + count})
 
 
-@dataclass(frozen=True)
-class SerializedContent:
+class SerializedContent(BaseModel):
     """Immutable serialized content with pre-computed metadata.
 
     Eliminates double JSON serialization by computing all serialization
@@ -119,6 +118,8 @@ class SerializedContent:
         >>> serialized.content_hash[:8]
         'a1b2c3d4'
     """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     raw_content: Any
     json_str: str

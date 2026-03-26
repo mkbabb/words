@@ -11,6 +11,7 @@ from datetime import timedelta
 from typing import Any, Generic, TypeVar
 
 from ..utils.logging import get_logger
+from ..search.config import INLINE_CONTENT_THRESHOLD_BYTES
 from .compression import compress_data, decompress_data
 from .config import DEFAULT_CONFIGS
 from .filesystem import FilesystemBackend
@@ -657,7 +658,7 @@ async def set_versioned_content(
     # Normal path: serialize once and decide storage strategy
     serialized = serialize_content(content)
 
-    inline_threshold = 16 * 1024
+    inline_threshold = INLINE_CONTENT_THRESHOLD_BYTES
 
     if serialized.size_bytes < inline_threshold:
         versioned_data.content_inline = content

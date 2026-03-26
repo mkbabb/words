@@ -1,21 +1,23 @@
 """Centralized caching configuration - Immutable data structures.
 
 Single source of truth for all caching configuration.
-All configuration uses frozen dataclasses for immutability.
+All configuration uses frozen Pydantic models for immutability.
 """
 
-from dataclasses import dataclass
 from datetime import timedelta
+
+from pydantic import BaseModel, ConfigDict
 
 from .models import CacheNamespace, CompressionType, ResourceType
 
 
-@dataclass(frozen=True)
-class DeltaConfig:
+class DeltaConfig(BaseModel):
     """Immutable configuration for delta-based version storage.
 
     Controls when full snapshots are kept versus delta-compressed versions.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     snapshot_interval: int = 10  # Full snapshot every N versions
     max_chain_length: int = 50  # Safety limit on delta chain traversal
@@ -25,13 +27,14 @@ class DeltaConfig:
 DELTA_CONFIG = DeltaConfig()
 
 
-@dataclass(frozen=True)
-class NamespaceCacheConfig:
+class NamespaceCacheConfig(BaseModel):
     """Immutable configuration for a cache namespace.
 
     Defines memory limits, TTLs, and compression settings for each namespace.
-    Using frozen dataclass ensures configuration cannot be mutated after creation.
+    Frozen Pydantic model ensures configuration cannot be mutated after creation.
     """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     namespace: CacheNamespace
     memory_limit: int  # Maximum number of entries in L1 (memory) cache

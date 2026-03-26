@@ -99,6 +99,92 @@ async def gridfs_delete(file_id_str: str) -> None:
         logger.warning(f"GridFS DELETE failed: {file_id_str}: {e}")
 
 
+async def gridfs_list_files(prefix: str | None = None) -> list[dict[str, Any]]:
+    """List GridFS files, optionally filtered by filename prefix.
+
+    Args:
+        prefix: Optional filename prefix to filter by (e.g. "semantic:" or "trie:")
+
+    Returns:
+        List of file info dicts with id, filename, length, metadata
+    """
+    bucket = await get_gridfs_bucket()
+    query: dict[str, Any] = {}
+    if prefix:
+        query["filename"] = {"$regex": f"^{prefix}"}
+
+    files: list[dict[str, Any]] = []
+    async for doc in bucket.find(query):
+        files.append(
+            {
+                "id": str(doc._id),
+                "filename": doc.filename,
+                "length": doc.length,
+                "metadata": doc.metadata or {},
+            }
+        )
+    return files
+
+
+async def gridfs_cleanup_stale(
+    corpus_uuid: str | None = None,
+    dry_run: bool = True,
+) -> dict[str, Any]:
+    """Find and optionally delete GridFS files not referenced by any live versioned data.
+
+    A file is "stale" if no BaseVersionedData document with is_latest=True
+    references it via content_location.path.
+
+    Args:
+        corpus_uuid: Optional filter — only check files whose metadata.corpus_uuid matches
+        dry_run: If True, count stale files without deleting them
+
+    Returns:
+        Dict with stale_count, stale_bytes, deleted count
+    """
+    from .models import BaseVersionedData
+
+    # 1. Collect all GridFS file IDs
+    all_files = await gridfs_list_files()
+    if corpus_uuid:
+        all_files = [f for f in all_files if f["metadata"].get("corpus_uuid") == corpus_uuid]
+
+    if not all_files:
+        return {"stale_count": 0, "stale_bytes": 0, "deleted": 0}
+
+    # 2. Collect all file IDs referenced by live (is_latest=True) versioned data
+    collection = BaseVersionedData.get_pymongo_collection()
+    live_refs: set[str] = set()
+    async for doc in collection.find(
+        {"version_info.is_latest": True, "content_location.path": {"$exists": True}},
+        projection={"content_location.path": 1},
+    ):
+        path = (doc.get("content_location") or {}).get("path")
+        if path:
+            live_refs.add(str(path))
+
+    # 3. Identify stale files
+    stale_files = [f for f in all_files if f["id"] not in live_refs]
+    stale_bytes = sum(f["length"] for f in stale_files)
+
+    deleted = 0
+    if not dry_run:
+        for f in stale_files:
+            await gridfs_delete(f["id"])
+            deleted += 1
+        logger.info(f"GridFS cleanup: deleted {deleted} stale files ({stale_bytes:,} bytes)")
+    else:
+        logger.info(
+            f"GridFS cleanup (dry run): {len(stale_files)} stale files ({stale_bytes:,} bytes)"
+        )
+
+    return {
+        "stale_count": len(stale_files),
+        "stale_bytes": stale_bytes,
+        "deleted": deleted,
+    }
+
+
 def reset_bucket() -> None:
     """Reset the singleton bucket (for testing)."""
     global _bucket, _bucket_loop_id

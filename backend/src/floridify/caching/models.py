@@ -231,11 +231,10 @@ class BaseVersionedData(Document):
     tags: list[str] = Field(default_factory=list)
     ttl: timedelta | None = None
 
-    # Pydantic configuration for MongoDB storage
-    # CRITICAL: use_enum_values=True ensures enums are stored as strings in MongoDB
-    # (MongoDB doesn't support Python enum objects natively)
+    # Pydantic configuration for MongoDB storage.
+    # str-based enums (ResourceType, CacheNamespace) serialize to strings natively
+    # via Beanie — no use_enum_values needed.
     model_config = {
-        "use_enum_values": True,  # Store enums as strings for MongoDB compatibility
         "arbitrary_types_allowed": True,
     }
 
