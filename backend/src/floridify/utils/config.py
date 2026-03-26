@@ -120,6 +120,9 @@ class DatabaseConfig(BaseModel):
         """Return the best URL for a target database.
 
         Priority: MONGODB_URL env var > tunnel URL (outside Docker) > config file URL.
+
+        Tunnel URLs have their port dynamically resolved from MONGO_TUNNEL_PORT
+        env var or by detecting the running SSH tunnel process.
         """
         env_url = os.environ.get("MONGODB_URL")
         if env_url and target == "runtime":
@@ -127,17 +130,68 @@ class DatabaseConfig(BaseModel):
 
         if target == "runtime":
             if self.tunnel_url and not self._in_docker():
-                return self.tunnel_url
+                return self._resolve_tunnel_port(self.tunnel_url)
             url = self.runtime_url
         elif target == "test":
             if self.tunnel_test_url and not self._in_docker():
-                return self.tunnel_test_url
+                return self._resolve_tunnel_port(self.tunnel_test_url)
             url = self.test_url
         else:
             raise ValueError(f"Unsupported database target: {target}")
 
         if not url:
             raise ValueError(f"Database URL for target '{target}' is empty")
+        return url
+
+    @staticmethod
+    def _resolve_tunnel_port(url: str) -> str:
+        """Replace the port in a tunnel URL with the actual running tunnel port.
+
+        Checks MONGO_TUNNEL_PORT env var first (set by dev.sh), then probes
+        for a running SSH tunnel process forwarding to MongoDB.
+        """
+        import re
+        import subprocess
+
+        # 1. Env var from dev.sh
+        tunnel_port = os.environ.get("MONGO_TUNNEL_PORT")
+
+        # 2. Detect from running SSH tunnel process
+        if not tunnel_port:
+            try:
+                result = subprocess.run(
+                    ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-Fn"],
+                    capture_output=True, text=True, timeout=3,
+                )
+                # Find SSH processes listening on ports in the tunnel range
+                ssh_pids: set[str] = set()
+                current_pid = ""
+                for line in result.stdout.splitlines():
+                    if line.startswith("p"):
+                        current_pid = line[1:]
+                    elif line.startswith("n") and current_pid:
+                        # Check if this pid is an ssh process
+                        try:
+                            ps_result = subprocess.run(
+                                ["ps", "-p", current_pid, "-o", "command="],
+                                capture_output=True, text=True, timeout=2,
+                            )
+                            if "ssh" in ps_result.stdout and "27017" in ps_result.stdout:
+                                # Extract the local port from the -L flag
+                                match = re.search(r"-L\s*(\d+):localhost:27017", ps_result.stdout)
+                                if match:
+                                    tunnel_port = match.group(1)
+                                    break
+                        except (subprocess.TimeoutExpired, OSError):
+                            continue
+            except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+                pass
+
+        if tunnel_port:
+            # Replace port in URL
+            return re.sub(r"localhost:\d+", f"localhost:{tunnel_port}", url)
+
+        # Fall back to the URL as-is
         return url
 
     @staticmethod

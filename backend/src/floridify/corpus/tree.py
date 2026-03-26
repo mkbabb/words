@@ -382,9 +382,9 @@ async def delete_corpus(
 
     # Delete associated search indices
     if corpus_uuid_to_delete:
-        from ..search.search_index import SearchIndex
-        from ..search.semantic.models import SemanticIndex
-        from ..search.trie_index import TrieIndex
+        from ..search.index import SearchIndex
+        from ..search.semantic.index import SemanticIndex
+        from ..search.trie.index import TrieIndex
 
         # Delete all versioned metadata for this corpus
         # These are stored in BaseVersionedData collection

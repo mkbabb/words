@@ -84,6 +84,7 @@ class TreeCorpusManager:
         semantic_model: str | None = None,
         config: VersionConfig | None = None,
         metadata: dict[str, Any] | None = None,
+        skip_parent_update: bool = False,
     ) -> Corpus | None:
         """Save a corpus - ONLY saves data, does NOT manage relationships."""
         return await _crud.save_corpus(
@@ -103,6 +104,7 @@ class TreeCorpusManager:
             config=config,
             metadata=metadata,
             get_corpus_fn=self.get_corpus,
+            skip_parent_update=skip_parent_update,
         )
 
     async def get_corpus_metadata(self, corpus_name: str) -> Corpus.Metadata | None:

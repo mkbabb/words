@@ -50,6 +50,9 @@ class WordListItem(BaseModel):
         description="When added to list",
     )
 
+    # Leech management
+    suspended: bool = Field(default=False, description="Suspended from reviews (leech management)")
+
     # User metadata
     notes: str = Field(default="", description="User notes about the word")
     tags: list[str] = Field(default_factory=list, description="User-defined tags")

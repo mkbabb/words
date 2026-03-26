@@ -59,12 +59,15 @@ class LiteratureCorpus(Corpus):
         self,
         source: LiteratureSource,
         connector: LiteratureConnector | None = None,
+        aggregate: bool = True,
     ) -> PydanticObjectId | None:
         """Add a literature work as child corpus.
 
         Args:
             source: Literature source configuration
             connector: Optional connector to use (defaults to Gutenberg)
+            aggregate: Whether to aggregate into parent after adding (default True).
+                Set to False when adding multiple sources, then aggregate once at the end.
 
         Returns:
             Child corpus ID if created
@@ -158,8 +161,8 @@ class LiteratureCorpus(Corpus):
                 self.child_uuids = fresh_parent.child_uuids
                 logger.debug(f"After refresh: self.child_uuids = {self.child_uuids}")
 
-        # Aggregate vocabularies into parent
-        if self.corpus_id and child.corpus_id:
+        # Aggregate vocabularies into parent (only if requested)
+        if aggregate and self.corpus_id and child.corpus_id:
             # Note: update_parent already added child to parent's child_uuids
             # aggregate_vocabularies aggregates from the corpus and its children automatically
             logger.debug(f"Before aggregate: self.child_uuids = {self.child_uuids}")
@@ -182,6 +185,10 @@ class LiteratureCorpus(Corpus):
         connector: LiteratureConnector | None = None,
     ) -> list[PydanticObjectId]:
         """Add multiple works from an author.
+
+        Adds all works WITHOUT per-source aggregation, then aggregates
+        once at the end. This avoids N redundant aggregation passes and
+        version chain fragmentation on the parent.
 
         Args:
             author: Author information
@@ -210,7 +217,10 @@ class LiteratureCorpus(Corpus):
             )
 
             try:
-                child_id = await self.add_literature_source(source, connector)
+                # aggregate=False: skip per-source aggregation, do it once at the end
+                child_id = await self.add_literature_source(
+                    source, connector, aggregate=False
+                )
                 if child_id:
                     child_ids.append(child_id)
             except Exception as e:
@@ -218,6 +228,18 @@ class LiteratureCorpus(Corpus):
                 continue
 
         logger.info(f"Successfully added {len(child_ids)} works")
+
+        # Single aggregation at the end instead of per-source
+        if child_ids and self.corpus_id:
+            manager = get_tree_corpus_manager()
+            await manager.aggregate_vocabularies(self.corpus_id)
+            # Refresh parent state
+            fresh = await manager.get_corpus(corpus_name=self.corpus_name)
+            if fresh:
+                self.vocabulary = fresh.vocabulary
+                self.child_uuids = fresh.child_uuids
+                self.corpus_id = fresh.corpus_id
+
         return child_ids
 
     async def add_file_work(

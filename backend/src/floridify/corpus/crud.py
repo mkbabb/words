@@ -147,6 +147,7 @@ async def save_corpus(
     config: VersionConfig | None = None,
     metadata: dict[str, Any] | None = None,
     get_corpus_fn: Any = None,
+    skip_parent_update: bool = False,
 ) -> Corpus | None:
     """Save a corpus - ONLY saves data, does NOT manage relationships.
 
@@ -293,7 +294,8 @@ async def save_corpus(
     # Auto-update parent's child_uuids if parent_uuid is provided
     # BUT ONLY if we're creating a NEW corpus (not updating existing)
     # AND we're not explicitly managing child_uuids
-    if parent_uuid and saved and not corpus_id and (child_uuids is None or not child_uuids):
+    # AND caller hasn't opted out (skip_parent_update=True means caller manages parent-child links)
+    if parent_uuid and saved and not corpus_id and not skip_parent_update and (child_uuids is None or not child_uuids):
         child_uuid = saved.uuid  # Use UUID string, not ObjectId
         if child_uuid and get_corpus_fn:
             # Get the full parent corpus via versioned path (not raw Beanie save)

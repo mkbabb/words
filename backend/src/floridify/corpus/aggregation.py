@@ -60,7 +60,22 @@ async def aggregate_vocabularies(
     vocabulary: set[str] = set()
 
     # Get child vocabularies recursively in parallel
+    # Defensive: if child_uuids is empty, fall back to querying by parent_uuid
     child_ids = corpus.child_uuids or []
+    if not child_ids and corpus.corpus_uuid:
+        # Fallback: find children by parent_uuid (in case child_uuids wasn't persisted)
+        from .core import Corpus
+
+        children_meta = await Corpus.Metadata.find(
+            {"parent_uuid": corpus.corpus_uuid, "version_info.is_latest": True}
+        ).to_list()
+        child_ids = [m.uuid for m in children_meta if m.uuid]
+        if child_ids:
+            logger.info(
+                f"aggregate_vocabularies: child_uuids was empty, found {len(child_ids)} "
+                f"children by parent_uuid lookup"
+            )
+
     if child_ids:
         # Fetch all child vocabularies concurrently
         child_vocabs = await asyncio.gather(

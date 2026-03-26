@@ -10,13 +10,12 @@ import tempfile
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypeVar
 from uuid import uuid4
 
 from openai import AsyncOpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.logging import get_logger
 from .connector import AIConnector
@@ -26,15 +25,16 @@ logger = get_logger(__name__)
 T = TypeVar("T")
 
 
-@dataclass
-class AIBatchRequest:
+class AIBatchRequest(BaseModel):
     """Represents a single request in an AI batch with its associated future."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     custom_id: str
     prompt: str
     response_model: type[BaseModel]
     kwargs: dict[str, Any]
-    future: asyncio.Future[Any] = field(default_factory=asyncio.Future)
+    future: asyncio.Future[Any] = Field(default_factory=asyncio.Future)
 
 
 class BatchCollector:

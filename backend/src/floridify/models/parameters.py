@@ -18,6 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from ..search.constants import DEFAULT_MIN_SCORE
 from .base import Language
 from .dictionary import DictionaryProvider
 
@@ -108,7 +109,7 @@ class SearchParams(BaseModel):
         description="Maximum number of results to return",
     )
     min_score: float = Field(
-        default=0.6,
+        default=DEFAULT_MIN_SCORE,
         ge=0.0,
         le=1.0,
         description="Minimum relevance score threshold",

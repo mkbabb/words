@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 import coolname
+import numpy as np
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field, field_validator
 
@@ -21,12 +22,28 @@ from ..caching.models import (
     ResourceType,
     VersionInfo,
 )
+import unicodedata
+
 from ..models.base import Language
-from ..text.normalize import batch_lemmatize, batch_normalize
+from ..text.normalize import batch_normalize
 from ..utils.logging import get_logger
-from .candidate_index import build_candidate_index, get_candidates, word_trigrams
+from ..search.fuzzy.candidates import (
+    LengthBuckets,
+    TrigramIndex,
+    build_candidate_index,
+    get_candidates,
+    get_substring_candidates,
+    word_trigrams,
+)
 from .models import CorpusType
 from .utils import get_vocabulary_hash
+from .vocabulary import (
+    create_lemmatization_maps,
+    filter_words,
+    merge_words,
+    normalize_vocabulary,
+    rebuild_original_indices,
+)
 
 logger = get_logger(__name__)
 
@@ -80,9 +97,11 @@ class Corpus(BaseModel):
     word_to_lemma_indices: dict[int, int] = Field(default_factory=dict)
     lemma_to_word_indices: dict[int, list[int]] = Field(default_factory=dict)
 
-    # Bigram inverted index for fuzzy candidate selection
-    trigram_index: dict[str, list[int]] = Field(default_factory=dict)
-    length_buckets: dict[int, list[int]] = Field(default_factory=dict)
+    # Trigram inverted index for fuzzy candidate selection (transient, rebuilt on load).
+    # Typed as Any to accept both numpy arrays (runtime) and plain lists (from old cached data).
+    # Always rebuilt via _build_candidate_index() after load.
+    trigram_index: Any = Field(default_factory=dict, exclude=True)
+    length_buckets: Any = Field(default_factory=dict, exclude=True)
 
     # Metadata
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -222,39 +241,14 @@ class Corpus(BaseModel):
             f"{f' named {corpus_name}' if corpus_name else ''}",
         )
 
-        # Normalize the vocabulary
-        normalized_vocabulary = batch_normalize(vocabulary)
-        logger.info(f"Normalized to {len(normalized_vocabulary)} unique words")
+        # NFC-normalize the raw input so decomposed and precomposed forms
+        # (e.g. cafe\u0301 vs café) resolve to the same string.
+        vocabulary = [unicodedata.normalize("NFC", w) for w in vocabulary]
 
-        # Sort and deduplicate normalized vocabulary
-        unique_normalized = sorted(set(normalized_vocabulary))
-        logger.info(f"Final vocabulary: {len(unique_normalized)} unique normalized words")
-
-        # Create vocabulary-to-index mapping
-        vocabulary_to_index = {word: i for i, word in enumerate(unique_normalized)}
-
-        # Build normalized_to_original_indices AFTER sorting
-        # Maps from index in sorted vocabulary to indices in original_vocabulary
-        # Sort indices by preference: diacritics > ASCII
-        def has_diacritics(word: str) -> bool:
-            """Check if word contains non-ASCII characters (diacritics)."""
-            return any(ord(c) > 127 for c in word)
-
-        normalized_to_original_indices: dict[int, list[int]] = {}
-        for orig_idx, (orig_word, norm_word) in enumerate(
-            zip(vocabulary, normalized_vocabulary, strict=False)
-        ):
-            if norm_word in vocabulary_to_index:
-                sorted_idx = vocabulary_to_index[norm_word]
-                if sorted_idx not in normalized_to_original_indices:
-                    normalized_to_original_indices[sorted_idx] = []
-                normalized_to_original_indices[sorted_idx].append(orig_idx)
-
-        # Sort each list of indices by preference: words with diacritics first
-        for sorted_idx, orig_indices in normalized_to_original_indices.items():
-            if len(orig_indices) > 1:
-                # Sort by: has_diacritics (True first), then by original index
-                orig_indices.sort(key=lambda idx: (not has_diacritics(vocabulary[idx]), idx))
+        # Normalize, sort, deduplicate, and build index mappings
+        unique_normalized, vocabulary_to_index, normalized_to_original_indices = (
+            normalize_vocabulary(vocabulary)
+        )
 
         # Create the corpus instance
         corpus = cls(
@@ -280,7 +274,7 @@ class Corpus(BaseModel):
         # Create semantic index if requested
         if semantic:
             from ..search.semantic.constants import DEFAULT_SENTENCE_MODEL
-            from ..search.semantic.models import SemanticIndex
+            from ..search.semantic.index import SemanticIndex
 
             model_name = model_name or DEFAULT_SENTENCE_MODEL
             logger.info(f"Creating semantic index with model {model_name}")
@@ -304,40 +298,14 @@ class Corpus(BaseModel):
 
         # Rebuild normalized_to_original_indices if needed
         if self.original_vocabulary and not self.normalized_to_original_indices:
-
-            def has_diacritics(word: str) -> bool:
-                """Check if word contains non-ASCII characters (diacritics)."""
-                return any(ord(c) > 127 for c in word)
-
-            self.normalized_to_original_indices = {}
-            normalized_orig = batch_normalize(self.original_vocabulary)
-            for orig_idx, norm_word in enumerate(normalized_orig):
-                if norm_word in self.vocabulary_to_index:
-                    sorted_idx = self.vocabulary_to_index[norm_word]
-                    if sorted_idx not in self.normalized_to_original_indices:
-                        self.normalized_to_original_indices[sorted_idx] = []
-                    self.normalized_to_original_indices[sorted_idx].append(orig_idx)
-
-            # Sort each list by preference: words with diacritics first
-            for sorted_idx, orig_indices in self.normalized_to_original_indices.items():
-                if len(orig_indices) > 1:
-                    orig_indices.sort(
-                        key=lambda idx: (
-                            not has_diacritics(self.original_vocabulary[idx]),
-                            idx,
-                        )
-                    )
+            self.normalized_to_original_indices = rebuild_original_indices(
+                self.vocabulary, self.original_vocabulary, self.vocabulary_to_index
+            )
 
         # Rebuild signature index
         self._build_candidate_index()
 
-        # Clear lemmatization data to force rebuild
-        self.lemmatized_vocabulary = []
-        self.lemma_text_to_index = {}
-        self.word_to_lemma_indices = {}
-        self.lemma_to_word_indices = {}
-
-        # Rebuild unified indices (lemmatization)
+        # Rebuild lemmatization
         await self._create_unified_indices()
 
         # Update metadata
@@ -348,44 +316,21 @@ class Corpus(BaseModel):
     async def _create_unified_indices(self) -> None:
         """Create unified indexing and lemmatization maps."""
         # Skip if already created AND vocabulary is empty (nothing to lemmatize)
-        # CRITICAL: Must validate lemmatized_vocabulary is in sync with vocabulary
-        # If vocabulary exists but lemmatized_vocabulary is empty/stale, rebuild it
         if self.lemmatized_vocabulary and not self.vocabulary:
             return
 
-        # Create lemmatized versions
-        lemmas, _, _ = batch_lemmatize(self.vocabulary)
+        # Clear stale lemmatization data before rebuild
+        self.lemmatized_vocabulary = []
+        self.lemma_text_to_index = {}
+        self.word_to_lemma_indices = {}
+        self.lemma_to_word_indices = {}
 
-        # Build lemma vocabulary (unique lemmas in order)
-        unique_lemmas: list[str] = []
-        seen_lemmas: set[str] = set()
-        for lemma in lemmas:
-            if lemma not in seen_lemmas:
-                unique_lemmas.append(lemma)
-                seen_lemmas.add(lemma)
-
-        self.lemmatized_vocabulary = unique_lemmas
-
-        # Create lemma index mapping (persisted for O(1) lookup in get_candidates)
-        lemma_to_idx = {lemma: i for i, lemma in enumerate(unique_lemmas)}
-        self.lemma_text_to_index = lemma_to_idx
-
-        # Build word-to-lemma and lemma-to-words mappings
-        for word_idx, (word, lemma) in enumerate(zip(self.vocabulary, lemmas, strict=False)):
-            lemma_idx = lemma_to_idx[lemma]
-
-            # Map word index to lemma index
-            self.word_to_lemma_indices[word_idx] = lemma_idx
-
-            # Map lemma index to word indices
-            if lemma_idx not in self.lemma_to_word_indices:
-                self.lemma_to_word_indices[lemma_idx] = []
-            self.lemma_to_word_indices[lemma_idx].append(word_idx)
-
-        logger.info(
-            f"Created lemmatization maps: {len(unique_lemmas)} lemmas "
-            f"from {len(self.vocabulary)} words",
-        )
+        (
+            self.lemmatized_vocabulary,
+            self.lemma_text_to_index,
+            self.word_to_lemma_indices,
+            self.lemma_to_word_indices,
+        ) = create_lemmatization_maps(self.vocabulary)
 
     async def add_words(self, words: list[str]) -> int:
         """Add words to the corpus incrementally.
@@ -402,30 +347,18 @@ class Corpus(BaseModel):
 
         logger.info(f"Adding {len(words)} words to corpus {self.corpus_name}")
 
-        # Normalize new words
-        normalized_new = batch_normalize(words)
-
-        # Track original count
         original_unique_count = len(self.vocabulary)
 
         # Add to original_vocabulary
         self.original_vocabulary.extend(words)
 
-        # Merge with existing vocabulary (set-based deduplication)
-        merged_vocab = set(self.vocabulary) | set(normalized_new)
-
-        # Sort and update
-        self.vocabulary = sorted(merged_vocab)
-
-        # Rebuild all indices to maintain consistency
+        # Merge and rebuild
+        self.vocabulary, normalized_new = merge_words(self.vocabulary, words)
         await self._rebuild_indices()
 
-        # Update word frequencies if provided
+        # Update word frequencies
         for word in normalized_new:
-            if word in self.word_frequencies:
-                self.word_frequencies[word] += 1
-            else:
-                self.word_frequencies[word] = 1
+            self.word_frequencies[word] = self.word_frequencies.get(word, 0) + 1
 
         # Update counts
         new_unique_count = len(self.vocabulary)
@@ -455,27 +388,16 @@ class Corpus(BaseModel):
 
         logger.info(f"Removing {len(words)} words from corpus {self.corpus_name}")
 
-        # Normalize words to remove
-        normalized_remove = set(batch_normalize(words))
-
-        # Track original count
         original_unique_count = len(self.vocabulary)
 
-        # Remove from vocabulary
-        self.vocabulary = sorted([w for w in self.vocabulary if w not in normalized_remove])
-
-        # Remove from original_vocabulary and rebuild mapping
-        # This is trickier - we need to track which original words map to removed normalized words
-        normalized_orig = batch_normalize(self.original_vocabulary)
-        keep_indices = [
-            i for i, norm_word in enumerate(normalized_orig) if norm_word not in normalized_remove
-        ]
-        self.original_vocabulary = [self.original_vocabulary[i] for i in keep_indices]
-
-        # Rebuild all indices to maintain consistency
+        # Filter both vocabularies and rebuild
+        self.vocabulary, self.original_vocabulary = filter_words(
+            self.vocabulary, self.original_vocabulary, words
+        )
         await self._rebuild_indices()
 
         # Remove from word frequencies
+        normalized_remove = set(batch_normalize(words))
         for word in normalized_remove:
             self.word_frequencies.pop(word, None)
 
@@ -515,11 +437,11 @@ class Corpus(BaseModel):
         # If no mapping exists, return the normalized word itself
         return self.get_word_by_index(normalized_index)
 
-    def get_words_by_indices(self, indices: list[int]) -> list[str]:
+    def get_words_by_indices(self, indices: list[int] | np.ndarray) -> list[str]:
         """Get multiple words by their indices."""
-        return [word for idx in indices if (word := self.get_word_by_index(idx)) is not None]
+        return [word for idx in indices if (word := self.get_word_by_index(int(idx))) is not None]
 
-    def get_original_words_by_indices(self, normalized_indices: list[int]) -> list[str]:
+    def get_original_words_by_indices(self, normalized_indices: list[int] | np.ndarray) -> list[str]:
         """Get original forms of words by their normalized indices."""
         return [
             word
@@ -570,6 +492,30 @@ class Corpus(BaseModel):
             use_lemmas=use_lemmas,
             use_trigrams=use_trigrams,
             length_tolerance=length_tolerance,
+        )
+
+    def get_substring_candidates(
+        self,
+        query: str,
+        max_results: int = 50,
+    ) -> list[int]:
+        """Get candidate word indices for substring/infix matching.
+
+        Delegates to candidate_index.get_substring_candidates().
+
+        Args:
+            query: Substring to search for
+            max_results: Maximum number of results
+
+        Returns:
+            List of vocabulary indices containing the query as a substring
+
+        """
+        return get_substring_candidates(
+            query=query,
+            vocabulary=self.vocabulary,
+            trigram_index=self.trigram_index,
+            max_results=max_results,
         )
 
     def _build_candidate_index(self) -> None:
@@ -634,7 +580,7 @@ class Corpus(BaseModel):
         )
 
         # Step 1: Delete all dependent SearchIndex documents (which will cascade to their indices)
-        from ..search.search_index import SearchIndex
+        from ..search.index import SearchIndex
 
         try:
             # Get the SearchIndex for this corpus

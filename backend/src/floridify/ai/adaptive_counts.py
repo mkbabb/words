@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 
 def _clamp(value: int, min_val: int, max_val: int) -> int:
@@ -33,9 +33,10 @@ MIN_USAGE_NOTES, MAX_USAGE_NOTES = 1, 3
 MIN_GRAMMAR_PATTERNS, MAX_GRAMMAR_PATTERNS = 1, 3
 
 
-@dataclass(frozen=True, slots=True)
-class AdaptiveCounts:
+class AdaptiveCounts(BaseModel):
     """Adaptive generation counts for all generated list fields."""
+
+    model_config = ConfigDict(frozen=True)
 
     # Definition-level (count-parameterized)
     synonyms: int

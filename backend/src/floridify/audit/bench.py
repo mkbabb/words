@@ -160,6 +160,7 @@ def benchmark_sync(
         ),
         metadata=metadata or {},
     )
+    _collect(case)
     return case, results
 
 
@@ -202,7 +203,78 @@ async def benchmark_async(
         ),
         metadata=metadata or {},
     )
+    _collect(case)
     return case, results
+
+
+# ── Session collector for tabular display ────────────────────────────
+
+_collected_cases: list[BenchmarkCase] = []
+
+
+def _collect(case: BenchmarkCase) -> None:
+    """Append a completed benchmark case to the session collector."""
+    _collected_cases.append(case)
+
+
+def get_collected_cases() -> list[BenchmarkCase]:
+    """Return all cases collected during this session."""
+    return list(_collected_cases)
+
+
+def reset_collected_cases() -> None:
+    """Clear the session collector (called at session start)."""
+    _collected_cases.clear()
+
+
+def format_table(cases: list[BenchmarkCase] | None = None) -> str:
+    """Format collected benchmark cases as a fixed-width table.
+
+    Produces output like pytest-benchmark's table: name, iterations,
+    min, mean, median, p95, max, ops/s.
+    """
+    cases = cases or _collected_cases
+    if not cases:
+        return "(no benchmarks collected)"
+
+    # Column definitions: (header, width, format_fn)
+    rows: list[tuple[str, str, int, str, str, str, str, str, str]] = []
+    for c in cases:
+        s = c.stats
+        if s is None:
+            continue
+        rows.append((
+            c.category,
+            c.name,
+            s.iterations,
+            f"{s.min_ms:.3f}",
+            f"{s.mean_ms:.3f}",
+            f"{s.median_ms:.3f}",
+            f"{s.p95_ms:.3f}",
+            f"{s.max_ms:.3f}",
+            f"{s.throughput_per_second:.1f}",
+        ))
+
+    if not rows:
+        return "(no benchmarks with stats)"
+
+    headers = ("Category", "Name", "Rounds", "Min (ms)", "Mean (ms)", "Median (ms)", "P95 (ms)", "Max (ms)", "OPS")
+    # Compute column widths
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+
+    sep = "  "
+    header_line = sep.join(str(h).rjust(w) for h, w in zip(headers, widths))
+    divider = sep.join("-" * w for w in widths)
+
+    lines = [divider, header_line, divider]
+    for row in rows:
+        lines.append(sep.join(str(cell).rjust(w) for cell, w in zip(row, widths)))
+    lines.append(divider)
+
+    return "\n".join(lines)
 
 
 def write_json(path: str | Path, payload: dict[str, Any]) -> Path:

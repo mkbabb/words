@@ -32,9 +32,9 @@ from ..providers.batch import BatchOperation
 from ..providers.dictionary.models import DictionaryProviderEntry
 from ..providers.language.models import LanguageEntry
 from ..providers.literature.models import LiteratureEntry
-from ..search.search_index import SearchIndex
-from ..search.semantic.models import SemanticIndex
-from ..search.trie_index import TrieIndex
+from ..search.index import SearchIndex
+from ..search.semantic.index import SemanticIndex
+from ..search.trie.index import TrieIndex
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList, WordListItemDoc
@@ -113,13 +113,9 @@ class MongoDBStorage:
         }
 
         uri_tls = self._parse_tls_from_uri(self.connection_string)
-        if self.tls_required is not None and uri_tls is not None and uri_tls != self.tls_required:
-            raise ValueError(
-                "MongoDB TLS mismatch: configured tls_required="
-                f"{self.tls_required} but URI sets tls={uri_tls}"
-            )
-
-        effective_tls = self.tls_required if self.tls_required is not None else uri_tls
+        # URI TLS setting takes precedence over config — the URI is more specific
+        # (e.g. Docker env var may set tls=true while config has tls_required=false for tunnel dev)
+        effective_tls = uri_tls if uri_tls is not None else self.tls_required
         if effective_tls is True:
             connection_kwargs["tls"] = True  # type: ignore[assignment]
             if self.cert_path:

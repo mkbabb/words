@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 from ..caching.models import BaseVersionedData
 from ..corpus.manager import get_tree_corpus_manager
 from ..models.base import Language
+from ..search.config import CORPUS_CHECK_INTERVAL_SECONDS
 from ..search.constants import SearchMode
-from ..search.core import Search, SearchResult
+from ..search.engine import Search, SearchResult
 from ..search.language import (
     LanguageSearch,
     _semantic_search_enabled,
@@ -34,9 +36,10 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-@dataclass
-class _CorpusFingerprint:
+class _CorpusFingerprint(BaseModel):
     """Lightweight fingerprint for detecting corpus changes."""
+
+    model_config = ConfigDict(frozen=True)
 
     corpus_name: str
     vocabulary_hash: str | None
@@ -50,7 +53,7 @@ class SearchEngineManager:
     The actual MongoDB metadata check happens at most once per check_interval seconds.
     """
 
-    def __init__(self, check_interval: float = 30.0) -> None:
+    def __init__(self, check_interval: float = CORPUS_CHECK_INTERVAL_SECONDS) -> None:
         self._engine: LanguageSearch | None = None
         self._fingerprint: _CorpusFingerprint | None = None
         self._last_check: float = 0.0
@@ -97,8 +100,9 @@ class SearchEngineManager:
                 return self._engine
 
             # Periodic check: has the corpus changed?
-            self._last_check = now
+            # Update _last_check only after confirming no change (avoids stale window)
             if not await self._corpus_changed():
+                self._last_check = now
                 return self._engine
 
             # Corpus changed — hot reload
@@ -130,11 +134,16 @@ class SearchEngineManager:
             logger.info(
                 f"Background search init starting (languages={[l.value for l in languages]}, semantic={semantic})"
             )
-            self._engine = await get_language_search(languages, semantic=semantic)
-            self._languages = languages
-            self._last_check = time.monotonic()
-            self._fingerprint = await self._capture_fingerprint(languages)
-            self._init_error = None
+            engine = await get_language_search(languages, semantic=semantic)
+            fingerprint = await self._capture_fingerprint(languages)
+
+            # Atomic swap under lock — readers see consistent state
+            async with self._reload_lock:
+                self._engine = engine
+                self._languages = languages
+                self._last_check = time.monotonic()
+                self._fingerprint = fingerprint
+                self._init_error = None
             logger.info("Background search init completed successfully")
         except Exception as e:
             self._init_error = str(e)

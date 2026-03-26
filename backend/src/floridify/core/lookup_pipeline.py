@@ -31,6 +31,7 @@ from ..utils.language_precedence import (
     merge_language_precedence,
     to_language_codes,
 )
+from ..utils.concurrency import gather_bounded
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -85,6 +86,19 @@ def _resolve_lookup_languages(
     return unique_languages
 
 
+async def _track_lookup(user_id: str, word: str) -> None:
+    """Track a word lookup in the user's history. Fails silently."""
+    try:
+        from ..models.user import UserHistory
+
+        history = await UserHistory.find_one({"clerk_id": user_id})
+        if history:
+            history.add_lookup(word)
+            await history.save()
+    except Exception:
+        pass  # Don't fail lookup on history tracking error
+
+
 @log_timing
 @log_stage("Word Lookup Pipeline", "📚")
 async def lookup_word_pipeline(
@@ -96,6 +110,7 @@ async def lookup_word_pipeline(
     force_refresh: bool = False,
     skip_search: bool = False,
     state_tracker: StateTracker | None = None,
+    user_id: str | None = None,
 ) -> DictionaryEntry | None:
     """Core lookup pipeline that normalizes, searches, gets provider definitions,
     and optionally synthesizes with AI.
@@ -188,6 +203,9 @@ async def lookup_word_pipeline(
                     source = "synthesis" if is_synthesis else str(existing.provider)
                     logger.info(f"📋 Using cached {source} entry for '{best_match}'")
                     asyncio.ensure_future(_ensure_primary_audio(existing))
+                    # Track lookup server-side if user is authenticated
+                    if user_id:
+                        await _track_lookup(user_id, word)
                     return existing
                 # Non-synthesis entry with AI enabled — fall through to synthesis
                 logger.info(
@@ -215,7 +233,9 @@ async def lookup_word_pipeline(
             )
             for provider in providers
         ]
-        providers_results = await asyncio.gather(*provider_tasks, return_exceptions=True)
+        providers_results = await gather_bounded(
+            *provider_tasks, limit=4, return_exceptions=True
+        )
 
         # Filter out None results and exceptions
         providers_data = []
@@ -280,6 +300,9 @@ async def lookup_word_pipeline(
                         definition_count=len(synthesized_entry.definition_ids),
                         provider_count=len(providers_data),
                     )
+                    # Track lookup server-side if user is authenticated
+                    if user_id:
+                        await _track_lookup(user_id, word)
                     return synthesized_entry
                 logger.error(
                     f"❌ AI synthesis returned empty result for '{best_match}' "
@@ -303,6 +326,9 @@ async def lookup_word_pipeline(
                 )
                 if result:
                     asyncio.ensure_future(_ensure_primary_audio(result))
+                    # Track lookup server-side if user is authenticated
+                    if user_id:
+                        await _track_lookup(user_id, word)
                 return result
             logger.warning("No provider data available for non-AI synthesis")
             return None

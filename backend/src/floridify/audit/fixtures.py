@@ -11,13 +11,16 @@ import numpy as np
 from ..corpus.core import Corpus
 from ..models.base import Language
 from ..search.constants import DEFAULT_MIN_SCORE
-from ..search.core import Search
-from ..search.fuzzy import FuzzySearch
-from ..search.search_index import SearchIndex
-from ..search.semantic.core import SemanticSearch
-from ..search.semantic.models import SemanticIndex
-from ..search.trie import TrieSearch
-from ..search.trie_index import TrieIndex
+from ..search.engine import Search
+from ..search.fuzzy.bk_tree import BKTree
+from ..search.fuzzy.search import FuzzySearch
+from ..search.fuzzy.suffix_array import SuffixArray
+from ..search.index import SearchIndex
+from ..search.phonetic.index import PhoneticIndex
+from ..search.semantic.index import SemanticIndex
+from ..search.semantic.search import SemanticSearch
+from ..search.trie.index import TrieIndex
+from ..search.trie.search import TrieSearch
 
 CORPUS_SIZES: dict[str, int] = {
     "tiny": 96,
@@ -147,7 +150,13 @@ async def build_search_fixture(
 
     search = Search(index=search_index, corpus=corpus)
     search.trie_search = TrieSearch(index=trie_index)
+
+    # Build full fuzzy pipeline: BK-tree + phonetic index + suffix array
     search.fuzzy_search = FuzzySearch(min_score=min_score)
+    search.fuzzy_search.bk_tree = BKTree.build(corpus.vocabulary)
+    search.fuzzy_search.phonetic_index = PhoneticIndex(corpus.vocabulary)
+    search.suffix_array = SuffixArray(corpus.vocabulary)
+
     search._initialized = True
     search._semantic_ready = False
     return search

@@ -237,6 +237,12 @@ class LanguageCorpus(Corpus):
     ) -> LanguageCorpus:
         """Create corpus from all available sources for a language.
 
+        Saves the parent once to get a stable UUID, creates children with
+        skip_parent_update=True, aggregates vocabularies in-memory, then
+        saves the parent a SECOND and FINAL time with the complete state.
+        This produces exactly 2 parent versions (empty + complete) instead
+        of N+2 versions that fragment the version chain.
+
         Args:
             corpus_name: Name for the corpus
             language: Target language
@@ -249,87 +255,93 @@ class LanguageCorpus(Corpus):
         """
         logger.info(f"Creating language corpus for {language.value}")
 
-        # Create master corpus
+        # Step 1: Save empty parent to get a stable UUID from the version manager
         corpus = cls(
             corpus_name=corpus_name,
             corpus_type=CorpusType.LANGUAGE,
             language=language,
             is_master=True,
-            vocabulary=[],  # Empty vocabulary initially, will be aggregated from sources
+            vocabulary=[],
         )
-
         corpus.metadata = {
             "semantic_enabled": semantic,
             "model_name": model_name,
         }
-
-        # Save to get corpus ID
         await corpus.save()
+        parent_uuid = corpus.corpus_uuid
+        logger.info(f"Created parent corpus '{corpus_name}' with uuid={parent_uuid}")
 
-        # Get all sources for the language (full corpus)
+        # Step 2: Create child corpora for each source
+        # Children are saved to DB individually with parent_uuid set,
+        # but skip_parent_update=True prevents auto-updating the parent's child_uuids
+        # (we'll set them all at once in step 3).
         sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
-
         if not sources:
             logger.warning(f"No sources found for language: {language.value}")
             return corpus
 
-        logger.info(f"Adding {len(sources)} sources for {language.value}")
-
-        # Add all sources in parallel WITHOUT aggregation
-        # This prevents redundant aggregations - we'll do one final aggregation at the end
-        async def add_source_safe(source: LanguageSource) -> bool:
-            """Add source with error handling."""
-            try:
-                # FIX: aggregate=False to prevent redundant aggregations
-                await corpus.add_language_source(source, aggregate=False)
-                return True
-            except Exception as e:
-                logger.error(f"Failed to add source {source.name}: {e}")
-                return False
-
-        # Process sources sequentially to avoid race conditions in tree updates
-        results: list[bool] = []
-        for source in sources:
-            results.append(await add_source_safe(source))
-
-        successful = sum(1 for r in results if r is True)
-        logger.info(f"Successfully added {successful}/{len(sources)} sources")
-
+        connector = URLLanguageConnector()
+        child_uuids: list[str] = []
+        aggregated_vocab: set[str] = set()
         manager = get_tree_corpus_manager()
 
-        if successful > 0:
-            # Reload corpus to get latest ID with all children
-            logger.info("Reloading corpus to get latest state before aggregation...")
-            fresh_corpus = await manager.get_corpus(
-                corpus_name=corpus.corpus_name, config=VersionConfig(use_cache=False)
-            )
-
-            if fresh_corpus and fresh_corpus.corpus_uuid:
-                logger.info(f"Aggregating vocabularies from {successful} sources...")
-                logger.info(
-                    f"About to call aggregate_vocabularies with corpus_uuid={fresh_corpus.corpus_uuid}"
+        for source in sources:
+            try:
+                logger.info(f"Adding language source: {source.name}")
+                result = await connector.fetch_source(
+                    source, config=VersionConfig(force_rebuild=True)
                 )
-                try:
-                    # Use corpus_uuid (stable) instead of corpus_id (changes with each version)
-                    await manager.aggregate_vocabularies(corpus_uuid=fresh_corpus.corpus_uuid)
-                    logger.info("aggregate_vocabularies call completed")
-                except Exception as e:
-                    logger.error(f"Exception in aggregate_vocabularies: {e}", exc_info=True)
+                if not result or not result.vocabulary:
+                    logger.warning(f"No vocabulary for source: {source.name}")
+                    continue
 
-        # Reload corpus to get aggregated vocabulary
-        # Use corpus_name instead of corpus_id because save_corpus creates a new version with new ID
-        # CRITICAL FIX: Don't use use_cache=False here! The aggregation just saved vocabulary to cache,
-        # so we WANT to read from cache. Using use_cache=False causes get_versioned_content() to skip
-        # the cache entirely and return None, resulting in empty vocabulary.
-        reloaded = await manager.get_corpus(
-            corpus_name=corpus.corpus_name  # Use default config (use_cache=True)
+                child = await Corpus.create(
+                    corpus_name=source.name,
+                    vocabulary=result.vocabulary,
+                    language=source.language,
+                    semantic=semantic,
+                    model_name=model_name,
+                )
+                child.corpus_type = CorpusType.LANGUAGE
+                child.parent_uuid = parent_uuid
+
+                await manager.save_corpus(
+                    corpus=child,
+                    parent_uuid=parent_uuid,
+                    skip_parent_update=True,
+                )
+
+                if child.corpus_uuid:
+                    child_uuids.append(child.corpus_uuid)
+                    aggregated_vocab.update(child.vocabulary)
+                    logger.info(
+                        f"Created child '{source.name}': {len(child.vocabulary):,} words"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to add source {source.name}: {e}")
+
+        logger.info(
+            f"Created {len(child_uuids)}/{len(sources)} child corpora, "
+            f"aggregated {len(aggregated_vocab):,} unique words"
         )
 
-        if reloaded:
-            corpus = reloaded
-            logger.info(f"✅ Created language corpus with {len(corpus.vocabulary):,} unique words")
-        else:
-            logger.warning("Failed to reload corpus after aggregation")
+        # Step 3: Update parent with complete state — vocabulary + child_uuids + indices
+        # This is the FINAL save; the version manager preserves the UUID from step 1.
+        sorted_vocab = sorted(aggregated_vocab)
+        corpus.vocabulary = sorted_vocab
+        corpus.child_uuids = child_uuids
+
+        if sorted_vocab:
+            corpus.vocabulary_to_index = {w: i for i, w in enumerate(sorted_vocab)}
+            await corpus._create_unified_indices()
+            corpus._build_candidate_index()
+
+        await corpus.save()
+
+        logger.info(
+            f"✅ Created language corpus '{corpus_name}' with "
+            f"{len(corpus.vocabulary):,} words from {len(child_uuids)} sources"
+        )
 
         return corpus
 

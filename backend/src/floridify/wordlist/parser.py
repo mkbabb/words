@@ -18,12 +18,52 @@ from ..utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class ParsedWordEntry(BaseModel):
+    """Structured parsed entry with preserved frequency and notes."""
+
+    source_text: str = Field(..., description="Original parsed text")
+    frequency: int = Field(default=1, ge=1, description="Occurrence count")
+    notes: str | None = Field(default=None, description="Optional notes")
+
+
 class ParsedWordList(BaseModel):
     """Result of parsing a word list file."""
 
-    words: list[str] = Field(..., description="Extracted words")
+    entries: list[ParsedWordEntry] = Field(..., description="Extracted structured entries")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Parsing metadata")
     source_file: str | None = Field(default=None, description="Source file path")
+
+    @property
+    def words(self) -> list[str]:
+        """Compatibility helper for legacy callers that only need text."""
+        return [entry.source_text for entry in self.entries]
+
+
+def collapse_entries(entries: list[ParsedWordEntry]) -> list[ParsedWordEntry]:
+    """Merge duplicate entries while summing frequency and preserving first notes."""
+    collapsed: dict[str, ParsedWordEntry] = {}
+    for entry in entries:
+        key = preserve_text_format(entry.source_text).lower()
+        existing = collapsed.get(key)
+        if existing:
+            existing.frequency += entry.frequency
+            if entry.notes and not existing.notes:
+                existing.notes = entry.notes
+        else:
+            collapsed[key] = ParsedWordEntry(
+                source_text=preserve_text_format(entry.source_text),
+                frequency=entry.frequency,
+                notes=entry.notes,
+            )
+    return list(collapsed.values())
+
+
+def _coerce_frequency(value: Any) -> int:
+    """Coerce a possibly malformed frequency value to a safe positive integer."""
+    try:
+        return max(1, int(str(value).strip() or "1"))
+    except (TypeError, ValueError, AttributeError):
+        return 1
 
 
 def preserve_text_format(text: str) -> str:
@@ -40,9 +80,16 @@ def preserve_text_format(text: str) -> str:
     # Remove zero-width characters
     text = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", text)
 
-    # Normalize quotes
-    text = text.replace(""", '"').replace(""", '"')
-    text = text.replace("'", "'").replace("'", "'")
+    # Normalize curly quotes/apostrophes to their ASCII equivalents.
+    text = (
+        text.replace("“", '"')
+        .replace("”", '"')
+        .replace("„", '"')
+        .replace("‟", '"')
+        .replace("‘", "'")
+        .replace("’", "'")
+        .replace("‛", "'")
+    )
 
     # Normalize dashes (keep hyphens for compound words)
     text = text.replace("—", "-").replace("–", "-")
@@ -227,7 +274,7 @@ def parse_text_file(path: Path) -> ParsedWordList:
     """Parse a plain text file with various list formats."""
     logger.info(f"📄 Parsing text file: {path}")
 
-    words: list[str] = []
+    entries: list[ParsedWordEntry] = []
     skipped = 0
 
     try:
@@ -245,12 +292,12 @@ def parse_text_file(path: Path) -> ParsedWordList:
                 # Multiple words from one line
                 for word in result:
                     if is_valid_word(word):
-                        words.append(word)
+                        entries.append(ParsedWordEntry(source_text=word))
                     else:
                         skipped += 1
             # Single word
             elif is_valid_word(result):
-                words.append(result)
+                entries.append(ParsedWordEntry(source_text=result))
             else:
                 skipped += 1
         elif line.strip():  # Non-empty line was skipped
@@ -259,18 +306,21 @@ def parse_text_file(path: Path) -> ParsedWordList:
     metadata = {
         "format": "text",
         "total_lines": len(lines),
-        "parsed_words": len(words),
+        "parsed_words": len(entries),
         "skipped_lines": skipped,
     }
 
-    return ParsedWordList(words=words, metadata=metadata, source_file=str(path))
+    collapsed = collapse_entries(entries)
+    metadata["unique_words"] = len(collapsed)
+    metadata["total_words"] = sum(entry.frequency for entry in collapsed)
+    return ParsedWordList(entries=collapsed, metadata=metadata, source_file=str(path))
 
 
 def parse_csv_file(path: Path) -> ParsedWordList:
     """Parse a CSV file (first column contains words)."""
     logger.info(f"📊 Parsing CSV file: {path}")
 
-    words: list[str] = []
+    entries: list[ParsedWordEntry] = []
     skipped = 0
     has_header = False
 
@@ -305,8 +355,21 @@ def parse_csv_file(path: Path) -> ParsedWordList:
                     continue
 
             word = preserve_text_format(row[0])
+            frequency = 1
+            notes: str | None = None
+            if len(row) > 1:
+                frequency = _coerce_frequency(row[1])
+            if len(row) > 2:
+                notes = str(row[2]).strip() or None
+
             if is_valid_word(word):
-                words.append(word)
+                entries.append(
+                    ParsedWordEntry(
+                        source_text=word,
+                        frequency=frequency,
+                        notes=notes,
+                    )
+                )
             else:
                 skipped += 1
 
@@ -314,18 +377,21 @@ def parse_csv_file(path: Path) -> ParsedWordList:
         "format": "csv",
         "delimiter": delimiter,
         "has_header": has_header,
-        "parsed_words": len(words),
+        "parsed_words": len(entries),
         "skipped_rows": skipped,
     }
 
-    return ParsedWordList(words=words, metadata=metadata, source_file=str(path))
+    collapsed = collapse_entries(entries)
+    metadata["unique_words"] = len(collapsed)
+    metadata["total_words"] = sum(entry.frequency for entry in collapsed)
+    return ParsedWordList(entries=collapsed, metadata=metadata, source_file=str(path))
 
 
 def parse_markdown_file(path: Path) -> ParsedWordList:
     """Parse a Markdown file extracting words from lists and tables."""
     logger.info(f"📝 Parsing Markdown file: {path}")
 
-    words: list[str] = []
+    entries: list[ParsedWordEntry] = []
     content = path.read_text(encoding="utf-8")
     lines = content.splitlines()
 
@@ -354,7 +420,7 @@ def parse_markdown_file(path: Path) -> ParsedWordList:
             if len(parts) >= 2:
                 word = preserve_text_format(parts[1])
                 if is_valid_word(word):
-                    words.append(word)
+                    entries.append(ParsedWordEntry(source_text=word))
             continue
         if in_table:
             in_table = False
@@ -365,17 +431,20 @@ def parse_markdown_file(path: Path) -> ParsedWordList:
             if isinstance(result, list):
                 for word in result:
                     if is_valid_word(word):
-                        words.append(word)
+                        entries.append(ParsedWordEntry(source_text=word))
             elif is_valid_word(result):
-                words.append(result)
+                entries.append(ParsedWordEntry(source_text=result))
 
     metadata = {
         "format": "markdown",
         "total_lines": len(lines),
-        "parsed_words": len(words),
+        "parsed_words": len(entries),
     }
 
-    return ParsedWordList(words=words, metadata=metadata, source_file=str(path))
+    collapsed = collapse_entries(entries)
+    metadata["unique_words"] = len(collapsed)
+    metadata["total_words"] = sum(entry.frequency for entry in collapsed)
+    return ParsedWordList(entries=collapsed, metadata=metadata, source_file=str(path))
 
 
 def parse_json_file(path: Path) -> ParsedWordList:
@@ -385,7 +454,7 @@ def parse_json_file(path: Path) -> ParsedWordList:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
-    words: list[str] = []
+    entries: list[ParsedWordEntry] = []
 
     # Handle different JSON structures
     if isinstance(data, list):
@@ -394,11 +463,18 @@ def parse_json_file(path: Path) -> ParsedWordList:
             if isinstance(item, str):
                 word = preserve_text_format(item)
                 if is_valid_word(word):
-                    words.append(word)
+                    entries.append(ParsedWordEntry(source_text=word))
             elif isinstance(item, dict) and "word" in item:
                 word = preserve_text_format(str(item["word"]))
                 if is_valid_word(word):
-                    words.append(word)
+                    notes_value = item.get("notes")
+                    entries.append(
+                        ParsedWordEntry(
+                            source_text=word,
+                            frequency=_coerce_frequency(item.get("frequency", 1)),
+                            notes=str(notes_value).strip() or None if notes_value is not None else None,
+                        )
+                    )
     elif isinstance(data, dict):
         # Look for common keys
         for key in ["words", "wordlist", "vocabulary", "terms"]:
@@ -407,16 +483,32 @@ def parse_json_file(path: Path) -> ParsedWordList:
                     if isinstance(item, str):
                         word = preserve_text_format(item)
                         if is_valid_word(word):
-                            words.append(word)
+                            entries.append(ParsedWordEntry(source_text=word))
+                    elif isinstance(item, dict) and "word" in item:
+                        word = preserve_text_format(str(item["word"]))
+                        if is_valid_word(word):
+                            notes_value = item.get("notes")
+                            entries.append(
+                                ParsedWordEntry(
+                                    source_text=word,
+                                    frequency=_coerce_frequency(item.get("frequency", 1)),
+                                    notes=str(notes_value).strip() or None
+                                    if notes_value is not None
+                                    else None,
+                                )
+                            )
                 break
 
     metadata = {
         "format": "json",
         "structure": type(data).__name__,
-        "parsed_words": len(words),
+        "parsed_words": len(entries),
     }
 
-    return ParsedWordList(words=words, metadata=metadata, source_file=str(path))
+    collapsed = collapse_entries(entries)
+    metadata["unique_words"] = len(collapsed)
+    metadata["total_words"] = sum(entry.frequency for entry in collapsed)
+    return ParsedWordList(entries=collapsed, metadata=metadata, source_file=str(path))
 
 
 # Excel and Word parsers require additional dependencies

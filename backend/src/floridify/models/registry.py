@@ -13,9 +13,9 @@ from ..corpus.core import Corpus
 from ..providers.dictionary.models import DictionaryProviderEntry
 from ..providers.language.models import LanguageEntry
 from ..providers.literature.models import LiteratureEntry
-from ..search.search_index import SearchIndex
-from ..search.semantic.models import SemanticIndex
-from ..search.trie_index import TrieIndex
+from ..search.index import SearchIndex
+from ..search.semantic.index import SemanticIndex
+from ..search.trie.index import TrieIndex
 
 if TYPE_CHECKING:
     from ..caching.models import BaseVersionedData

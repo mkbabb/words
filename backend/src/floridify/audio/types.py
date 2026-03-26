@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
-@dataclass
-class TTSResult:
+class TTSResult(BaseModel):
     """Lightweight result from TTS synthesis (no MongoDB dependency)."""
 
     url: str
