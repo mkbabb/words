@@ -34,8 +34,8 @@ dependencies = [
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
-    "watchfiles>=0.21.0",  # Required for uvicorn --reload
-    "python-multipart>=0.0.6",  # Required for form data / file uploads
+    "watchfiles>=0.21.0", # Required for uvicorn --reload
+    "python-multipart>=0.0.6", # Required for form data / file uploads
     "nltk>=3.9.1",
     "pillow>=10.0.0", # For image processing in definitions
     # Semantic search dependencies (CPU-only by default)
@@ -54,14 +54,17 @@ dependencies = [
     "boto3>=1.40.7",
     "botocore>=1.40.7",
     # Document parsing
-    "pypdf>=4.0.0",        # Modern PDF parsing (fork of PyPDF2)
-    "ebooklib>=0.18",      # EPUB parsing
+    "pypdf>=4.0.0", # Modern PDF parsing (fork of PyPDF2)
+    "ebooklib>=0.18", # EPUB parsing
     # Authentication
-    "PyJWT[crypto]>=2.8.0",  # JWT validation for Clerk auth
+    "PyJWT[crypto]>=2.8.0", # JWT validation for Clerk auth
     # TTS audio synthesis
-    "kittentts>=0.1.0",      # English TTS (15M params, local)
-    "kokoro-onnx>=0.5.0",    # Non-English TTS (82M params, 8 languages)
-    "soundfile>=0.12.1",     # Audio I/O for TTS
+    "kittentts>=0.1.0", # English TTS (15M params, local)
+    "kokoro-onnx>=0.5.0", # Non-English TTS (82M params, 8 languages)
+    "soundfile>=0.12.1", # Audio I/O for TTS
+    "jellyfish>=1.2.1",
+    "pydivsufsort>=0.0.20",
+    "pyicu>=2.16.2",
 ]
 
 [project.optional-dependencies]

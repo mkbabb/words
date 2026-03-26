@@ -5,10 +5,12 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS base
 # Runtime dependencies
 # - ffmpeg: TTS WAV→MP3 conversion
 # - espeak-ng: Kokoro-ONNX phonemization (required for non-English TTS)
+# - libicu-dev: ICU C++ library for PyICU (phonetic transliteration)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
     espeak-ng \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Python environment
@@ -29,8 +31,13 @@ WORKDIR /app
 COPY --from=uv-installer /bin/uv /bin/uv
 
 # Install system dependencies for building
+# - build-essential: C/C++ compiler for native extensions
+# - pkg-config: required by PyICU's setup.py to find ICU
+# - libicu-dev: ICU headers + libraries for PyICU compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    pkg-config \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
