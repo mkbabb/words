@@ -1,31 +1,12 @@
 <template>
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div class="min-h-0 flex-1 overflow-y-auto p-4 overscroll-contain">
-            <Transition
-                mode="out-in"
-                enter-active-class="transition-opacity duration-200 ease-apple-smooth"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="transition-opacity duration-150 ease-apple-smooth"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
-            >
-            <!-- Show different views based on search mode -->
+            <!-- Instant swap — no out-in transitions (they double DOM during mode switch) -->
             <div v-if="!collapsed" key="expanded">
-                <Transition
-                    mode="out-in"
-                    enter-active-class="transition-all duration-300 ease-out"
-                    enter-from-class="opacity-0 translate-x-4"
-                    enter-to-class="opacity-100 translate-x-0"
-                    leave-active-class="transition-all duration-200 ease-in"
-                    leave-from-class="opacity-100 translate-x-0"
-                    leave-to-class="opacity-0 -translate-x-4"
-                >
-                    <component
-                        :is="currentView"
-                        :key="searchBarStore.searchMode"
-                    />
-                </Transition>
+                <component
+                    :is="currentView"
+                    :key="searchBarStore.searchMode"
+                />
             </div>
 
             <!-- Collapsed state -->
@@ -36,8 +17,8 @@
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="item.type === 'lookup' ? handleCollapsedWordClick(item.word!) : handleCollapsedAIClick(item.query!)"
-                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
-                                :class="{ 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20': item.type === 'ai' }"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                                :class="{ 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 hover:bg-yellow-500/15 hover:border-yellow-500/30 dark:text-yellow-300': item.type === 'ai' }"
                             >
                                 <template v-if="item.type === 'lookup'">
                                     {{ item.word!.substring(0, 2).toUpperCase() }}
@@ -50,13 +31,13 @@
                         <HoverCardContent side="right" :sideOffset="5" class="w-64">
                             <div class="space-y-2">
                                 <template v-if="item.type === 'lookup'">
-                                    <h4 class="font-semibold">{{ item.word }}</h4>
+                                    <h4 class="font-medium">{{ item.word }}</h4>
                                     <p v-if="getFirstDefinition(item.entry!)" class="text-sm text-muted-foreground">
                                         {{ getFirstDefinition(item.entry!) }}
                                     </p>
                                 </template>
                                 <template v-else>
-                                    <h4 class="font-semibold text-yellow-600 dark:text-yellow-400">AI Query</h4>
+                                    <h4 class="font-medium text-yellow-600 dark:text-yellow-400">AI Query</h4>
                                     <p class="text-sm text-muted-foreground">{{ item.query }}</p>
                                 </template>
                                 <p class="text-xs text-muted-foreground/70">
@@ -69,19 +50,37 @@
                 
                 <!-- Wordlist tiles for wordlist mode -->
                 <template v-else-if="searchBarStore.searchMode === 'wordlist'">
+                    <!-- Dashboard icon -->
+                    <HoverCard>
+                        <HoverCardTrigger as-child>
+                            <button
+                                @click="handleCollapsedDashboardClick"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                                :class="{ 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/15 hover:border-primary/30': !wordlistMode.selectedWordlist }"
+                            >
+                                <LayoutDashboard :size="18" class="text-muted-foreground" />
+                            </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="right" :sideOffset="5" class="w-40">
+                            <p class="font-medium text-sm">Dashboard</p>
+                            <p class="text-xs text-muted-foreground mt-1">View all wordlists</p>
+                        </HoverCardContent>
+                    </HoverCard>
+                    <!-- Divider -->
+                    <div class="w-6 border-t border-border/40" />
                     <HoverCard v-for="wordlist in recentWordlists" :key="wordlist.id">
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="handleCollapsedWordlistClick(wordlist.id)"
-                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
-                                :class="{ 'bg-primary/10 border-primary/20 hover:bg-primary/20': wordlistMode.selectedWordlist === wordlist.id }"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                                :class="{ 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/15 hover:border-primary/30': wordlistMode.selectedWordlist === wordlist.id }"
                             >
                                 {{ wordlist.name.substring(0, 2).toUpperCase() }}
                             </button>
                         </HoverCardTrigger>
                         <HoverCardContent side="right" :sideOffset="5" class="w-64">
                             <div class="space-y-2">
-                                <h4 class="font-semibold">{{ wordlist.name }}</h4>
+                                <h4 class="font-medium">{{ wordlist.name }}</h4>
                                 <p v-if="wordlist.description" class="text-sm text-muted-foreground">
                                     {{ wordlist.description }}
                                 </p>
@@ -99,10 +98,10 @@
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <button 
-                                    @click="ui.setSidebarCollapsed(false)"
-                                    class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl hover:bg-muted/50 transition-colors"
-                                >
+                        <button
+                            @click="ui.setSidebarCollapsed(false)"
+                            class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                        >
                                     <FileText :size="18" class="text-muted-foreground" />
                                 </button>
                             </TooltipTrigger>
@@ -113,7 +112,6 @@
                     </TooltipProvider>
                 </template>
             </div>
-            </Transition>
         </div>
     </div>
 </template>
@@ -126,7 +124,7 @@ import { useStores } from '@/stores';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
-import { FileText } from 'lucide-vue-next';
+import { FileText, LayoutDashboard } from 'lucide-vue-next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import SidebarLookupView from './SidebarLookupView.vue';
@@ -279,6 +277,11 @@ const formatWordlistDate = (dateString: string | null): string => {
     if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
     
     return date.toLocaleDateString();
+};
+
+const handleCollapsedDashboardClick = () => {
+    wordlistMode.setWordlist(null);
+    searchBarStore.setMode('wordlist');
 };
 
 const handleCollapsedWordlistClick = async (wordlistId: string) => {

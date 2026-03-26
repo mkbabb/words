@@ -51,6 +51,30 @@ export function useWordlistUpload(options: UseWordlistUploadOptions) {
         }
     };
 
+    const buildStructuredEntries = (parsedWords: ParsedWord[]) =>
+        parsedWords.map((word) => ({
+            source_text: word.text,
+            resolved_text: word.resolvedText || undefined,
+            frequency: word.frequency || 1,
+            notes: word.notes,
+        }));
+
+    const buildUploadFile = (parsedWords: ParsedWord[], fileName: string) => {
+        const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const rows = [
+            'word,frequency,notes',
+            ...parsedWords.map((word) =>
+                [
+                    escapeCsv(word.text),
+                    String(word.frequency || 1),
+                    escapeCsv(word.notes || ''),
+                ].join(',')
+            ),
+        ];
+        const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+        return new File([blob], `${fileName}.csv`, { type: 'text/csv' });
+    };
+
     const handleUpload = async (
         parsedWords: ParsedWord[],
         uploadMode: 'new' | 'existing',
@@ -65,6 +89,7 @@ export function useWordlistUpload(options: UseWordlistUploadOptions) {
 
         try {
             const words = parsedWords.map((w) => w.text);
+            const entries = buildStructuredEntries(parsedWords);
 
             if (uploadMode === 'new') {
                 // Create new wordlist with streaming
@@ -72,14 +97,8 @@ export function useWordlistUpload(options: UseWordlistUploadOptions) {
                 uploadStage.value = 'initializing';
                 uploadCategory.value = 'wordlist_creation';
 
-                // Create FormData for file upload
                 const fileName = newWordlistName.trim() || 'wordlist';
-                const blob = new Blob([words.join('\n')], {
-                    type: 'text/plain',
-                });
-                const file = new File([blob], `${fileName}.txt`, {
-                    type: 'text/plain',
-                });
+                const file = buildUploadFile(parsedWords, fileName);
 
                 const response = await wordlistApi.uploadWordlistStream(
                     file,
@@ -118,7 +137,7 @@ export function useWordlistUpload(options: UseWordlistUploadOptions) {
                 uploadStatus.value = 'Adding words to wordlist...';
                 uploadProgress.value = 50;
 
-                await wordlistApi.addWords(selectedWordlistId, words);
+                await wordlistApi.addWords(selectedWordlistId, entries);
                 uploadProgress.value = 100;
 
                 await loadWordlists();

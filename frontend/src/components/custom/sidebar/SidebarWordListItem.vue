@@ -3,20 +3,19 @@
     @click="$emit('select', wordlist)"
     :title="wordlist.name"
     :class="[
-      'group flex w-full items-center justify-between rounded-lg px-2 py-1.5',
-      'transition-all duration-200',
-      'text-left',
+      'group flex w-full items-center justify-between rounded-lg border px-2 py-1.5',
+      'transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu',
+      'text-left active-scale focus-ring disabled-base',
       isSelected
-        ? 'bg-primary/10 text-foreground'
-        : 'text-foreground/80 hover:bg-muted/30 hover:text-foreground',
-      'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
+        ? 'border-primary/20 bg-primary/10 text-foreground shadow-sm'
+        : 'border-border/40 bg-background/96 text-foreground/80 hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:shadow-sm hover:border-border/60'
     ]"
   >
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-1.5">
         <p :class="[
           'truncate text-sm',
-          isSelected ? 'font-bold' : 'font-medium'
+          isSelected ? 'font-medium' : 'font-normal'
         ]">{{ wordlist.name }}</p>
 
         <!-- Mastery indicator dot -->
@@ -28,13 +27,13 @@
         <!-- Active indicator (matches SidebarCluster) -->
         <div
           v-if="isSelected"
-          class="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-all duration-300"
+          class="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[opacity] duration-350 ease-apple-default"
         />
       </div>
 
       <div class="flex items-center gap-1.5 mt-0.5">
         <span class="text-micro text-muted-foreground/70 tabular-nums">
-          {{ wordlist.unique_words }} words
+          {{ formatCount(wordlist.unique_words) }} words
         </span>
         <span class="text-micro text-muted-foreground/50">·</span>
         <span class="text-micro text-muted-foreground/70">
@@ -47,7 +46,7 @@
         <div class="h-0.5 w-full rounded-full bg-muted/50 overflow-hidden">
           <div
             :class="[
-                'h-full transition-all duration-300 rounded-full',
+                'h-full rounded-full',
                 masteryProgress >= 80
                     ? 'bg-gradient-to-r from-yellow-400/60 to-amber-500/70'
                     : masteryProgress >= 40
@@ -127,6 +126,7 @@ import {
 import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList } from '@/types';
 import { formatRelativeTime } from '@/utils';
+import { formatCount } from '@/components/custom/wordlist/utils/formatting';
 
 interface Props {
   wordlist: WordList;

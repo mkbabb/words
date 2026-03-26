@@ -15,7 +15,7 @@
               <Bell class="h-6 w-6 text-amber-700 dark:text-amber-300 animate-wiggle-bounce" />
             </div>
             <div class="flex-1">
-              <h3 class="text-lg font-semibold text-foreground">
+              <h3 class="text-subheading text-foreground">
                 Daily Word Notifications
               </h3>
               <p class="text-sm text-muted-foreground mt-1">

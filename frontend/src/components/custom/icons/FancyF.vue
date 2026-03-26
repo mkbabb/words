@@ -2,7 +2,7 @@
   <button
     ref="fancyFButton"
     :class="[
-      'inline-flex items-baseline gap-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 rounded-lg p-0',
+      'inline-flex items-baseline gap-0 cursor-pointer transition-fast hover:scale-105 active:scale-95 rounded-lg p-0',
       clickable ? 'hover-lift' : '',
       !clickable && mode === 'suggestions' ? 'relative overflow-hidden' : ''
     ]"
@@ -38,7 +38,7 @@
         ref="fancyFSubscript"
         :expression="`_{\\text{${getModeSubscript()}}}`"
         :class="[
-          'transition-all duration-300',
+          'transition-normal',
           {
             'text-xs': size === 'sm',
             'text-base': size === 'base',

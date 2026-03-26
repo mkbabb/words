@@ -2,22 +2,19 @@
     <div class="space-y-4 p-2">
         <!-- Search bar -->
         <div class="relative">
-            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
             <input
                 v-model="searchQuery"
                 type="text"
                 placeholder="Search wordlists..."
-                class="w-full rounded-lg bg-background/60 dark:bg-white/[0.04] border border-border/30 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                class="w-full rounded-lg bg-background/96 dark:bg-background/85 border border-border/40 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/60 shadow-sm transition-[background-color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
             />
         </div>
-
-        <!-- Gradient separator -->
-        <hr class="h-px border-0 divider-h" />
 
         <!-- All Wordlists -->
         <div v-if="isLoading" class="space-y-2">
             <div v-for="i in 3" :key="i" class="animate-pulse">
-                <div class="h-16 rounded-md bg-muted/30"></div>
+                <div class="h-16 rounded-md border border-border/20 bg-background/96 shadow-sm"></div>
             </div>
         </div>
 
@@ -53,9 +50,6 @@
         <!-- Gradient separator -->
         <hr class="h-px border-0 divider-h" />
 
-        <!-- Add wordlist label -->
-        <p class="text-micro font-medium uppercase tracking-wider text-muted-foreground/50">Add wordlist</p>
-
         <!-- File Upload Drop Zone -->
         <div
             @drop="onDrop"
@@ -63,10 +57,10 @@
             @dragenter.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             :class="[
-                'cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-all duration-200',
+                'cursor-pointer rounded-lg border-2 border-dashed border-border/30 bg-background/96 p-4 text-center shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring',
                 isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted-foreground/30 hover:border-muted-foreground/50',
+                    ? 'border-primary bg-primary/5 shadow-md'
+                    : 'hover:-translate-y-0.5 hover:border-muted-foreground/50 hover:bg-background hover:shadow-md',
             ]"
             @click="showUploadModal = true"
         >
@@ -110,7 +104,7 @@
                 <div
                     v-for="upload in activeUploads"
                     :key="upload.id"
-                    class="flex items-center justify-between rounded-md bg-muted/30 p-2"
+                    class="flex items-center justify-between rounded-md border border-border/30 bg-background/96 p-2 shadow-sm"
                 >
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium">
@@ -125,7 +119,7 @@
                             class="h-1 w-12 overflow-hidden rounded-full bg-muted"
                         >
                             <div
-                                class="h-full bg-primary transition-all duration-300"
+                                class="h-full bg-primary"
                                 :style="{ width: `${upload.progress}%` }"
                             />
                         </div>
@@ -177,12 +171,14 @@ import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { useWordlistData } from '@/composables/useWordlistData';
 import { logger } from '@/utils/logger';
 
 const searchBarStore = useSearchBarStore();
 const wordlistMode = useWordlistMode();
 const auth = useAuthStore();
 const { toast } = useToast();
+const { fetchAllWordlists } = useWordlistData();
 
 // Access UI store for sidebar control
 const { ui } = useStores();
@@ -337,12 +333,7 @@ const transformWordlistFromAPI = (apiWordlist: any): WordList => {
 // Load wordlists via shared store
 const loadWordlists = async () => {
     if (!auth.isAuthenticated) return;
-    await wordlistMode.fetchAllWordlists();
-
-    // Auto-select first wordlist if none selected and wordlists exist
-    if (!selectedWordlist.value && wordlists.value.length > 0) {
-        wordlistMode.setWordlist(wordlists.value[0].id);
-    }
+    await fetchAllWordlists();
 };
 
 const handleWordlistSelect = async (wordlist: WordList) => {

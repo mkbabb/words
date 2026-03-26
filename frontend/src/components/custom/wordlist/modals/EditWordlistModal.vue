@@ -102,7 +102,7 @@
                         id="is-public"
                         v-model="form.is_public"
                         type="checkbox"
-                        class="h-4 w-4 rounded border-border"
+                        class="h-4 w-4 rounded-full border-border"
                     />
                     <Label for="is-public" class="text-sm font-medium">
                         Public wordlist

@@ -16,7 +16,7 @@
       <!-- Top line -->
       <span
         :class="[
-          'absolute h-0.5 w-full rounded-full bg-current transition-all',
+          'absolute h-0.5 w-full rounded-full bg-current transition-[transform,opacity]',
           isOpen ? 'rotate-45 translate-y-0' : '-translate-y-1.5'
         ]"
         :style="{
@@ -28,7 +28,7 @@
       <!-- Middle line -->
       <span
         :class="[
-          'absolute h-0.5 w-full rounded-full bg-current transition-all',
+          'absolute h-0.5 w-full rounded-full bg-current transition-[transform,opacity]',
           isOpen ? 'opacity-0 scale-0' : 'opacity-100 scale-100'
         ]"
         :style="{
@@ -40,7 +40,7 @@
       <!-- Bottom line -->
       <span
         :class="[
-          'absolute h-0.5 w-full rounded-full bg-current transition-all',
+          'absolute h-0.5 w-full rounded-full bg-current transition-[transform,opacity]',
           isOpen ? '-rotate-45 translate-y-0' : 'translate-y-1.5'
         ]"
         :style="{

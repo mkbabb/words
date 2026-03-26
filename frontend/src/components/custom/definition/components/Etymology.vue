@@ -5,7 +5,7 @@
     >
         <h3 class="mb-3 text-3xl font-semibold tracking-wide">Etymology</h3>
         <div
-            class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-all duration-200 hover:border-border/50 hover:bg-muted/10"
+            class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-fast hover:border-border/50 hover:bg-muted/10"
         >
             <EditableField
                 v-if="editModeEnabled"
@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { CardContent } from '@/components/ui/card';
 import type { Etymology } from '@/types/api';
-import EditableField from './EditableField.vue';
+import EditableField from './editing/EditableField.vue';
 
 interface EtymologyProps {
     etymology: Etymology | null | undefined;

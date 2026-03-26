@@ -33,19 +33,13 @@ const {
 } = useDockState({
     collapseDelay: props.manual ? Number.MAX_SAFE_INTEGER : props.collapseDelay,
     rootEl,
+    persistent: props.manual,
 });
 
-// Handle startCollapsed / manual props
+// Handle startCollapsed / manual props — force expand immediately
 onMounted(() => {
     if (!props.startCollapsed || props.manual) {
-        // Force expand immediately, bypassing the ignoreEvents guard
-        expand();
-        // If the ignoreEvents guard blocked it, retry after the guard lifts
-        setTimeout(() => {
-            if (!expanded.value) {
-                expand();
-            }
-        }, 650);
+        expand(true);
     }
 });
 
@@ -125,19 +119,18 @@ defineExpose({ expanded, isPinned, expand, collapse, keepOpen, release, toggle }
     align-items: center;
     padding: 0.375rem 0.75rem;
     border-radius: 9999px;
-    background: color-mix(in srgb, var(--color-card) 82%, transparent);
+    background: var(--color-card-82);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-foreground) 8%, transparent);
+    border: 1px solid var(--color-border-50);
+    box-shadow: 0 4px 16px var(--color-foreground-8);
     overflow: visible;
     white-space: nowrap;
     transition:
-        padding 0.2s var(--ease-apple-smooth),
-        box-shadow 0.2s var(--ease-apple-smooth),
-        transform 0.2s var(--ease-apple-smooth),
-        opacity 0.15s var(--ease-apple-default);
-    will-change: transform;
+        transform 0.25s var(--ease-apple-spring),
+        opacity 0.18s var(--ease-apple-smooth);
+    transform: translateZ(0);
+    will-change: transform, opacity;
 }
 
 .glass-dock.collapsed {
@@ -145,20 +138,20 @@ defineExpose({ expanded, isPinned, expand, collapse, keepOpen, release, toggle }
     min-width: 2.5rem;
     cursor: pointer;
     padding: 0.375rem 0.625rem;
-    background: color-mix(in srgb, var(--color-card) 92%, transparent);
-    border-color: color-mix(in srgb, var(--color-border) 70%, transparent);
+    background: var(--color-card-92);
+    border-color: var(--color-border-70);
     box-shadow:
-        0 2px 8px color-mix(in srgb, var(--color-foreground) 12%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--color-foreground) 6%, transparent);
+        0 2px 8px var(--color-foreground-12),
+        0 0 0 1px var(--color-foreground-6);
 }
 
 .glass-dock.collapsed:hover {
-    background: color-mix(in srgb, var(--color-card) 96%, transparent);
+    background: var(--color-card-96);
     border-color: var(--color-border);
     box-shadow:
-        0 4px 20px color-mix(in srgb, var(--color-foreground) 18%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--color-foreground) 10%, transparent);
-    transform: scale(1.02);
+        0 4px 20px var(--color-foreground-18),
+        0 0 0 1px var(--color-foreground-10);
+    transform: translateZ(0) scale(1.015);
 }
 
 .dock-layer {
@@ -166,27 +159,18 @@ defineExpose({ expanded, isPinned, expand, collapse, keepOpen, release, toggle }
     align-items: center;
     gap: 0.375rem;
     min-height: 2.5rem;
+    transform: translateZ(0);
 }
 
 .dock-layer--full {
     overflow: visible;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.28s var(--ease-apple-smooth), transform 0.28s var(--ease-apple-spring);
 }
 
 .dock-layer--summary {
     gap: 0.375rem;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.24s var(--ease-apple-smooth), transform 0.24s var(--ease-apple-spring);
 }
 
-.dock-fade-enter-active {
-    transition: opacity 0.2s ease 0.08s;
-}
-.dock-fade-leave-active {
-    transition: opacity 0.12s ease;
-    position: absolute;
-}
-.dock-fade-enter-from,
-.dock-fade-leave-to {
-    opacity: 0;
-}
+/* dock-fade transition classes are in src/assets/transitions.css */
 </style>

@@ -25,7 +25,7 @@
             <div v-else class="space-y-4">
                 <!-- Create New Wordlist Option -->
                 <div
-                    class="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/30"
+                    class="card-surface interactive-item flex items-center justify-between p-3"
                 >
                     <div class="flex items-center gap-3">
                         <Plus class="h-5 w-5 text-primary" />
@@ -49,7 +49,7 @@
                         <div
                             v-for="wordlist in wordlists"
                             :key="wordlist.id"
-                            class="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/30"
+                            class="card-surface interactive-item flex items-center justify-between p-3"
                         >
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">

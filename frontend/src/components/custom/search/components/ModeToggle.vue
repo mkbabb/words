@@ -1,7 +1,7 @@
 <template>
     <div
         :class="[
-            'flex flex-shrink-0 items-center justify-center overflow-hidden transition-all ease-out',
+            'flex flex-shrink-0 items-center justify-center overflow-hidden transition-[opacity,transform] ease-out',
             `duration-${animationDuration}`,
         ]"
         :style="{

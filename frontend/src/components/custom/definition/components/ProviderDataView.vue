@@ -107,8 +107,8 @@
 
     <!-- Etymology (shown below definitions, matching AI Synthesis layout) -->
     <div v-if="provider.etymology?.text" class="border-t border-border/50 pt-4">
-      <h3 class="mb-3 font-serif text-xl font-semibold">Etymology</h3>
-      <div class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-all duration-200 hover:border-border/50 hover:bg-muted/10">
+      <h3 class="mb-3 text-heading">Etymology</h3>
+      <div class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-fast hover:border-border/50 hover:bg-muted/10">
         <EditableField
           v-if="editModeEnabled"
           :model-value="provider.etymology.text"
@@ -142,7 +142,7 @@
 <script setup lang="ts">
 import type { ProviderEntry } from '@/api/providers';
 import { useContentStore } from '@/stores';
-import EditableField from './EditableField.vue';
+import EditableField from './editing/EditableField.vue';
 import { logger } from '@/utils/logger';
 
 interface Props {

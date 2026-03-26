@@ -10,7 +10,7 @@
             <div
                 v-for="(phrase, i) in phrases"
                 :key="i"
-                class="rounded-lg border border-border/20 bg-background/60 px-3 py-2 shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-border/40 hover:bg-background/80"
+                class="rounded-lg border border-border/20 bg-card px-3 py-2 shadow-sm transition-fast hover:border-border/40 hover:bg-card/90"
             >
                 <div class="flex items-baseline gap-2">
                     <span class="font-medium text-foreground">

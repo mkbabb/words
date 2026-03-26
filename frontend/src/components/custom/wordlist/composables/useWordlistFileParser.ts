@@ -5,6 +5,7 @@ export interface ParsedWord {
     text: string;
     frequency: number;
     notes?: string;
+    resolvedText?: string;
 }
 
 interface UseWordlistFileParserOptions {
@@ -21,11 +22,99 @@ export function useWordlistFileParser(options: UseWordlistFileParserOptions) {
     const uploadedFiles = ref<File[]>([]);
     const parsedWords = ref<ParsedWord[]>([]);
 
+    const preserveTextFormat = (text: string): string => {
+        return text
+            .normalize('NFC')
+            .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+            .replace(/[“”]/g, '"')
+            .replace(/[‘’]/g, "'")
+            .replace(/[—–]/g, '-')
+            .trim()
+            .replace(/\s+/g, ' ');
+    };
+
+    const looksLikePhrase = (text: string): boolean => {
+        const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+        if (words.length <= 1) return false;
+
+        const phraseIndicators = new Set([
+            'a', 'an', 'the', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'to',
+            'and', 'or', 'but', 'from', 'as', 'is', 'are', 'was', 'were', 'be',
+            'la', 'le', 'de', 'du', 'des', 'il', 'et', 'en', 'el', 'los', 'las',
+            'y', 'o', 'del',
+        ]);
+
+        if (words.some((word) => phraseIndicators.has(word))) return true;
+
+        const commonPhrases = new Set([
+            'quid pro quo', 'carpe diem', 'et cetera', 'ad hoc', 'per se', 'vice versa',
+            'status quo', 'modus operandi', 'alma mater', 'bona fide', 'de facto',
+            'prima facie', 'pro bono', 'sine qua non', 'coup de grace', 'deja vu',
+            'faux pas', "raison d'etre", 'au revoir', 'bon appetit', "c'est la vie",
+            'joie de vivre',
+        ]);
+
+        if (commonPhrases.has(text.toLowerCase())) return true;
+        return words.every((word) => word[0] === word[0]?.toUpperCase());
+    };
+
+    const isValidWord = (word: string): boolean => {
+        if (!word) return false;
+        if (word.length < 1 || word.length > 100) return false;
+        if (!/[a-zA-Z\u00C0-\u017F\u0400-\u04FF]/.test(word)) return false;
+        if (/^[\d\W\s]+$/.test(word)) return false;
+        if (word.toLowerCase().includes('should be skipped')) return false;
+        return true;
+    };
+
+    const extractWordsFromLine = (line: string): string[] => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return [];
+
+        const numberedPatterns = [
+            /^\d+[.)]\s*(.+)$/,
+            /^\d+\.\s+(.+)$/,
+            /^\d+\t(.+)$/,
+            /^[a-zA-Z][.)]\s*(.+)$/,
+        ];
+
+        for (const pattern of numberedPatterns) {
+            const match = trimmed.match(pattern);
+            if (match?.[1]) {
+                return [preserveTextFormat(match[1])];
+            }
+        }
+
+        for (const bullet of ['-', '*', '•', '·', '○', '□', '▪', '▫', '►', '▸']) {
+            if (trimmed.startsWith(bullet)) {
+                const text = preserveTextFormat(trimmed.slice(bullet.length).trim());
+                return text ? [text] : [];
+            }
+        }
+
+        const normalized = preserveTextFormat(trimmed);
+        if (!normalized) return [];
+
+        if (normalized.includes(',') || normalized.includes(';')) {
+            return normalized
+                .split(/[,;]\s*/)
+                .map((word) => preserveTextFormat(word))
+                .filter(Boolean);
+        }
+
+        if (looksLikePhrase(normalized)) {
+            return [normalized];
+        }
+
+        const parts = normalized.split(/\s+/).filter(Boolean);
+        return parts.length > 1 ? parts : [normalized];
+    };
+
     const parseTxtFile = (text: string): ParsedWord[] => {
         return text
             .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line && !line.startsWith('#'))
+            .flatMap((line) => extractWordsFromLine(line))
+            .filter((word) => isValidWord(word))
             .map((word) => ({ text: word, frequency: 1 }));
     };
 
@@ -40,12 +129,12 @@ export function useWordlistFileParser(options: UseWordlistFileParserOptions) {
                     .split(',')
                     .map((s) => s.trim());
                 return {
-                    text: word,
+                    text: preserveTextFormat(word),
                     frequency: parseInt(frequency) || 1,
                     notes: notes || undefined,
                 };
             })
-            .filter((item) => item.text);
+            .filter((item) => isValidWord(item.text));
     };
 
     const parseJsonFile = (text: string): ParsedWord[] => {
@@ -55,10 +144,15 @@ export function useWordlistFileParser(options: UseWordlistFileParserOptions) {
             return data
                 .map((item) => {
                     if (typeof item === 'string') {
-                        return { text: item, frequency: 1 };
+                        const text = preserveTextFormat(item);
+                        return isValidWord(text)
+                            ? { text, frequency: 1 }
+                            : null;
                     } else if (typeof item === 'object' && item.text) {
+                        const text = preserveTextFormat(item.text);
+                        if (!isValidWord(text)) return null;
                         return {
-                            text: item.text,
+                            text,
                             frequency: item.frequency || 1,
                             notes: item.notes,
                         };

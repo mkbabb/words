@@ -76,9 +76,12 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
             searchBar.setFocused(false);
             emit('blur');
 
-            // Hide results on blur only if we're not interacting with search area
+            // Hide dropdown, but only clear results for non-wordlist modes.
+            // Wordlist cards should persist when the search bar loses focus.
             searchBar.hideDropdown();
-            searchBar.clearResults();
+            if (searchBar.searchMode !== 'wordlist') {
+                searchBar.clearResults();
+            }
         }, 200); // Increased delay to 200ms for better UX
     };
 
@@ -129,9 +132,12 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
                 searchBar.setFocused(false);
                 emit('blur');
 
-                // Hide search results
+                // Hide dropdown, but only clear results for non-wordlist modes.
+                // Wordlist cards should persist when clicking outside.
                 searchBar.hideDropdown();
-                searchBar.clearResults();
+                if (searchBar.searchMode !== 'wordlist') {
+                    searchBar.clearResults();
+                }
             }
         }
     };

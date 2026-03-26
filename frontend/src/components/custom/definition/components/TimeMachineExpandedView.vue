@@ -3,7 +3,7 @@
         <!-- Back button header -->
         <div class="mb-3 flex items-center gap-3">
             <button
-                class="flex h-8 items-center gap-1.5 rounded-lg border border-border/30 bg-background/60 px-3 text-xs text-muted-foreground backdrop-blur-sm transition-colors hover:bg-background/80 hover:text-foreground"
+                class="flex h-8 items-center gap-1.5 rounded-lg border border-border/40 bg-background/80 px-3 text-xs text-muted-foreground backdrop-blur-sm transition-colors hover:bg-background/95 hover:text-foreground"
                 @click="$emit('collapse')"
             >
                 <ChevronLeft :size="14" />
@@ -73,7 +73,7 @@
 import { ChevronLeft, RotateCcw } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import DefinitionContentRenderer from './DefinitionContentRenderer.vue';
+import DefinitionContentRenderer from './content/DefinitionContentRenderer.vue';
 import { useAuthStore } from '@/stores/auth';
 import type { VersionSummary } from '@/types/api';
 import type { SynthesizedDictionaryEntry } from '@/types';

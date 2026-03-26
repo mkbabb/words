@@ -4,7 +4,7 @@
             :class="[
                 'group flex w-full items-center justify-between px-0 py-3',
                 'hover:no-underline hover:bg-transparent',
-                'transition-all duration-200',
+                'transition-fast',
                 'text-sm font-medium text-foreground/80 hover:text-foreground',
                 '[&[data-state=open]>svg]:rotate-90'
             ]"
@@ -19,7 +19,7 @@
             <div
                 v-if="items.length > 0"
                 :class="[
-                    'space-y-1',
+                    'space-y-1 rounded-xl border border-border/30 bg-background/96 p-1.5 shadow-sm',
                     items.length > 10 ? 'max-h-[40vh] overflow-y-auto scrollbar-thin pr-2' : ''
                 ]"
             >
@@ -51,4 +51,3 @@ withDefaults(defineProps<Props>(), {
     emptyMessage: 'No items yet'
 });
 </script>
-

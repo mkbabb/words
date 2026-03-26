@@ -1,83 +1,72 @@
 <template>
-    <div class="space-y-4">
-        <div
-            @drop="onDrop"
-            @dragover.prevent
-            @dragenter.prevent
-            :class="[
-                'cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors',
-                isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50',
-            ]"
-            @click="fileInput?.click()"
+    <div
+        @drop="onDrop"
+        @dragover.prevent="isDragging = true"
+        @dragenter.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false"
+        :class="[
+            'relative flex min-h-[56svh] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-spring sm:p-10',
+            isDragging
+                ? 'border-primary bg-primary/8 shadow-cartoon-sm scale-[1.01]'
+                : 'border-muted-foreground/25 bg-background/40 hover:border-muted-foreground/45 hover:bg-background/55',
+        ]"
+        @click="fileInput?.click()"
+    >
+        <button
+            type="button"
+            class="group/info absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full glass-light text-muted-foreground shadow-sm transition-fast hover:text-foreground"
+            aria-label="Supported formats"
+            @click.stop
         >
-            <input
-                ref="fileInput"
-                type="file"
-                accept=".txt,.csv,.json"
-                @change="onFileChange"
-                class="hidden"
-                multiple
-            />
-
-            <div class="space-y-2">
-                <Upload class="mx-auto h-8 w-8 text-muted-foreground" />
-                <div>
-                    <p class="font-medium">
-                        Drop files here or click to browse
-                    </p>
-                    <p class="text-sm text-muted-foreground">
-                        Supports .txt, .csv, and .json files
-                    </p>
+            <Info class="h-4 w-4" />
+            <div
+                class="pointer-events-none absolute right-0 top-10 z-20 w-64 translate-y-1 opacity-0 transition-fast group-hover/info:translate-y-0 group-hover/info:opacity-100"
+            >
+                <div class="popover-surface space-y-2 p-3 text-left text-xs">
+                    <p class="font-medium text-foreground">Supported formats</p>
+                    <ul class="space-y-1 text-muted-foreground">
+                        <li><span class="font-medium text-foreground">.txt</span> One word per line</li>
+                        <li><span class="font-medium text-foreground">.csv</span> word,frequency,notes</li>
+                        <li><span class="font-medium text-foreground">.json</span> Array of words or word objects</li>
+                    </ul>
                 </div>
             </div>
-        </div>
+        </button>
 
-        <!-- File Format Instructions -->
-        <div class="space-y-1 text-xs text-muted-foreground">
-            <p><strong>Supported formats:</strong></p>
-            <ul class="ml-2 list-inside list-disc space-y-0.5">
-                <li><strong>.txt:</strong> One word per line</li>
-                <li>
-                    <strong>.csv:</strong> word,frequency,notes (headers
-                    optional)
-                </li>
-                <li><strong>.json:</strong> Array of words or word objects</li>
-            </ul>
-        </div>
+        <input
+            ref="fileInput"
+            type="file"
+            accept=".txt,.csv,.json"
+            @change="onFileChange"
+            class="hidden"
+            multiple
+        />
 
-        <!-- File Preview -->
-        <div v-if="uploadedFiles.length > 0" class="space-y-3">
-            <h3 class="font-medium">Uploaded Files</h3>
-            <div class="max-h-32 space-y-2 overflow-y-auto">
-                <div
-                    v-for="file in uploadedFiles"
-                    :key="file.name"
-                    class="flex items-center justify-between rounded-md bg-muted/50 p-2"
-                >
-                    <div class="flex items-center gap-2">
-                        <FileText class="h-4 w-4" />
-                        <span class="text-sm">{{ file.name }}</span>
-                    </div>
-                    <Button
-                        @click="$emit('remove-file', file)"
-                        variant="ghost"
-                        size="sm"
-                        class="h-6 w-6 p-0"
-                    >
-                        <X class="h-3 w-3" />
-                    </Button>
-                </div>
+        <div class="space-y-4">
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm">
+                <Upload class="h-8 w-8" />
             </div>
+            <div class="space-y-1">
+                <p class="text-heading">
+                    Drop wordlist files here
+                </p>
+                <p class="text-sm text-muted-foreground">
+                    or click to browse your device
+                </p>
+            </div>
+            <p
+                v-if="uploadedFiles.length > 0"
+                class="inline-flex items-center rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground"
+            >
+                {{ uploadedFiles.length }} file{{ uploadedFiles.length === 1 ? '' : 's' }} ready
+            </p>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Upload, X, FileText } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
+import { Info, Upload } from 'lucide-vue-next';
 
 defineProps<{
     uploadedFiles: File[];

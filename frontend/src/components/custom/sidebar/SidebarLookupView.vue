@@ -13,13 +13,24 @@
                 :empty-message="'No recent lookups'"
             >
                 <template #item="{ item }">
-                    <RecentItem
-                        :item="item"
-                        :title="item.word"
-                        :subtitle="getFirstDefinition(item)"
-                        :timestamp="item.timestamp"
-                        @click="handleLookupClick(item)"
-                    />
+                    <div class="flex items-center gap-1">
+                        <RecentItem
+                            class="flex-1 min-w-0"
+                            :item="item"
+                            :title="item.word"
+                            :subtitle="getFirstDefinition(item)"
+                            :timestamp="item.timestamp"
+                            @click="handleLookupClick(item)"
+                        />
+                        <button
+                            v-if="wordlistMode.selectedWordlist"
+                            class="flex-shrink-0 p-1 rounded-md text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-colors"
+                            title="Add to active wordlist"
+                            @click.stop="handleAddToWordlist(item.word)"
+                        >
+                            <Plus class="w-3 h-3" />
+                        </button>
+                    </div>
                 </template>
             </SidebarSection>
             <div class="divider-h-tapered mx-2" />
@@ -33,7 +44,7 @@
             >
                 <template #item="{ item }">
                     <button
-                        class="flex w-full items-start gap-3 rounded px-3 py-2.5 hover:bg-muted/50 text-left"
+                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md"
                         @click="handleAISuggestionClick(item)"
                     >
                         <Sparkles class="mt-0.5 h-3.5 w-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
@@ -72,12 +83,12 @@
             >
                 <template #item="{ item }">
                     <button
-                        class="flex w-full items-start gap-3 rounded px-3 py-2.5 hover:bg-muted/50 text-left"
+                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md"
                         @click="handleSearchClick(item)"
                     >
                         <Search class="mt-0.5 h-3.5 w-3.5 text-foreground/40 flex-shrink-0" />
                         <div class="flex-1 min-w-0">
-                            <p class="text-xs text-foreground/70">{{ item.query }}</p>
+                            <p class="text-xs text-foreground/70 truncate">{{ item.query }}</p>
                         </div>
                     </button>
                 </template>
@@ -94,23 +105,31 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useRouter } from 'vue-router';
 import { Accordion } from '@/components/ui/accordion';
-import { Search, Sparkles } from 'lucide-vue-next';
+import { Plus, Search, Sparkles } from 'lucide-vue-next';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
 import RecentItem from './RecentItem.vue';
 import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
+import { useVocabularySuggestions } from '@/composables/useVocabularySuggestions';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
+import { wordlistApi } from '@/api';
+import { useToast } from '@/components/ui/toast/use-toast';
 import type { SynthesizedDictionaryEntry } from '@/types';
 import { logger } from '@/utils/logger';
 
 const { history, ui, content } = useStores();
 const searchBar = useSearchBarStore();
+const wordlistMode = useWordlistMode();
 const router = useRouter();
+const { toast } = useToast();
 const { recentLookups, vocabularySuggestions, recentSearches, aiQueryHistory } = storeToRefs(history);
 
 // Create orchestrator for API operations
 const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery)
 });
+
+const { refreshSuggestions } = useVocabularySuggestions();
 
 // Computed property to format AI query history for display
 const recentAISuggestions = computed(() => 
@@ -147,6 +166,18 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();
+    }
+};
+
+const handleAddToWordlist = async (word: string) => {
+    const activeId = wordlistMode.selectedWordlist;
+    if (!activeId) return;
+    try {
+        await wordlistApi.addWords(activeId, [word]);
+        toast({ title: 'Word added', description: `"${word}" added to wordlist.` });
+    } catch (error) {
+        logger.error('Failed to add word to wordlist:', error);
+        toast({ title: 'Failed to add word', variant: 'destructive' });
     }
 };
 
@@ -217,7 +248,7 @@ const extractWordCount = (query: string): number => {
 onMounted(async () => {
     if (history.vocabularySuggestions.length === 0 && history.recentLookups.length > 0) {
         try {
-            await history.refreshVocabularySuggestions();
+            await refreshSuggestions();
         } catch (error) {
             logger.error('Failed to generate vocabulary suggestions:', error);
         }

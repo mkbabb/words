@@ -4,7 +4,7 @@
     :height="size"
     viewBox="0 0 24 24"
     fill="none"
-    class="transition-all duration-200"
+    class="transition-fast"
     :class="className"
   >
     <!-- Wiktionary W symbol -->

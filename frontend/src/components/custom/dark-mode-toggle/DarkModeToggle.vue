@@ -48,7 +48,7 @@ const handleToggle = () => {
 .dark-mode-toggle-button {
     cursor: pointer;
     border: 1px solid transparent;
-    opacity: 0.65;
+    opacity: 0.75;
     padding: 0.375rem;
     border-radius: 9999px;
     position: relative;

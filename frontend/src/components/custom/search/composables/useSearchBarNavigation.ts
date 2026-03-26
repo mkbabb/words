@@ -43,7 +43,11 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         lookupMode.cancelSearch();
         searchBar.hideDropdown();
         searchBar.hideControls();
-        searchBar.clearResults();
+        // Only clear results for non-wordlist modes — wordlist cards
+        // should persist when the search bar loses focus.
+        if (searchBar.searchMode !== 'wordlist') {
+            searchBar.clearResults();
+        }
     };
     const PANEL_CLOSE_ANIMATION_MS = 360;
     const wait = (durationMs: number) =>
@@ -130,7 +134,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                 searchBar.setQuery('');
                 searchBar.hideDropdown();
                 searchBar.hideControls();
-                searchBar.clearResults();
+                // Don't clear wordlist results — cards should persist
                 // TODO: Emit event to scroll to word in list
             },
 

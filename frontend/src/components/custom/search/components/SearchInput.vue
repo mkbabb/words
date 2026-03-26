@@ -7,15 +7,14 @@
         aria-label="Search for a word"
         role="searchbox"
         :style="{
-            minHeight: `${minHeight}px`,
-            lineHeight: '1.4',
-            ...style,
+            minHeight: `var(--search-min-h, ${minHeight}px)`,
+            maxHeight: `var(--search-max-h, ${maxHeight}px)`,
+            lineHeight: 'var(--search-line-height, 1.4)',
         }"
         :class="[
-            'relative z-10 w-full rounded-xl bg-transparent text-lg transition-all duration-300 ease-out outline-none',
-            'resize-none placeholder:truncate placeholder:text-muted-foreground',
+            'search-input-field relative z-10 block w-full bg-transparent text-lg outline-none transition-[height,color,transform] duration-300 ease-out',
+            'resize-none whitespace-pre-wrap break-words overflow-hidden align-top placeholder:truncate placeholder:text-muted-foreground',
             'focus:ring-0',
-            'flex items-center leading-relaxed',
             {
                 'text-center': textAlign === 'center',
                 'text-right': textAlign === 'right',
@@ -47,7 +46,7 @@ interface SearchInputProps {
     disabled?: boolean;
     aiMode?: boolean;
     minHeight?: number;
-    style?: Record<string, any>;
+    maxHeight?: number;
 }
 
 const props = withDefaults(defineProps<SearchInputProps>(), {
@@ -56,7 +55,7 @@ const props = withDefaults(defineProps<SearchInputProps>(), {
     disabled: false,
     aiMode: false,
     minHeight: 48,
-    style: () => ({}),
+    maxHeight: 200,
 });
 
 // Use defineModel for two-way binding (Vue 3.4+)
@@ -91,7 +90,7 @@ const resizeTextarea = () => {
     const minHeightValue = props.minHeight || 48;
 
     // In AI mode, allow full expansion; otherwise limit to reasonable height
-    const maxHeight = props.aiMode ? 400 : 200;
+    const maxHeight = props.aiMode ? props.maxHeight * 2 : props.maxHeight;
     const finalHeight = Math.max(
         minHeightValue,
         Math.min(scrollHeight, maxHeight)
@@ -138,13 +137,10 @@ watch(
 // Also resize on mount and when component becomes visible
 onMounted(() => {
     resizeTextarea();
-
-    // Use a small delay to handle any DOM settling
-    setTimeout(resizeTextarea, 50);
+    requestAnimationFrame(() => {
+        resizeTextarea();
+    });
 });
-
-// Props are used in template
-void props;
 
 // Expose methods for parent component
 defineExpose({
@@ -154,3 +150,12 @@ defineExpose({
     resize: resizeTextarea,
 });
 </script>
+
+<style scoped>
+.search-input-field {
+    box-sizing: border-box;
+    padding-inline: var(--search-pad-start, 1rem) var(--search-pad-end, 1rem);
+    padding-block: var(--search-text-pad-y, calc((var(--search-min-h, 48px) - 1.1em) / 2));
+    line-height: var(--search-line-height, 1.1);
+}
+</style>

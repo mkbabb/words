@@ -18,7 +18,7 @@
             >
                 <!-- Dot -->
                 <div
-                    class="relative flex items-center justify-center rounded-full transition-all duration-300"
+                    class="relative flex items-center justify-center rounded-full transition-normal"
                     :class="[
                         index === selectedIndex
                             ? 'h-4 w-4 scale-125 bg-primary shadow-lg shadow-primary/30 ring-2 ring-primary/30 ring-offset-2 ring-offset-background'

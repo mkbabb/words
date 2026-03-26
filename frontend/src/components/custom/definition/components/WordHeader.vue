@@ -1,16 +1,16 @@
 <template>
     <CardHeader class="relative">
         <!-- Row 1: Word Title + Speaker + Plus + [spacer] + Providers -->
-        <CardTitle class="flex flex-wrap items-center gap-2">
-            <!-- Word title — shrink-wraps to text width, not flex-1 -->
+        <CardTitle class="space-y-2">
+            <!-- Word title — full width, wraps mid-word -->
             <div
-                class="relative min-w-0 overflow-hidden"
-                style="hyphens: auto; word-break: break-word; overflow-wrap: break-word;"
+                class="relative w-full"
+                style="overflow-wrap: anywhere;"
                 lang="en"
             >
-                <!-- Invisible text to reserve space -->
+                <!-- Invisible text to reserve space (pr-3 for cursor) -->
                 <span
-                    class="invisible text-5xl sm:text-6xl md:text-7xl leading-tight font-bold font-serif"
+                    class="invisible text-5xl sm:text-6xl md:text-7xl leading-tight font-bold font-serif pr-3"
                 >
                     {{ word }}
                 </span>
@@ -24,24 +24,27 @@
                 </div>
             </div>
 
-            <!-- Audio Playback Button — matches language/provider icon size (h-10 w-10) -->
+            <!-- Action buttons row (below the word, not competing for width) -->
+            <div class="flex flex-wrap items-center gap-2">
+
+            <!-- Audio Playback Button -->
             <AudioPlaybackButton
                 :state="audioState"
                 :error-message="audioError"
-                class="flex-shrink-0"
-                size="lg"
+                class="flex-shrink-0 ml-1"
+                size="md"
                 @play="playAudio"
             />
 
-            <!-- Plus / Add to Wordlist — matches icon size (h-10 w-10) -->
+            <!-- Plus / Add to Wordlist -->
             <HoverCard>
                 <HoverCardTrigger as-child>
                     <button
                         @click="showAddToWordlistModal = true"
-                        class="group flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-border/20 bg-muted/80 shadow-sm opacity-60 transition-all duration-200 hover:border-border/40 hover:bg-muted hover:opacity-100"
+                        class="group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/96 shadow-sm opacity-80 transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:border-border/60 hover:bg-background hover:opacity-100 hover:shadow-md"
                     >
                         <Plus
-                            :size="20"
+                            :size="16"
                             class="text-muted-foreground group-hover:text-foreground"
                         />
                     </button>
@@ -72,6 +75,7 @@
                 class="flex-shrink-0"
                 @select-source="$emit('select-source', $event)"
             />
+            </div>
         </CardTitle>
 
         <!-- Row 2: Language badges + Pronunciation pill -->
@@ -83,7 +87,7 @@
                     <TooltipTrigger as-child>
                         <span
                             :class="[
-                                'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-muted/80 font-semibold uppercase text-muted-foreground shadow-sm',
+                                'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase text-muted-foreground shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow,opacity] duration-250 ease-apple-spring',
                                 languages[0].length > 2 ? 'text-[10px]' : 'text-xs',
                             ]"
                         >
@@ -102,10 +106,10 @@
                                 v-for="(lang, i) in orderedLanguages.slice(0, 2)"
                                 :key="lang"
                                 :class="[
-                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-muted/80 font-semibold uppercase shadow-sm transition-colors duration-200 ease-apple-spring',
+                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow,opacity] duration-250 ease-apple-spring',
                                     lang.length > 2 ? 'text-[10px]' : 'text-xs',
-                                    i > 0 ? '-ml-2 group-hover/lang:ml-0.5' : '',
-                                    lang === audioLanguage ? 'ring-2 ring-primary/30 bg-muted' : '',
+                                    i > 0 ? '-ml-2 group-hover/lang:translate-x-2 group-hover/lang:scale-105' : '',
+                                    lang === audioLanguage ? 'ring-2 ring-primary/30 bg-primary/10' : '',
                                 ]"
                                 :style="{ zIndex: orderedLanguages.length - i }"
                             >
@@ -117,8 +121,8 @@
                             <span
                                 v-if="orderedLanguages.length > 2"
                                 :class="[
-                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-muted/50 text-xs font-semibold text-muted-foreground/50 transition-colors duration-200 ease-apple-spring hover:bg-muted/80 hover:text-muted-foreground',
-                                    '-ml-2 group-hover/lang:ml-0.5',
+                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 text-xs font-semibold text-muted-foreground/60 shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow] duration-250 ease-apple-spring hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                                    '-ml-2 group-hover/lang:translate-x-2 group-hover/lang:scale-105',
                                 ]"
                             >
                                 +{{ orderedLanguages.length - 2 }}
@@ -128,26 +132,26 @@
                     <InlinePopoverContent
                         side="bottom"
                         align="start"
-                        :side-offset="20"
-                        class="w-44 rounded-xl border border-border/40 bg-popover p-1.5 shadow-lg backdrop-blur-md"
+                        :side-offset="12"
+                        class="z-50 w-44 rounded-xl border border-border/40 bg-background/96 p-1.5 shadow-cartoon-lg backdrop-blur-xl"
                     >
                         <div
                             v-for="lang in languages"
                             :key="lang"
                             :class="[
-                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-colors duration-150',
+                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-[background-color,color,box-shadow,transform] duration-200 ease-apple-smooth',
                                 lang === audioLanguage
-                                    ? 'bg-primary/10 font-medium text-foreground hover:bg-primary/15'
-                                    : 'text-foreground/80 hover:bg-muted/80 hover:text-foreground',
+                                    ? 'bg-primary/10 font-medium text-foreground hover:bg-primary/15 hover:shadow-sm'
+                                    : 'bg-background/96 text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-sm',
                             ]"
                             @click="selectAudioLanguage(lang)"
                         >
                             <span
                                 :class="[
-                                    'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold uppercase',
+                                    'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold uppercase shadow-sm',
                                     lang === audioLanguage
                                         ? 'bg-primary/15 text-primary'
-                                        : 'bg-muted text-muted-foreground',
+                                        : 'bg-background/95 text-muted-foreground',
                                 ]"
                             >{{ lang }}</span>
                             <span class="text-sm flex-1">{{ getLanguageDisplayName(lang) }}</span>
@@ -165,14 +169,14 @@
                 <Popover>
                     <PopoverTrigger as-child>
                         <button
-                            class="group/pron flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground cursor-pointer min-w-0"
+                        class="group/pron flex items-center gap-1.5 rounded-full border border-border/40 bg-background/96 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-smooth hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:border-border/60 hover:shadow-md cursor-pointer min-w-0"
                         >
                             <span class="font-mono text-sm max-w-[120px] sm:max-w-[200px] truncate">{{ displayPronunciation }}</span>
                             <span
                                 v-if="allPronunciationVariants.length > 1"
-                                class="text-[10px] font-sans text-muted-foreground/50 group-hover/pron:text-muted-foreground flex-shrink-0"
+                                class="text-micro font-sans text-muted-foreground/50 group-hover/pron:text-muted-foreground flex-shrink-0"
                             >+{{ allPronunciationVariants.length - 1 }}</span>
-                            <span class="rounded bg-muted/60 px-1 py-0.5 text-[10px] font-sans font-medium text-muted-foreground/60 flex-shrink-0">
+                            <span class="rounded bg-background/95 px-1 py-0.5 text-micro font-sans font-medium text-muted-foreground/60 flex-shrink-0 shadow-sm">
                                 {{ pronunciationMode === 'ipa' || (!pronunciation?.phonetic || pronunciation?.phonetic === 'unknown') ? 'IPA' : 'Ph.' }}
                             </span>
                         </button>
@@ -197,8 +201,8 @@
                                 v-for="(variant, vi) in splitVariants(pronunciation.ipa)"
                                 :key="'ipa-' + vi"
                                 :class="[
-                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm',
-                                    pronunciationMode === 'ipa' ? 'bg-primary/5 text-foreground' : 'text-foreground/70',
+                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-200 ease-apple-smooth',
+                                    pronunciationMode === 'ipa' ? 'bg-primary/5 text-foreground shadow-sm' : 'bg-background/96 text-foreground/70',
                                 ]"
                             >
                                 <span class="flex-1">{{ variant }}</span>
@@ -218,8 +222,8 @@
                                 v-for="(variant, vi) in splitVariants(pronunciation.phonetic)"
                                 :key="'ph-' + vi"
                                 :class="[
-                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm',
-                                    pronunciationMode === 'phonetic' ? 'bg-primary/5 text-foreground' : 'text-foreground/70',
+                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-200 ease-apple-smooth',
+                                    pronunciationMode === 'phonetic' ? 'bg-primary/5 text-foreground shadow-sm' : 'bg-background/96 text-foreground/70',
                                 ]"
                             >
                                 <span class="flex-1">{{ variant }}</span>
@@ -263,9 +267,9 @@ import {
 } from '@/components/ui/tooltip';
 import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
-import AudioPlaybackButton from './AudioPlaybackButton.vue';
+import AudioPlaybackButton from './media/AudioPlaybackButton.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
-import ProviderIcons from './ProviderIcons.vue';
+import ProviderIcons from './metadata/ProviderIcons.vue';
 import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
 import type { AudioFile, SourceReference } from '@/types/api';

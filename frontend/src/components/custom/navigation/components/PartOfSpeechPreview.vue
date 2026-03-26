@@ -3,7 +3,7 @@
         <!-- Header -->
         <div>
             <div class="flex items-center justify-between">
-                <h4 class="themed-cluster-title text-sm font-semibold uppercase">
+                <h4 class="themed-cluster-title text-sm font-medium uppercase">
                     {{ partOfSpeech.type }}
                 </h4>
                 <span class="rounded bg-muted px-1.5 py-0.5 text-micro font-medium text-muted-foreground">

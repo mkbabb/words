@@ -14,7 +14,7 @@
                         v-else
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             aiAnimating && 'animate-sparkle',
                         ]"
                     />
@@ -48,7 +48,7 @@
                     <RefreshCw
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             'group-hover:rotate-180',
                             refreshAnimating && 'animate-rotate-once',
                         ]"
@@ -73,7 +73,7 @@
                     <Trash2
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             trashAnimating && 'animate-wiggle',
                         ]"
                     />
@@ -91,7 +91,7 @@
                     <Download
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             pwaInstallAnimating && 'animate-bounce-in',
                         ]"
                     />
@@ -112,7 +112,7 @@
                     <Bell
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             notificationAnimating && 'animate-ring',
                         ]"
                     />
@@ -133,7 +133,7 @@
                     <BellDot
                         :size="20"
                         :class="[
-                            'transition-all duration-300',
+                            'transition-normal',
                             notificationPromptAnimating && 'animate-pulse',
                         ]"
                     />

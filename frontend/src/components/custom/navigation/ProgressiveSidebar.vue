@@ -1,11 +1,11 @@
 <template>
     <div
-        class="themed-card shadow-cartoon-lg rounded-lg bg-background/95 p-2 backdrop-blur-sm"
+        class="themed-card overflow-visible shadow-cartoon-lg bg-card p-2 rounded-xl"
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
         <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100dvh-8rem)] space-y-0 overflow-y-auto">
-            <TransitionGroup name="sidebar-item" tag="div" class="space-y-0">
+            <TransitionGroup name="sidebar-item" tag="div" class="space-y-0.5">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
                 <!-- Special handling for etymology -->
                 <template v-if="cluster.clusterId === 'etymology'">
@@ -19,13 +19,13 @@
                         data-toc-id="etymology"
                         data-sidebar-cluster="etymology"
                         :class="[
-                            'w-full text-left px-3 py-2 rounded-md transition-all duration-200',
+                            'w-full text-left px-3 py-2 rounded-md transition-fast',
                             activeCluster === 'etymology'
                                 ? 'bg-primary/10 text-primary'
                                 : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                         ]"
                     >
-                        <h4 class="text-sm font-semibold">Etymology</h4>
+                        <h4 class="text-sm font-medium">Etymology</h4>
                     </button>
                 </template>
 

@@ -1,79 +1,51 @@
 <template>
-    <Teleport to="body">
-        <Transition :css="false" @enter="modalEnter" @leave="modalLeave">
-            <div
-                v-if="show"
-                class="fixed inset-0 z-modal flex items-center justify-center p-4"
-                @click="handleClose"
-            >
-                <!-- Backdrop -->
-                <div
-                    ref="modalBackdrop"
-                    class="absolute inset-0 glass-overlay"
-                />
+    <Dialog :open="show" @update:open="handleOpenChange">
+        <DialogContent
+            class="max-w-2xl"
+            @close-auto-focus.prevent
+        >
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-subheading">
+                    Describe what you're looking for
+                </h3>
+            </div>
 
-                <!-- Modal Content -->
-                <div
-                    ref="modalContent"
-                    class="shadow-cartoon-lg relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background/95 backdrop-blur-xl p-6 shadow-2xl"
-                    @click.stop
-                >
-                    <!-- Header -->
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold">
-                            Describe what you're looking for
-                        </h3>
-                        <button
-                            class="rounded-lg p-2 transition-colors hover:bg-accent/50"
-                            @click="handleClose"
-                        >
-                            <X class="h-5 w-5" />
-                        </button>
-                    </div>
+            <Textarea
+                ref="expandedTextarea"
+                v-model="localQuery"
+                class="min-h-[200px] bg-background/60 text-lg"
+                :placeholder="placeholder"
+                @keydown.escape="handleClose"
+                @keydown.cmd.enter="handleSubmit"
+                @keydown.ctrl.enter="handleSubmit"
+            />
 
-                    <!-- Expanded Textarea -->
-                    <textarea
-                        ref="expandedTextarea"
-                        v-model="localQuery"
-                        class="min-h-[200px] w-full resize-none rounded-xl border border-border bg-background/50 p-4 text-lg outline-none focus:ring-2 focus:ring-primary/50"
-                        :placeholder="placeholder"
-                        @keydown.escape="handleClose"
-                        @keydown.cmd.enter="handleSubmit"
-                        @keydown.ctrl.enter="handleSubmit"
-                    />
-
-                    <!-- Footer -->
-                    <div class="mt-4 flex items-center justify-between">
-                        <p class="text-sm text-muted-foreground">
-                            Press
-                            <kbd class="rounded border px-1.5 py-0.5 text-xs"
-                                >⌘</kbd
-                            >
-                            +
-                            <kbd class="rounded border px-1.5 py-0.5 text-xs"
-                                >Enter</kbd
-                            >
-                            to search
-                        </p>
-                        <div class="flex gap-2">
-                            <Button variant="outline" @click="handleClose">
-                                Cancel
-                            </Button>
-                            <Button variant="default" @click="handleSubmit">
-                                Search
-                            </Button>
-                        </div>
-                    </div>
+            <div class="mt-4 flex items-center justify-between">
+                <p class="text-sm text-muted-foreground">
+                    Press
+                    <kbd class="rounded border px-1.5 py-0.5 text-xs">⌘</kbd>
+                    +
+                    <kbd class="rounded border px-1.5 py-0.5 text-xs">Enter</kbd>
+                    to search
+                </p>
+                <div class="flex gap-2">
+                    <Button variant="outline" @click="handleClose">
+                        Cancel
+                    </Button>
+                    <Button variant="default" @click="handleSubmit">
+                        Search
+                    </Button>
                 </div>
             </div>
-        </Transition>
-    </Teleport>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
-import { X } from 'lucide-vue-next';
 import { Button } from '@/components/ui';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 interface ExpandModalProps {
     show: boolean;
@@ -88,24 +60,25 @@ const emit = defineEmits<{
 }>();
 
 const localQuery = ref('');
-const expandedTextarea = ref<HTMLTextAreaElement>();
-const modalBackdrop = ref<HTMLDivElement>();
-const modalContent = ref<HTMLDivElement>();
+const expandedTextarea = ref<{ $el?: HTMLTextAreaElement } | HTMLTextAreaElement>();
 
 const placeholder = `Examples:
 • Words that mean someone who's really dedicated to their craft
 • I need a word for someone who pays attention to every tiny detail
 • What's a good word for stubborn but in a mean way`;
 
-// Sync with initial query when modal opens
 watch(
     () => props.show,
     (newVal) => {
         if (newVal) {
             localQuery.value = props.initialQuery;
             nextTick(() => {
-                expandedTextarea.value?.focus();
-                expandedTextarea.value?.setSelectionRange(
+                const textarea =
+                    expandedTextarea.value instanceof HTMLTextAreaElement
+                        ? expandedTextarea.value
+                        : expandedTextarea.value?.$el;
+                textarea?.focus();
+                textarea?.setSelectionRange(
                     localQuery.value.length,
                     localQuery.value.length
                 );
@@ -114,83 +87,17 @@ watch(
     }
 );
 
+const handleOpenChange = (open: boolean) => {
+    if (!open) {
+        handleClose();
+    }
+};
+
 const handleClose = () => {
     emit('close');
 };
 
 const handleSubmit = () => {
     emit('submit', localQuery.value);
-};
-
-// Smooth modal animations
-const modalEnter = (_el: Element, done: () => void) => {
-    const backdrop = modalBackdrop.value;
-    const content = modalContent.value;
-
-    if (!backdrop || !content) {
-        done();
-        return;
-    }
-
-    // Initial states
-    backdrop.style.opacity = '0';
-    content.style.opacity = '0';
-    content.style.transform = 'scale(0.97) translateY(10px)';
-
-    // Force reflow
-    backdrop.offsetHeight;
-
-    // Animate
-    requestAnimationFrame(() => {
-        // Backdrop fades in
-        backdrop.style.transition =
-            'opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1)';
-        backdrop.style.opacity = '1';
-
-        // Content appears slightly after
-        setTimeout(() => {
-            content.style.transition =
-                'all 250ms cubic-bezier(0.16, 1, 0.3, 1)';
-            content.style.opacity = '1';
-            content.style.transform = 'scale(1) translateY(0)';
-
-            setTimeout(done, 250);
-        }, 50);
-    });
-};
-
-const modalLeave = (el: Element, done: () => void) => {
-    const backdrop = modalBackdrop.value;
-    const content = modalContent.value;
-
-    if (!backdrop || !content) {
-        done();
-        return;
-    }
-
-    // Force current styles to be computed
-    const currentBackdropOpacity = window.getComputedStyle(backdrop).opacity;
-    const currentContentOpacity = window.getComputedStyle(content).opacity;
-    const currentContentTransform = window.getComputedStyle(content).transform;
-
-    // Set current state explicitly
-    backdrop.style.opacity = currentBackdropOpacity;
-    content.style.opacity = currentContentOpacity;
-    content.style.transform = currentContentTransform;
-
-    // Force reflow
-    void (el as HTMLElement).offsetHeight;
-
-    // Animate out
-    requestAnimationFrame(() => {
-        content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)';
-        content.style.opacity = '0';
-        content.style.transform = 'scale(0.97) translateY(10px)';
-
-        backdrop.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 1, 1)';
-        backdrop.style.opacity = '0';
-    });
-
-    setTimeout(done, 200);
 };
 </script>

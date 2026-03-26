@@ -7,19 +7,17 @@
     >
         <!-- Expand Button -->
         <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            leave-active-class="transition-all duration-200 ease-in"
+            enter-active-class="transition-fast"
+            leave-active-class="transition-[opacity,transform] duration-200 ease-in"
             enter-from-class="opacity-0 scale-90"
             leave-to-class="opacity-0 scale-90"
         >
-            <button
+            <Button
                 v-if="aiMode && scrollProgress < 0.3"
+                variant="ai"
+                size="icon"
                 :class="[
-                    'rounded-md p-1 transition-all duration-200',
-                    'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                    aiMode
-                        ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
-                        : 'bg-muted/50 hover:bg-muted/80',
+                    'h-[var(--search-slot-size,2rem)] w-[var(--search-slot-size,2rem)] rounded-xl p-0',
                 ]"
                 :style="{
                     opacity: 1 - scrollProgress * 3,
@@ -28,51 +26,36 @@
                 @click.stop="$emit('expand')"
                 title="Expand for longer input"
             >
-                <Maximize2
-                    :class="[
-                        'h-4 w-4',
-                        aiMode
-                            ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                            : 'text-foreground/70 hover:text-foreground',
-                    ]"
-                />
-            </button>
+                <Maximize2 class="h-4 w-4" />
+            </Button>
         </Transition>
 
         <!-- Clear Button -->
         <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            leave-active-class="transition-all duration-200 ease-in"
+            enter-active-class="transition-fast"
+            leave-active-class="transition-[opacity,transform] duration-200 ease-in"
             enter-from-class="opacity-0 scale-90"
             leave-to-class="opacity-0 scale-90"
         >
-            <button
+            <Button
                 v-if="showClear"
+                :variant="aiMode ? 'ai' : 'glass-subtle'"
+                size="icon"
                 @click.stop="$emit('clear')"
                 :class="[
-                    'rounded-md p-1 transition-all duration-200',
-                    'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                    aiMode
-                        ? 'bg-transparent hover:bg-amber-100/80 dark:hover:bg-amber-900/40'
-                        : 'bg-transparent hover:bg-muted/80',
+                    'h-[var(--search-slot-size,2rem)] w-[var(--search-slot-size,2rem)] rounded-xl p-0',
                 ]"
                 title="Clear search"
             >
-                <X
-                    :class="[
-                        'h-4 w-4',
-                        aiMode
-                            ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                            : 'text-foreground/50 hover:text-foreground/70',
-                    ]"
-                />
-            </button>
+                <X class="h-4 w-4" />
+            </Button>
         </Transition>
     </div>
 </template>
 
 <script setup lang="ts">
 import { Maximize2, X } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 
 defineProps<{
     aiMode: boolean;

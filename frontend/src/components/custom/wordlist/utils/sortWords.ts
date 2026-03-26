@@ -44,6 +44,12 @@ export function applySortCriteria(
                       : 'field' in criterion &&
                           criterion.field === 'next_review'
                         ? 'next_review'
+                        : 'field' in criterion &&
+                            criterion.field === 'frequency'
+                          ? 'frequency'
+                          : 'field' in criterion &&
+                              criterion.field === 'last_visited'
+                            ? 'last_visited'
                         : 'field' in criterion && criterion.field === 'added_at'
                           ? 'created'
                           : 'word';
@@ -87,6 +93,14 @@ export function applySortCriteria(
                 case 'created':
                     aVal = new Date(a.added_date || 0).getTime();
                     bVal = new Date(b.added_date || 0).getTime();
+                    break;
+                case 'frequency':
+                    aVal = a.frequency || 0;
+                    bVal = b.frequency || 0;
+                    break;
+                case 'last_visited':
+                    aVal = new Date(a.last_visited || 0).getTime();
+                    bVal = new Date(b.last_visited || 0).getTime();
                     break;
                 default:
                     continue;

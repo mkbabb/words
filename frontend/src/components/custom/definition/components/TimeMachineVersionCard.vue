@@ -81,7 +81,7 @@
                     <FieldWithDiff field="model_info" :diff-fields="diffFields" class="mt-2">
                         <div
                             v-if="content.model_info"
-                            class="flex items-center gap-3 text-[11px] text-muted-foreground"
+                            class="flex items-center gap-3 text-micro text-muted-foreground"
                         >
                             <span class="font-mono font-medium text-foreground/60">
                                 {{ content.model_info.name ?? content.model_info.model }}
@@ -166,8 +166,8 @@ import { computed, h, type FunctionalComponent } from 'vue';
 import { BookOpen, Maximize2, RotateCcw } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import ProviderIcons from './ProviderIcons.vue';
-import EditMetadataBlock from './EditMetadataBlock.vue';
+import ProviderIcons from './metadata/ProviderIcons.vue';
+import EditMetadataBlock from './editing/EditMetadataBlock.vue';
 import { useAuthStore } from '@/stores/auth';
 import type { VersionSummary, VersionDetailResponse } from '@/types/api';
 

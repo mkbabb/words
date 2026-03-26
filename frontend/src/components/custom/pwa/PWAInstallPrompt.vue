@@ -17,7 +17,7 @@
                 <Share2 class="h-6 w-6 text-primary animate-wiggle" />
               </div>
               <div class="flex-1">
-                <h3 class="text-lg font-semibold text-foreground">
+                <h3 class="text-subheading text-foreground">
                   Install Floridify
                 </h3>
                 <p class="text-sm text-muted-foreground">
@@ -77,7 +77,7 @@
                 <Download class="h-6 w-6 text-primary animate-bounce-in" />
               </div>
               <div class="flex-1">
-                <h3 class="text-lg font-semibold text-foreground">
+                <h3 class="text-subheading text-foreground">
                   Install Floridify
                 </h3>
                 <p class="text-sm text-muted-foreground">

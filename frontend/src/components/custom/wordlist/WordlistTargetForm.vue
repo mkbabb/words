@@ -36,7 +36,7 @@
                         <span>
                             {{
                                 selectedWordlist
-                                    ? `${selectedWordlist.name} (${selectedWordlist.unique_words} words)`
+                                    ? `${selectedWordlist.name} (${formatCount(selectedWordlist.unique_words)} words)`
                                     : 'Select a wordlist...'
                             }}
                         </span>
@@ -53,7 +53,7 @@
                         <div class="flex flex-col items-start">
                             <span class="font-medium">{{ wordlist.name }}</span>
                             <span class="text-xs text-muted-foreground">
-                                {{ wordlist.unique_words }} words
+                                {{ formatCount(wordlist.unique_words) }} words
                             </span>
                         </div>
                     </DropdownMenuItem>
@@ -121,6 +121,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import type { WordList } from '@/types';
+import { formatCount } from './utils/formatting';
 
 defineProps<{
     showForm: boolean;

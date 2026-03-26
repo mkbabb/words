@@ -1,7 +1,7 @@
 <template>
     <HoverCardContent
         :class="cn(
-            'themed-hovercard z-hovercard w-96',
+            'themed-hovercard z-hovercard max-w-[min(384px,90vw)] w-96 glass-heavy bg-background/96 shadow-cartoon-lg',
             variant !== 'default' ? 'shadow-cartoon-sm' : ''
         )"
         :data-theme="variant || 'default'"
@@ -11,7 +11,7 @@
         <div class="space-y-3">
             <!-- Cluster Header -->
             <div>
-                <h4 class="mb-1 text-base font-semibold uppercase">
+                <h4 class="mb-1 text-base font-medium uppercase">
                     {{ cluster.clusterName }}
                 </h4>
                 <p class="text-sm text-muted-foreground">
@@ -26,7 +26,7 @@
                     :key="i"
                     class="rounded-lg border border-border/30 bg-muted/20 px-3 py-2"
                 >
-                    <div class="mb-0.5 text-xs font-semibold text-primary/80">
+                    <div class="mb-0.5 text-xs font-medium text-primary/80">
                         {{ def.partOfSpeech }}
                     </div>
                     <p class="text-xs leading-relaxed text-foreground/80 line-clamp-2">

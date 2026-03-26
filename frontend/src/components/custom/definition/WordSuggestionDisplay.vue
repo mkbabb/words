@@ -12,7 +12,7 @@
                     <HoverCardTrigger as-child>
                         <ThemedCard
                             :variant="getCardVariant(index)"
-                            class="group ease-apple-spring relative cursor-pointer transition-all duration-500 hover:scale-[1.03]"
+                            class="group ease-apple-spring relative cursor-pointer transition-smooth hover:-translate-y-0.5 hover:shadow-lg"
                             @click="handleWordClick(suggestion.word)"
                         >
                             <div class="p-3">
@@ -31,7 +31,7 @@
                                             class="relative h-2 w-16 overflow-hidden rounded-full bg-muted"
                                         >
                                             <div
-                                                class="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-400 to-yellow-500 transition-all duration-500"
+                                                class="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-400 to-yellow-500 transition-smooth"
                                                 :style="{
                                                     width: `${suggestion.confidence * 100}%`,
                                                 }"

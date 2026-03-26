@@ -87,7 +87,7 @@
         </GlassDock>
 
         <!-- Theme dropdown -->
-        <Transition name="theme-dropdown">
+        <Transition name="dropdown">
             <div
                 v-if="showDropdown && editModeEnabled"
                 class="absolute top-full right-0 z-dropdown mt-2 min-w-[140px] origin-top-right rounded-lg border border-border/30 bg-background/92 backdrop-blur-md text-popover-foreground shadow-lg p-1"
@@ -100,7 +100,7 @@
                     :class="[
                         'flex w-full items-center rounded-md px-2 py-1.5 text-sm',
                         'transition-colors duration-150 hover:bg-accent hover:text-accent-foreground',
-                        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                        'focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none',
                         modelValue === option.value &&
                             'bg-accent text-accent-foreground font-medium',
                     ]"
@@ -121,7 +121,7 @@
         </Transition>
 
         <!-- Provider Version Selector Modal -->
-        <Transition name="theme-dropdown">
+        <Transition name="dropdown">
             <div
                 v-if="showVersionSelector && word"
                 class="absolute top-full right-0 z-dropdown mt-2 w-96 rounded-lg border border-border/30 bg-background/92 backdrop-blur-md p-4 shadow-lg"
@@ -146,7 +146,7 @@ import GlassDock from '@/components/custom/animation/GlassDock.vue';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';
-import ProviderVersionSelector from './ProviderVersionSelector.vue';
+import ProviderVersionSelector from './metadata/ProviderVersionSelector.vue';
 
 interface ThemeSelectorProps {
     isMounted: boolean;
@@ -216,7 +216,7 @@ const selectTheme = (theme: CardVariant) => {
     background: transparent;
     color: var(--color-muted-foreground);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
     flex-shrink: 0;
     padding: 0;
 }
@@ -244,30 +244,5 @@ const selectTheme = (theme: CardVariant) => {
     flex-shrink: 0;
 }
 
-.theme-dropdown-enter-active {
-    transition:
-        opacity 180ms var(--ease-apple-smooth),
-        transform 350ms var(--ease-apple-spring);
-}
-.theme-dropdown-leave-active {
-    transition:
-        opacity 150ms var(--ease-apple-smooth),
-        transform 200ms var(--ease-apple-smooth);
-}
-.theme-dropdown-enter-from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-8px);
-}
-.theme-dropdown-enter-to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-}
-.theme-dropdown-leave-from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-}
-.theme-dropdown-leave-to {
-    opacity: 0;
-    transform: scale(0.95) translateY(-8px);
-}
+/* dropdown transition classes are in src/assets/transitions.css */
 </style>

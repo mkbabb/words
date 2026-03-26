@@ -20,7 +20,7 @@
                 ref="searchBarElement"
                 :class="[
                     'search-bar relative flex items-center gap-2 overflow-visible px-1 py-0.5 sm:px-1',
-                    'shadow-cartoon-sm rounded-2xl transition-all duration-500 ease-out',
+                    'shadow-cartoon-sm rounded-2xl transition-[border-color,background-color,box-shadow,backdrop-filter] duration-500 ease-apple-smooth',
                     searchBar.isAIQuery && !searchBar.hasErrorAnimation
                         ? 'border-2 border-amber-500 bg-amber-50 backdrop-blur-sm dark:border-amber-700/40 dark:bg-amber-950/30'
                         : searchBar.hasErrorAnimation
@@ -33,24 +33,7 @@
                         'shake-error': searchBar.hasErrorAnimation,
                     },
                 ]"
-                :style="{
-                    height: searchBar.isAIQuery
-                        ? 'auto'
-                        : `${uiState.searchBarHeight}px`,
-                    minHeight: searchBar.isAIQuery
-                        ? `${uiState.searchBarHeight}px`
-                        : undefined,
-                    maxHeight: searchBar.isAIQuery
-                        ? 'min(420px, 60vh)'
-                        : undefined,
-                    overflowY: searchBar.isAIQuery ? 'visible' : 'visible',
-                    borderColor:
-                        searchBar.isAIQuery && !searchBar.hasErrorAnimation
-                            ? 'var(--ai-accent)'
-                            : searchBar.hasErrorAnimation
-                              ? 'var(--error-accent)'
-                              : undefined,
-                }"
+                :style="searchBarShellStyle"
             >
                 <!-- Border shimmer overlay in AI mode -->
                 <BorderShimmer
@@ -77,21 +60,11 @@
                 />
 
                 <!-- Search Input Container with Autocomplete -->
-                <div class="relative max-w-none min-w-0 flex-1 flex-grow">
+                <div class="search-field-shell relative max-w-none min-w-0 flex-1 flex-grow">
                     <!-- Autocomplete Overlay -->
                     <AutocompleteOverlay
                         :query="searchQuery"
                         :suggestion="searchBar.autocompleteText"
-                        :padding-left="iconOpacity > 0.1 ? '1rem' : '1.5rem'"
-                        :padding-right="
-                            searchQuery.length > 0
-                                ? '5rem'
-                                : uiState.expandButtonVisible
-                                  ? '3rem'
-                                  : iconOpacity > 0.1
-                                    ? '1rem'
-                                    : '1.5rem'
-                        "
                         :text-align="
                             iconOpacity < 0.3 && !searchBar.isAIQuery
                                 ? 'center'
@@ -105,25 +78,12 @@
                         v-model="searchQuery"
                         :placeholder="placeholder"
                         :ai-mode="searchBar.isAIQuery"
+                        :max-height="searchBar.isAIQuery ? 210 : 200"
                         :text-align="
                             iconOpacity < 0.3 && !searchBar.isAIQuery
                                 ? 'center'
                                 : 'left'
                         "
-                        :style="{
-                            paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight:
-                                searchQuery.length > 0 && searchBar.isAIQuery
-                                    ? '4.5rem' // Both clear and expand buttons visible
-                                    : searchQuery.length > 0 ||
-                                        searchBar.isAIQuery
-                                      ? '3rem' // Either clear or expand button visible
-                                      : iconOpacity > 0.1
-                                        ? '1rem'
-                                        : '1.5rem',
-                            paddingTop: '0.75rem',
-                            paddingBottom: '0.75rem',
-                        }"
                         @enter="handleEnterWrapped"
                         @tab="acceptAutocomplete"
                         @space="handleSpaceKey"
@@ -151,13 +111,11 @@
 
                 <!-- Hamburger Button -->
                 <div
-                    class="flex flex-shrink-0 items-center justify-center overflow-hidden transition-all duration-300 ease-out"
+                    class="search-hamburger-slot flex flex-shrink-0 items-center justify-center overflow-hidden transition-[opacity,transform] duration-350 ease-apple-default"
                     :style="{
                         opacity: iconOpacity,
                         transform: `scale(${0.9 + iconOpacity * 0.1})`,
                         pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-                        width: iconOpacity > 0.1 ? '40px' : '0px',
-                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
                     }"
                 >
                     <HamburgerIcon
@@ -222,15 +180,11 @@
                     <SearchResults
                         ref="searchResultsComponent"
                         :show="searchBar.showDropdown"
-                        :results="(searchBar.currentResults || []) as any[]"
+                        :results="unifiedResults"
                         :loading="loading.isSearching.value"
                         v-model:selected-index="searchSelectedIndex"
                         :query="searchQuery"
                         :ai-mode="searchBar.isAIQuery"
-                        :wordlist-mode="searchBar.searchMode === 'wordlist'"
-                        :wordlist-results="
-                            (searchBar.getResults('wordlist') as any[]) || []
-                        "
                         :recent-searches="historyStore.recentSearches as any[]"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
@@ -261,12 +215,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 // Modular stores - direct imports
 import { useSearchBarStore } from '@/stores/search/search-bar';
-import { useLookupMode } from '@/stores/search/modes/lookup';
-import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useContentStore } from '@/stores/content/content';
 import { useHistoryStore } from '@/stores/content/history';
 import { useUIStore } from '@/stores/ui/ui-state';
@@ -280,8 +232,8 @@ import SearchInput from './components/SearchInput.vue';
 import SparkleIndicator from './components/SparkleIndicator.vue';
 import ModeToggle from './components/ModeToggle.vue';
 import AutocompleteOverlay from './components/AutocompleteOverlay.vue';
-import SearchControls from './components/SearchControls.vue';
-import SearchResults from './components/SearchResults.vue';
+import SearchControls from './components/controls/SearchControls.vue';
+import SearchResults from './components/results/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
 import ThinLoadingProgress from './components/ThinLoadingProgress.vue';
 import SearchInputActions from './components/SearchInputActions.vue';
@@ -290,13 +242,12 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 // Import composables
 import {
     useSearchBarUI,
+    useSearchBarBindings,
     useSearchBarNavigation,
     useFocusManagement,
     useModalManagement,
     useSearchBarScroll,
     useAutocomplete,
-    useAIQueryDetection,
-    useSemanticStatusPoller,
 } from './composables';
 
 interface SearchBarProps {
@@ -326,8 +277,6 @@ const emit = defineEmits<{
 
 // Store & State - Direct store access for single source of truth
 const searchBar = useSearchBarStore();
-const lookupMode = useLookupMode();
-const wordlistMode = useWordlistMode();
 const content = useContentStore();
 const historyStore = useHistoryStore();
 const ui = useUIStore();
@@ -335,100 +284,29 @@ const loading = useLoadingStore();
 const router = useRouter();
 const { iconOpacity, uiState } = useSearchBarUI();
 
-// All functionality now uses modular stores directly - no reactive wrapper needed
-
-// Computed properties from stores
-const canToggleMode = computed(() => {
-    // Disable mode toggle in wordlist mode
-    if (searchBar.searchMode === 'wordlist') return false;
-
-    const hasWordQuery = !!content.currentEntry;
-    const hasSuggestionQuery = !!content.wordSuggestions;
-
-    if (!hasWordQuery && !hasSuggestionQuery) return false;
-    if (hasSuggestionQuery && !hasWordQuery) return false;
-
-    // Only allow thesaurus toggle if a dedicated thesaurus response exists
-    if (!content.currentThesaurus) return false;
-
-    return true;
-});
-
-const placeholder = computed(() => {
-    // Hide placeholder when scrolled
-    if (props.scrollProgress > 0.3) {
-        return '';
-    }
-
-    // First check searchMode for specific modes
-    if (searchBar.searchMode === 'wordlist') {
-        return 'words';
-    } else if (searchBar.searchMode === 'stage') {
-        return 'staging';
-    }
-
-    // Default to mode-based placeholders for lookup mode
-    return searchBar.getSubMode('lookup') === 'dictionary'
-        ? 'definitions'
-        : 'synonyms';
-});
-
-// Results container style — controls wrapper handles its own spacing now
-
-// Computed properties for v-model bindings
-const searchQuery = computed({
-    get: () => searchBar.searchQuery,
-    set: (value: string) => searchBar.setQuery(value),
-});
-
-const searchSelectedIndex = computed({
-    get: () => searchBar.searchSelectedIndex,
-    set: (value: number) => searchBar.setSelectedIndex(value),
-});
-
-// Computed properties for v-model bindings with mode stores directly
-const selectedSources = computed({
-    get: () => Array.from(lookupMode.selectedSources) as string[],
-    set: (value: string[]) => lookupMode.setSources(value as any),
-});
-
-const selectedLanguages = computed({
-    get: () => Array.from(lookupMode.selectedLanguages) as string[],
-    set: (value: string[]) => lookupMode.setLanguages(value as any),
-});
-
-const noAI = computed({
-    get: () => lookupMode.noAI,
-    set: (value: boolean) => lookupMode.setAI(!value),
-});
-
-// Computed properties for v-model bindings with wordlist mode store
-const wordlistFilters = computed({
-    get: () => ({ ...wordlistMode.wordlistFilters }),
-    set: (value: any) => wordlistMode.setWordlistFilters(value),
-});
-
-const wordlistSortCriteria = computed({
-    get: () => [...wordlistMode.wordlistSortCriteria],
-    set: (value: any) => wordlistMode.setWordlistSortCriteria(value),
-});
-
-// Progress bar state - computed based on loading state
-const isLoadingInProgress = computed(() => {
-    return (
-        loading.isSearching.value ||
-        (loading.loadingProgress.value > 0 &&
-            loading.loadingProgress.value < 100)
-    );
+// Extracted v-model bindings, computeds, and mode-lifecycle watchers
+const {
+    searchQuery,
+    searchSelectedIndex,
+    unifiedResults,
+    selectedSources,
+    selectedLanguages,
+    noAI,
+    wordlistFilters,
+    wordlistSortCriteria,
+    canToggleMode,
+    placeholder,
+    showProgressBar,
+    searchBarShellStyle,
+    stopLifecycleEffects,
+} = useSearchBarBindings({
+    scrollProgress: () => props.scrollProgress,
+    iconOpacity,
+    uiState,
 });
 
 // Dialog state
 const showClearStorageDialog = ref(false);
-
-const showProgressBar = computed(() => {
-    // Show progress bar if loading is in progress and modal is not visible
-    return isLoadingInProgress.value && !loading.showLoadingModal.value;
-});
 
 // Refs
 const searchContainer = ref<HTMLDivElement>();
@@ -476,30 +354,6 @@ const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery),
 });
 const { performSearch, clearSearch, cleanup: cleanupSearch } = orchestrator;
-
-// AI query detection and semantic status poller (extracted from lookup store)
-const aiQueryDetection = useAIQueryDetection();
-const semanticPoller = useSemanticStatusPoller();
-
-if (searchBar.searchMode === 'lookup') {
-    aiQueryDetection.start();
-    semanticPoller.start();
-}
-
-// Restart/stop when the search mode changes
-watch(
-    () => searchBar.searchMode,
-    (newMode, oldMode) => {
-        if (newMode === oldMode) return;
-        if (newMode === 'lookup') {
-            aiQueryDetection.start();
-            semanticPoller.start();
-        } else {
-            aiQueryDetection.stop();
-            semanticPoller.stop();
-        }
-    }
-);
 
 // Unified navigation and keyboard handling
 const {
@@ -627,20 +481,6 @@ watch(
     }
 );
 
-// Reset selected index when results change
-watchEffect(() => {
-    const results = searchBar.currentResults || [];
-
-    // Reset selected index if out of bounds
-    const maxResults =
-        searchBar.searchMode === 'wordlist'
-            ? Math.min(10, results.length)
-            : results.length;
-    if (searchBar.searchSelectedIndex >= maxResults) {
-        searchBar.setSelectedIndex(0);
-    }
-});
-
 // Click outside handler is now in useFocusManagement composable
 
 // Watch query changes — direct search (429s silenced in api/search.ts)
@@ -668,25 +508,6 @@ watch(
     }
 );
 
-// Hide dropdown when focus is lost; show recent searches on empty focus
-watchEffect(() => {
-    const focused = searchBar.isFocused;
-    const query = searchBar.searchQuery;
-
-    if (!focused) {
-        if (searchBar.showDropdown) {
-            searchBar.hideDropdown();
-        }
-    } else if (!query || query.length === 0) {
-        // Show dropdown for recent searches when focused with empty query
-        if (historyStore.recentSearches.length > 0) {
-            searchBar.openDropdown();
-        } else if (searchBar.showDropdown) {
-            searchBar.hideDropdown();
-        }
-    }
-});
-
 // Initialize
 onMounted(() => {
     searchBar.setAISuggestions([]);
@@ -696,12 +517,22 @@ onMounted(() => {
 onUnmounted(() => {
     cleanupSearch();
     cleanupFocus();
-    aiQueryDetection.stop();
-    semanticPoller.stop();
+    stopLifecycleEffects();
 });
 </script>
 
 <style scoped>
+.search-field-shell {
+    min-height: var(--search-min-h, 48px);
+    display: grid;
+    align-items: stretch;
+}
+
+.search-hamburger-slot {
+    width: var(--search-hamburger-width, 0rem);
+    margin-left: var(--search-hamburger-gap, 0rem);
+}
+
 /*
  * Controls dropdown: grid-based height animation.
  * Uses grid-template-rows 0fr/1fr for smooth collapse without max-height.

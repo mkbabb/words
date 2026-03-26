@@ -30,7 +30,7 @@
                     <template #display>
                         <p
                             :class="[
-                                'rounded-md border border-border/30 bg-muted/5 px-3 py-2 text-base leading-relaxed text-foreground italic transition-all duration-200',
+                                'rounded-md border border-border/30 bg-muted/5 px-3 py-2 text-base leading-relaxed text-foreground italic transition-fast',
                                 editMode
                                     ? 'hover:border-border/50 hover:bg-muted/10'
                                     : '',
@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import EditableField from './EditableField.vue';
+import EditableField from './editing/EditableField.vue';
 import { formatExampleHTML } from '../utils/formatting';
 
 import type { Example } from '@/types/api';

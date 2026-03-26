@@ -57,7 +57,7 @@ export function shouldTriggerAIMode(queryText: string): boolean {
     // Check for number requests (e.g., "10 words about...")
     const hasNumberRequest = /\b\d+\s+words?\b/.test(lowerQuery);
 
-    return hasQuestionWord || hasAIPattern || hasNumberRequest || wordCount > 2;
+    return hasQuestionWord || hasAIPattern || hasNumberRequest;
 }
 
 /**

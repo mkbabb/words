@@ -1,56 +1,45 @@
 <template>
     <div v-if="wordlist" class="space-y-4">
-        <!-- Stats Cards Row -->
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <!-- Words -->
-                <div class="stat-mastery rounded-xl bg-background/60 dark:bg-white/[0.04] backdrop-blur-sm border border-border/30 p-3">
-                    <div class="text-2xl font-bold tabular-nums">{{ wordlist.unique_words }}</div>
-                    <div class="text-xs font-medium tracking-wide text-muted-foreground uppercase">Words</div>
-                </div>
-
-                <!-- Mastered -->
-                <div class="stat-mastery rounded-xl bg-background/60 dark:bg-white/[0.04] backdrop-blur-md border border-border/30 border-mastery-gold bg-mastery-gold p-3">
-                    <div class="flex items-baseline gap-1.5">
-                        <span class="text-2xl font-bold tabular-nums mastery-gold">{{ mastered }}</span>
-                        <span v-if="wordlist.unique_words > 0" class="text-xs text-muted-foreground">
-                            / {{ wordlist.unique_words }}
-                        </span>
-                    </div>
-                    <div class="text-xs font-medium tracking-wide mastery-gold opacity-70 uppercase">Mastered</div>
-                </div>
-
-                <!-- Due for Review -->
-                <div :class="[
-                    'stat-mastery rounded-xl bg-background/60 dark:bg-white/[0.04] backdrop-blur-sm border border-border/30 p-3',
-                    dueForReview > 0 && 'border-primary/20 bg-primary/5 dark:bg-primary/[0.06]',
-                ]">
-                    <div :class="[
-                        'text-2xl font-bold tabular-nums',
-                        dueForReview > 0 ? 'text-primary' : ''
-                    ]">{{ dueForReview }}</div>
-                    <div :class="[
-                        'text-xs font-medium tracking-wide uppercase',
-                        dueForReview > 0 ? 'text-primary/70' : 'text-muted-foreground'
-                    ]">Due</div>
-                </div>
-
-                <!-- Streak -->
-                <div :class="[
-                    'stat-mastery rounded-xl bg-background/60 dark:bg-white/[0.04] backdrop-blur-sm border border-border/30 p-3',
-                    wordlist.learning_stats.streak_days > 0 && 'border-mastery-bronze bg-mastery-bronze',
-                ]">
-                    <div class="flex items-baseline gap-1">
-                        <span :class="[
-                            'text-2xl font-bold tabular-nums',
-                            wordlist.learning_stats.streak_days > 0 ? 'mastery-bronze' : ''
-                        ]">{{ wordlist.learning_stats.streak_days }}</span>
-                    </div>
-                    <div :class="[
-                        'text-xs font-medium tracking-wide uppercase',
-                        wordlist.learning_stats.streak_days > 0 ? 'mastery-bronze opacity-70' : 'text-muted-foreground'
-                    ]">Streak</div>
-                </div>
+        <!-- Stats Row — no background cards, just numbers -->
+        <div class="flex items-end gap-8 flex-wrap">
+            <!-- Words -->
+            <div>
+                <p class="text-3xl font-bold tabular-nums font-serif leading-none">{{ formatCount(wordlist.unique_words) }}</p>
+                <p class="mt-1 text-xs text-muted-foreground/60 uppercase tracking-widest">Words</p>
             </div>
+
+            <!-- Mastered -->
+            <div>
+                <div class="flex items-baseline gap-1.5">
+                    <p class="text-3xl font-bold tabular-nums font-serif leading-none mastery-gold">{{ formatCount(mastered) }}</p>
+                    <span v-if="wordlist.unique_words > 0" class="text-sm text-muted-foreground/40 tabular-nums">
+                        / {{ formatCount(wordlist.unique_words) }}
+                    </span>
+                </div>
+                <p class="mt-1 text-xs mastery-gold opacity-60 uppercase tracking-widest">Mastered</p>
+            </div>
+
+            <!-- Due for Review -->
+            <div>
+                <p :class="[
+                    'text-3xl font-bold tabular-nums font-serif leading-none',
+                    dueForReview > 0 ? 'text-primary' : ''
+                ]">{{ formatCount(dueForReview) }}</p>
+                <p :class="[
+                    'mt-1 text-xs uppercase tracking-widest',
+                    dueForReview > 0 ? 'text-primary/60' : 'text-muted-foreground/60'
+                ]">Due</p>
+            </div>
+
+            <!-- Streak -->
+            <div v-if="wordlist.learning_stats.streak_days > 0">
+                <p class="text-3xl font-bold tabular-nums font-serif leading-none mastery-bronze flex items-end gap-1">
+                    <Flame class="h-6 w-6 mb-0.5" />
+                    {{ formatCount(wordlist.learning_stats.streak_days) }}
+                </p>
+                <p class="mt-1 text-xs mastery-bronze opacity-60 uppercase tracking-widest">Streak</p>
+            </div>
+        </div>
 
         <!-- Divider -->
         <div class="border-b border-border/50" />
@@ -58,7 +47,9 @@
 </template>
 
 <script setup lang="ts">
+import { Flame } from 'lucide-vue-next';
 import type { WordList } from '@/types';
+import { formatCount } from './utils/formatting';
 
 defineProps<{
     wordlist: WordList | null;

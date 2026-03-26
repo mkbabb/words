@@ -6,7 +6,7 @@
         <span
             v-for="(synonym, index) in synonyms"
             :key="index"
-            class="group relative cursor-pointer rounded-md border border-border/50 bg-muted/50 px-2 py-1 text-sm text-foreground/80 transition-all duration-200 hover:border-border hover:bg-muted hover:text-foreground"
+            class="group relative cursor-pointer rounded-md border border-border/50 bg-muted/50 px-2 py-1 text-sm text-foreground/80 transition-fast hover:border-border hover:bg-muted hover:text-foreground"
             @click="!editMode && $emit('synonym-click', synonym)"
             @dblclick="editMode && editSynonym(index)"
         >
@@ -38,7 +38,7 @@
         <span v-if="editMode" class="inline-flex items-center gap-1">
             <button
                 @click="addSynonym"
-                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-all duration-150 hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
                 title="Add synonym"
             >
                 <Plus class="h-3.5 w-3.5" />
@@ -47,7 +47,7 @@
                 v-if="canRegenerate"
                 @click="$emit('regenerate')"
                 :disabled="isRegenerating"
-                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-all duration-150 hover:border-border hover:bg-muted hover:text-foreground hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                 title="Regenerate synonyms"
             >
                 <RefreshCw :class="['h-3.5 w-3.5', isRegenerating && 'animate-spin']" />
@@ -68,7 +68,7 @@
                 v-model="editingValue"
                 @keydown.enter="saveEdit"
                 @keydown.escape="cancelEdit"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none"
                 placeholder="Enter synonym..."
                 ref="editInput"
             />

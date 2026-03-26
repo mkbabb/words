@@ -75,7 +75,7 @@
                     <textarea
                         v-model="form.description"
                         placeholder="Brief description of this wordlist..."
-                        class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                        class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-primary"
                         rows="3"
                     />
                 </div>
@@ -88,7 +88,7 @@
                     <textarea
                         v-model="initialWordsText"
                         placeholder="words"
-                        class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-primary"
+                        class="w-full resize-none rounded-md border border-border bg-background px-3 py-2 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-primary"
                         rows="4"
                     />
                     <p class="text-xs text-muted-foreground">

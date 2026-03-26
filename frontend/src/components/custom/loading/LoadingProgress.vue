@@ -11,7 +11,7 @@
                     dark:bg-gray-700"
                 :class="[
                     variant === 'thin' ? 'h-1.5' : 'h-8',
-                    variant === 'thin' ? 'bg-muted/60 backdrop-blur-sm shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
+                    variant === 'thin' ? 'bg-muted/60 shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
                     interactive ? 'cursor-pointer' : '',
                 ]"
                 @mousedown="handleMouseDown"
@@ -22,10 +22,10 @@
                         ease-out"
                     :style="{
                         width: `${normalizedProgress}%`,
-                        background: rainbowGradient,
                         boxShadow: variant === 'thin' ? '0 0 10px rgba(255, 255, 255, 0.5)' : undefined,
                     }"
                     :class="[
+                        'progress-gradient',
                         variant === 'thin' ? '' : 'shadow-lg',
                         normalizedProgress < 100 ? 'animate-pulse' : '',
                     ]"
@@ -56,7 +56,7 @@
                     <HoverCard :open-delay="100" :close-delay="50">
                         <HoverCardTrigger as-child>
                             <button
-                                class="rounded-full transition-all duration-300 outline-none"
+                                class="rounded-full transition-normal outline-none"
                                 :class="[
                                     variant === 'thin' ? 'h-2 w-2 border' : 'h-6 w-6 border-2',
                                     normalizedProgress >= checkpoint.progress
@@ -133,7 +133,6 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { generateRainbowGradient } from '@/utils/animations';
 import {
     HoverCard,
     HoverCardContent,
@@ -200,8 +199,6 @@ const emit = defineEmits<Emits>();
 const progressBarRef = ref<HTMLElement>();
 const isDragging = ref(false);
 const isMounted = ref(false);
-
-const rainbowGradient = computed(() => generateRainbowGradient(8));
 
 // Get descriptive text for checkpoint stages using centralized config
 const getCheckpointDescriptionText = (progress: number): string => {

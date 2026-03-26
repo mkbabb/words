@@ -28,8 +28,7 @@
                     </span>
                     <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
                         <div
-                            class="h-full w-full animate-pulse rounded-full"
-                            :style="{ background: rainbowGradient }"
+                            class="h-full w-full animate-pulse rounded-full progress-gradient"
                         />
                     </div>
                 </div>
@@ -69,7 +68,7 @@
                     <!-- Actions -->
                     <div class="flex items-center gap-1 pt-1.5">
                         <button
-                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 transition-all duration-200 hover:scale-105 hover:bg-muted/30 hover:text-foreground active:scale-95"
+                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleLookup"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -77,7 +76,7 @@
                         </button>
                         <span class="mx-0.5 h-4 w-px bg-border/40" />
                         <button
-                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 transition-all duration-200 hover:scale-105 hover:bg-muted/30 hover:text-foreground active:scale-95"
+                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleAddToWordlist"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -100,7 +99,7 @@
                     <hr class="border-border/40" />
                     <div class="flex items-center gap-1 pt-1.5">
                         <button
-                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 transition-all duration-200 hover:scale-105 hover:bg-muted/30 hover:text-foreground active:scale-95"
+                            class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleLookup"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -116,7 +115,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { lookupApi, type WordPreview } from '@/api/lookup';
-import { generateRainbowGradient } from '@/utils/animations';
 
 interface WordLookupPopoverProps {
     selectedWord: string;
@@ -136,7 +134,6 @@ const emit = defineEmits<{
 
 const preview = ref<WordPreview | null>(null);
 const loading = ref(false);
-const rainbowGradient = generateRainbowGradient(8);
 
 // Position with centering baked into left/top so transform is free for animation
 const pillStyle = computed(() => ({

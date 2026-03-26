@@ -55,9 +55,10 @@ const cardStyles = computed(() => ({
   // Only add background-image, avoid mixBlendMode and opacity on the element itself
   ...(props.textureEnabled ? {
     backgroundImage: `var(--paper-${props.textureType}-texture)`,
-    backgroundSize: props.textureIntensity === 'subtle' ? '60px 60px' : 
+    backgroundSize: props.textureIntensity === 'subtle' ? '60px 60px' :
                    props.textureIntensity === 'medium' ? '80px 80px' : '100px 100px',
-    backgroundBlendMode: 'multiply'
+    // Skip blend-mode for subtle intensity — avoids CPU compositing on repeated cards
+    ...(props.textureIntensity !== 'subtle' ? { backgroundBlendMode: 'multiply' } : {}),
   } : {}),
 }))
 </script>
@@ -67,8 +68,5 @@ const cardStyles = computed(() => ({
   /* Base card styles */
 }
 
-/* Ensure texture is visible with base background */
-.card[style*="background"] {
-  background-blend-mode: multiply;
-}
+/* Base card — blend-mode applied via inline style only when intensity !== 'subtle' */
 </style>

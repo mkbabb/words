@@ -1,7 +1,7 @@
 <template>
     <div
         @click="$emit('click', suggestion)"
-        class="group border-border from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/15 cursor-pointer rounded-lg border bg-gradient-to-br p-3 transition-all duration-200 hover:shadow-sm"
+        class="group border-border from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/15 cursor-pointer rounded-lg border bg-gradient-to-br p-3 transition-fast hover:shadow-sm"
     >
         <div class="flex items-start justify-between">
             <div class="min-w-0 flex-1">

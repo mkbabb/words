@@ -1,19 +1,39 @@
 <template>
     <span class="tw-root">
         <span
-            v-for="(char, index) in displayTextChars"
+            v-for="(char, index) in leadingChars"
             :key="index"
             class="cursor-pointer hover:bg-muted/50 transition-colors duration-150 rounded-sm px-0.5 -mx-0.5"
             @click="handleCharClick(index)"
-            >{{ char }}</span
-        ><span
-            v-if="cursorVisible"
+        >
+            {{ char }}
+        </span>
+        <span v-if="tailChar !== null" class="tw-tail">
+            <span
+                class="cursor-pointer hover:bg-muted/50 transition-colors duration-150 rounded-sm px-0.5 -mx-0.5"
+                @click="handleCharClick(displayTextChars.length - 1)"
+            >
+                {{ tailChar }}
+            </span>
+            <span
+                v-if="cursorVisible"
+                class="tw-cursor text-primary font-light"
+                :class="{
+                    'tw-cursor--blink': cursorBlink && !typewriter.isTyping.value,
+                }"
+            >
+                {{ cursorChar }}
+            </span>
+        </span>
+        <span
+            v-else-if="cursorVisible"
             class="tw-cursor text-primary font-light"
             :class="{
                 'tw-cursor--blink': cursorBlink && !typewriter.isTyping.value,
             }"
-            >{{ cursorChar }}</span
         >
+            {{ cursorChar }}
+        </span>
     </span>
 </template>
 
@@ -85,6 +105,12 @@ const typewriter = useTypewriter({
 const { displayText, startTyping, stopTyping, reset, backspaceToPosition } = typewriter;
 
 const displayTextChars = computed(() => displayText.value.split(''));
+const leadingChars = computed(() => displayTextChars.value.slice(0, -1));
+const tailChar = computed(() =>
+    displayTextChars.value.length > 0
+        ? displayTextChars.value[displayTextChars.value.length - 1]
+        : null,
+);
 
 function handleCharClick(clickedIndex: number) {
     if (clickedIndex >= displayText.value.length) return;
@@ -133,6 +159,14 @@ defineExpose({
 </script>
 
 <style scoped>
+.tw-root {
+    display: inline;
+}
+
+.tw-tail {
+    white-space: nowrap;
+}
+
 .tw-cursor {
     display: inline-block;
 }

@@ -9,30 +9,30 @@
                     :data-sidebar-cluster="cluster.clusterId"
                     :aria-current="isActive ? 'true' : undefined"
                     :class="[
-                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200 focus-ring',
+                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring focus-ring transform-gpu',
                         isActive
-                            ? 'font-bold text-foreground'
-                            : 'font-normal text-foreground/80 hover:bg-muted/30 hover:text-foreground'
+                            ? 'bg-background/96 font-medium text-foreground shadow-sm'
+                            : 'bg-background/96 font-normal text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-sm'
                     ]"
                 >
                     <div class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2">
                         <ShimmerText
                             v-if="isActive"
                             :text="cluster.clusterName.toUpperCase()"
-                            text-class="themed-cluster-title text-left text-xs font-bold uppercase tracking-wider"
+                            text-class="themed-cluster-title text-left text-xs font-medium uppercase tracking-wider"
                             :duration="400"
                             :interval="15000"
                         />
                         <span
                             v-else
-                            class="themed-cluster-title text-left text-xs font-bold uppercase tracking-wider"
+                            class="themed-cluster-title text-left text-xs font-medium uppercase tracking-wider"
                         >
                             {{ cluster.clusterName.toUpperCase() }}
                         </span>
                     </div>
                     <div
                         v-if="isActive"
-                        class="ml-2 h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-all duration-300"
+                        class="ml-2 h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[transform,opacity] duration-300 ease-apple-smooth"
                     />
                 </button>
             </HoverCardTrigger>

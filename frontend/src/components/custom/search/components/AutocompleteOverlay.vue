@@ -2,17 +2,13 @@
     <div
         v-if="suggestion && suggestion !== query"
         :class="[
-            'pointer-events-none absolute inset-0 overflow-hidden whitespace-nowrap text-lg',
+            'search-input-overlay pointer-events-none absolute inset-0 overflow-hidden whitespace-nowrap text-lg',
             'text-muted-foreground/50',
         ]"
         :style="{
-            paddingLeft: paddingLeft,
-            paddingRight: paddingRight,
-            paddingTop: '0.75rem',
-            paddingBottom: '0.75rem',
             textAlign: textAlign,
-            lineHeight: '1.4',
-            minHeight: '48px',
+            lineHeight: 'var(--search-line-height, 1.4)',
+            minHeight: 'var(--search-min-h, 48px)',
         }"
     >
         <span class="invisible whitespace-pre">{{ query }}</span
@@ -24,14 +20,20 @@
 interface AutocompleteOverlayProps {
     query: string;
     suggestion: string;
-    paddingLeft?: string;
-    paddingRight?: string;
     textAlign?: 'left' | 'center' | 'right';
 }
 
 withDefaults(defineProps<AutocompleteOverlayProps>(), {
-    paddingLeft: '1rem',
-    paddingRight: '1rem',
     textAlign: 'left',
 });
 </script>
+
+<style scoped>
+.search-input-overlay {
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    padding-inline: var(--search-pad-start, 1rem) var(--search-pad-end, 1rem);
+    padding-block: var(--search-text-pad-y, calc((var(--search-min-h, 48px) - 1.1em) / 2));
+}
+</style>

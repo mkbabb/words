@@ -1,5 +1,11 @@
 import type { MasteryLevel, CardState } from '@/types/wordlist';
 
+const countFormatter = new Intl.NumberFormat('en-US');
+
+export function formatCount(value: number | undefined | null): string {
+    return countFormatter.format(value ?? 0);
+}
+
 /** Format fractional-day interval: 0.000694 -> "1min", 0.00694 -> "10min", 1 -> "1d", 4 -> "4d" */
 export function formatInterval(days: number | undefined): string {
     if (days == null) return '';

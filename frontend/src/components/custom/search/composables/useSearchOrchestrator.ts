@@ -1,20 +1,14 @@
 import { Ref, computed, ref } from 'vue';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
-import { useWordlistMode } from '@/stores/search/modes/wordlist';
-import { useHistoryStore } from '@/stores/content/history';
-import { useContentStore } from '@/stores/content/content';
 import { useLoadingState } from '@/stores/ui/loading';
-import { lookupApi, aiApi, wordlistApi } from '@/api';
 import { logger } from '@/utils/logger';
-import type {
-    SearchResult,
-    WordListItem,
-    WordSuggestionResponse,
-    SynthesizedDictionaryEntry,
-} from '@/types';
+import type { SynthesizedDictionaryEntry } from '@/types';
 
-interface UseSearchOrchestratorOptions {
+import { useLookupSearch } from './useLookupSearch';
+import { useWordlistSearch } from './useWordlistSearch';
+
+export interface UseSearchOrchestratorOptions {
     query: Ref<string>;
     onSearchComplete?: (results: any[]) => void;
 }
@@ -23,28 +17,23 @@ interface UseSearchOrchestratorOptions {
  * Central orchestration composable for all search operations
  *
  * ARCHITECTURE:
- * - This composable handles ALL search logic and API calls
+ * - This composable routes to mode-specific composables
  * - Stores handle ONLY state management, never API calls
  * - Loading state is wired to the global loading store
- * - Each mode has clearly separated operations
+ * - Each mode has clearly separated operations in its own composable
  */
 export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     const searchBar = useSearchBarStore();
     const lookupMode = useLookupMode();
-    const wordlistMode = useWordlistMode();
-    const history = useHistoryStore();
-    const contentStore = useContentStore();
     const loading = useLoadingState();
     const { query, onSearchComplete } = options;
 
     // Reactive error state
     const _searchError = ref<Error | null>(null);
 
-    // Track active stream for cancellation on new lookups
-    let activeStreamController: AbortController | null = null;
-
-    // Track active wordlist abort controller
-    let wordlistAbortController: AbortController | null = null;
+    // Mode-specific composables
+    const lookup = useLookupSearch({ query });
+    const wordlist = useWordlistSearch();
 
     // ============================================================================
     // SEARCH EXECUTION - MODE ROUTER
@@ -61,10 +50,11 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
             switch (mode) {
                 case 'lookup':
-                    results = await executeLookupSearch(queryText);
+                    results = await lookup.executeLookupSearch(queryText);
                     break;
                 case 'wordlist':
-                    results = await executeWordlistSearch(queryText);
+                    // WordListView owns wordlist search (debounce, guards, error handling).
+                    // No-op here to prevent double-watcher race conditions.
                     break;
                 case 'word-of-the-day':
                     results = await executeWordOfTheDaySearch(queryText);
@@ -88,374 +78,6 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             searchBar.clearResults();
             searchBar.hideDropdown();
             return [];
-        }
-    };
-
-    // ============================================================================
-    // LOOKUP MODE OPERATIONS
-    // ============================================================================
-
-    const executeLookupSearch = async (
-        queryText: string
-    ): Promise<SearchResult[]> => {
-        if (queryText.length < 2) {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-            return [];
-        }
-
-        const results = await lookupMode.search(queryText);
-
-        // Don't update UI if query changed while we were waiting (stale response)
-        const currentQuery = query.value?.trim() || '';
-        if (currentQuery !== queryText) {
-            return results;
-        }
-
-        // Guard against mode switches while request was in flight.
-        if (searchBar.searchMode !== 'lookup') {
-            return results;
-        }
-
-        if (searchBar.isDirectLookup || !searchBar.isFocused) {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-            return results;
-        }
-
-        if (results.length > 0) {
-            searchBar.openDropdown();
-            searchBar.setSelectedIndex(0);
-            history.addToHistory(queryText, results);
-        } else {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-        }
-
-        return results;
-    };
-
-    const getDefinition = async (
-        word: string,
-        options?: {
-            forceRefresh?: boolean;
-            onProgress?: (stage: string, progress: number) => void;
-        }
-    ): Promise<SynthesizedDictionaryEntry> => {
-        // Abort any active stream before starting a new one
-        if (activeStreamController) {
-            activeStreamController.abort();
-            activeStreamController = null;
-        }
-
-        const apiOptions = {
-            forceRefresh: options?.forceRefresh || false,
-            providers: Array.from(lookupMode.selectedSources) as any[],
-            languages: Array.from(lookupMode.selectedLanguages) as any[],
-            noAI: lookupMode.noAI,
-        };
-
-        loading.startOperation();
-
-        // Delay showing the modal — cached lookups return in <200ms and don't need it.
-        // Only show if the lookup takes longer than 400ms (provider fetch / synthesis).
-        const modalTimer = setTimeout(() => loading.setShowLoadingModal(true), 400);
-
-        try {
-            if (options?.onProgress) {
-                activeStreamController = new AbortController();
-                return await lookupApi.lookupStream(word, {
-                    forceRefresh: apiOptions.forceRefresh,
-                    providers: apiOptions.providers,
-                    languages: apiOptions.languages,
-                    noAI: apiOptions.noAI,
-                    abortController: activeStreamController,
-                    onProgress: (event) => {
-                        const stage = event.stage || 'processing';
-                        const progress = event.progress || 0;
-                        loading.setLoadingStage(stage);
-                        loading.setLoadingProgress(progress);
-                        options.onProgress?.(stage, progress);
-                    },
-                });
-            }
-
-            return await lookupApi.lookup(word, apiOptions);
-        } finally {
-            clearTimeout(modalTimer);
-            activeStreamController = null;
-            loading.setShowLoadingModal(false);
-            loading.endOperation();
-        }
-    };
-
-    const getThesaurusData = async (word: string): Promise<any> => {
-        // In no_ai mode, extract synonyms from provider definitions
-        if (lookupMode.noAI) {
-            const entry = contentStore.currentEntry;
-            if (entry?.definitions) {
-                const synonyms = (entry.definitions as any[])
-                    .flatMap((d: any) => d.synonyms || [])
-                    .filter((s: string, i: number, arr: string[]) => arr.indexOf(s) === i)
-                    .map((word: string) => ({ word, score: 0.8 }));
-                return { word, synonyms, confidence: synonyms.length > 0 ? 0.7 : 0 };
-            }
-            return { word, synonyms: [], confidence: 0 };
-        }
-
-        loading.startOperation();
-        try {
-            return await aiApi.synthesize.synonyms(word);
-        } catch (error) {
-            logger.error('Failed to fetch thesaurus data:', error);
-            // Return a graceful fallback instead of crashing the UI
-            return {
-                word,
-                synonyms: [],
-                confidence: 0,
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Failed to load thesaurus data',
-            };
-        } finally {
-            loading.endOperation();
-        }
-    };
-
-    const getAISuggestions = async (
-        query: string,
-        count = 12,
-        options?: {
-            onProgress?: (
-                stage: string,
-                progress: number,
-                message?: string,
-                details?: any
-            ) => void;
-        }
-    ): Promise<WordSuggestionResponse> => {
-        loading.setSuggestingWords(true);
-
-        try {
-            if (options?.onProgress) {
-                return await aiApi.suggestWordsStream(
-                    query,
-                    count,
-                    (
-                        stage: string,
-                        progress: number,
-                        message?: string,
-                        details?: any
-                    ) => {
-                        loading.setSuggestionsStage(stage);
-                        loading.setSuggestionsProgress(progress);
-                        options.onProgress?.(stage, progress, message, details);
-                    }
-                );
-            }
-
-            return await aiApi.suggestWords(query, count);
-        } finally {
-            loading.stopSuggestions();
-        }
-    };
-
-    // ============================================================================
-    // WORDLIST MODE OPERATIONS
-    // ============================================================================
-
-    const cancelWordlistSearch = () => {
-        if (wordlistAbortController) {
-            wordlistAbortController.abort();
-            wordlistAbortController = null;
-        }
-    };
-
-    const executeWordlistFetch = async (
-        wordlistId: string,
-        offset = 0,
-        limit = 100
-    ): Promise<WordListItem[]> => {
-        wordlistMode.setCurrentWordlistId(wordlistId);
-
-        // Cancel any existing wordlist search
-        cancelWordlistSearch();
-        wordlistAbortController = new AbortController();
-
-        try {
-            const response = await wordlistApi.getWordlistWords(wordlistId, {
-                offset,
-                limit,
-            });
-
-            const items = (response.items || []) as WordListItem[];
-            const replace = offset === 0;
-
-            // Update pagination in store
-            wordlistMode.setPagination({
-                offset: offset + items.length,
-                limit,
-                total: response.total || items.length,
-                hasMore: (response.total || 0) > offset + items.length,
-            });
-
-            wordlistMode.setResults(items, replace);
-            return items;
-        } catch (error: any) {
-            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-                wordlistMode.setPagination({
-                    ...wordlistMode.pagination,
-                    hasMore: false,
-                });
-                return [];
-            }
-
-            wordlistMode.clearResults();
-            throw error;
-        } finally {
-            wordlistAbortController = null;
-        }
-    };
-
-    const executeWordlistSearchApi = async (
-        wordlistId: string,
-        queryText: string,
-        offset = 0,
-        limit = 50
-    ): Promise<WordListItem[]> => {
-        wordlistMode.setCurrentWordlistId(wordlistId);
-        wordlistMode.setCurrentQuery(queryText);
-
-        // Cancel any existing wordlist search
-        cancelWordlistSearch();
-        wordlistAbortController = new AbortController();
-
-        try {
-            const response = await wordlistApi.searchWordlist(wordlistId, {
-                query: queryText,
-                max_results: limit,
-                min_score: wordlistMode.filters.minScore,
-                offset,
-                limit,
-            });
-
-            const items = (response.items || []) as unknown as WordListItem[];
-            const replace = offset === 0;
-
-            // Update pagination in store
-            wordlistMode.setPagination({
-                offset: offset + items.length,
-                limit,
-                total: response.total || items.length,
-                hasMore: (response.total || 0) > offset + items.length,
-            });
-
-            wordlistMode.setResults(items, replace);
-            return items;
-        } catch (error: any) {
-            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-                wordlistMode.setPagination({
-                    ...wordlistMode.pagination,
-                    hasMore: false,
-                });
-                return [];
-            }
-
-            wordlistMode.clearResults();
-            throw error;
-        } finally {
-            wordlistAbortController = null;
-        }
-    };
-
-    const executeWordlistSearch = async (
-        queryText: string
-    ): Promise<WordListItem[]> => {
-        const wordlistId = wordlistMode.selectedWordlist;
-
-        if (!wordlistId) {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-            return [];
-        }
-
-        let results: WordListItem[] = [];
-
-        if (!queryText) {
-            results = await executeWordlistFetch(wordlistId);
-            searchBar.hideDropdown();
-        } else {
-            results = await executeWordlistSearchApi(wordlistId, queryText);
-
-            if (results.length > 0) {
-                searchBar.openDropdown();
-                searchBar.setSelectedIndex(0);
-            } else {
-                searchBar.hideDropdown();
-            }
-        }
-
-        return results;
-    };
-
-    const loadMoreWordlist = async (): Promise<WordListItem[]> => {
-        const { hasMore } = wordlistMode.pagination;
-        const wordlistId = wordlistMode.currentWordlistId;
-        if (!hasMore || !wordlistId) return [];
-
-        const { offset, limit } = wordlistMode.pagination;
-        const currentQuery = wordlistMode.currentQuery;
-
-        if (currentQuery) {
-            return await executeWordlistSearchApi(
-                wordlistId,
-                currentQuery,
-                offset,
-                limit
-            );
-        } else {
-            return await executeWordlistFetch(wordlistId, offset, limit);
-        }
-    };
-
-    const addToWordlist = async (word: string): Promise<void> => {
-        const wordlistId = wordlistMode.selectedWordlist;
-        if (!wordlistId) {
-            throw new Error('No wordlist selected');
-        }
-        await wordlistApi.addWords(wordlistId, [word]);
-        // Refresh results to show the new word
-        await executeWordlistFetch(wordlistId);
-    };
-
-    const removeFromWordlist = async (word: string): Promise<void> => {
-        const wordlistId = wordlistMode.selectedWordlist;
-        if (!wordlistId) {
-            throw new Error('No wordlist selected');
-        }
-        await wordlistApi.removeWord(wordlistId, word);
-        // Optimistic update: remove from store results
-        const updated = [...wordlistMode.results].filter(
-            (w: any) => w.word !== word
-        );
-        wordlistMode.setResults(updated as any);
-    };
-
-    const processBatchWordlist = async (
-        words: string[],
-        onProgress?: (completed: number, total: number) => void
-    ): Promise<void> => {
-        const wordlistId = wordlistMode.selectedWordlist;
-        if (!wordlistId) {
-            throw new Error('No wordlist selected');
-        }
-
-        for (let i = 0; i < words.length; i++) {
-            await addToWordlist(words[i]);
-            if (onProgress) {
-                onProgress(i + 1, words.length);
-            }
         }
     };
 
@@ -506,7 +128,10 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
     const clearSearch = () => {
         searchBar.setQuery('');
-        searchBar.clearResults();
+        // Don't nuke wordlist cards — WordListView re-fetches on empty query.
+        if (searchBar.searchMode !== 'wordlist') {
+            searchBar.clearResults();
+        }
         searchBar.hideDropdown();
         _searchError.value = null;
         loading.resetLoading();
@@ -514,7 +139,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
     const cancelSearch = () => {
         lookupMode.cancelSearch();
-        cancelWordlistSearch();
+        lookup.cancelLookupStream();
+        wordlist.cancelWordlistSearch();
         loading.resetLoading();
     };
 
@@ -543,17 +169,17 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
         cancelSearch,
 
         // Lookup Mode Operations
-        getDefinition,
-        getThesaurusData,
-        getAISuggestions,
+        getDefinition: lookup.getDefinition,
+        getThesaurusData: lookup.getThesaurusData,
+        getAISuggestions: lookup.getAISuggestions,
 
         // Wordlist Mode Operations
-        executeWordlistFetch,
-        executeWordlistSearchApi,
-        loadMoreWordlist,
-        addToWordlist,
-        removeFromWordlist,
-        processBatchWordlist,
+        executeWordlistFetch: wordlist.executeWordlistFetch,
+        executeWordlistSearchApi: wordlist.executeWordlistSearchApi,
+        loadMoreWordlist: wordlist.loadMoreWordlist,
+        addToWordlist: wordlist.addToWordlist,
+        removeFromWordlist: wordlist.removeFromWordlist,
+        processBatchWordlist: wordlist.processBatchWordlist,
 
         // Word-of-the-Day Operations
         getTodaysWord,

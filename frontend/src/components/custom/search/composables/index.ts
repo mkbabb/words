@@ -1,5 +1,6 @@
 // Export focused SearchBar composables
 export { useSearchBarUI } from './useSearchBarUI';
+export { useSearchBarBindings } from './useSearchBarBindings';
 export { useSearchBarNavigation } from './useSearchBarNavigation';
 export { useSearchBarScroll } from './useSearchBarScroll';
 

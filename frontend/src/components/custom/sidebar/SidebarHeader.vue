@@ -1,15 +1,10 @@
 <template>
     <div class="border-border border-b px-3 py-2.5 flex items-center min-h-[3.25rem] overflow-hidden">
-        <Transition
-            mode="out-in"
-            enter-active-class="transition-opacity duration-200 ease-apple-smooth"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-150 ease-apple-smooth"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div v-if="!collapsed" key="expanded" class="flex items-center w-full gap-2">
+            <div
+                v-if="!collapsed"
+                key="expanded"
+                class="flex w-full items-center gap-2 transition-[opacity,transform] duration-350 ease-apple-spring transform-gpu"
+            >
                 <!-- Floridify icon -->
                 <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
 
@@ -27,7 +22,7 @@
                                 <AvatarImage src="https://avatars.githubusercontent.com/u/2848617?v=4" />
                             </Avatar>
                             <div>
-                                <h4 class="text-sm font-semibold hover:underline">
+                                <h4 class="text-sm font-medium hover:underline">
                                     <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
                                 </h4>
                                 <p class="text-muted-foreground text-sm italic">
@@ -54,22 +49,25 @@
                 <HamburgerIcon
                     :is-open="mobile ? ui.sidebarOpen : !collapsed"
                     :class="cn(
-                        'transition-all duration-300 ease-apple-smooth flex-shrink-0',
+                        'transform-gpu transition-[transform,opacity] duration-250 ease-apple-smooth flex-shrink-0',
                         mobile ? 'cursor-pointer' : 'cursor-ew-resize'
                     )"
                     @toggle="mobile ? ui.toggleSidebar() : ui.setSidebarCollapsed(!collapsed)"
                 />
             </div>
-            <div v-else key="collapsed" class="flex flex-col items-center gap-3 py-3 w-full">
-                <DarkModeToggle class="h-6 w-6 flex-shrink-0" />
+            <div
+                v-else
+                key="collapsed"
+                class="flex w-full flex-col items-center gap-3 py-3 transition-[opacity,transform] duration-350 ease-apple-spring transform-gpu"
+            >
+                <DarkModeToggle class="h-9 w-9 flex-shrink-0" />
                 <button
                     @click="ui.setSidebarCollapsed(false)"
-                    class="focus-ring cursor-ew-resize hover:bg-muted/50 rounded-xl p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
+                    class="focus-ring cursor-ew-resize rounded-xl border border-border/50 bg-background/95 p-2 transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/70 hover:shadow-md"
                 >
                     <PanelRight :size="16" class="text-muted-foreground" />
                 </button>
             </div>
-        </Transition>
     </div>
 </template>
 
