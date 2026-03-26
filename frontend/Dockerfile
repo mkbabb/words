@@ -39,8 +39,8 @@ COPY --from=dev-dependencies /app/node_modules ./node_modules
 ENV CHOKIDAR_USEPOLLING=true
 ENV VITE_HOST=0.0.0.0
 
-EXPOSE ${VITE_PORT:-3000}
-CMD ["sh", "-c", "npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-3000}"]
+EXPOSE ${VITE_PORT:-3004}
+CMD ["sh", "-c", "npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-3004}"]
 
 # Build stage
 FROM base AS build

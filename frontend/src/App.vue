@@ -1,8 +1,7 @@
 <template>
     <div
         :class="{ ios: isIOS, 'ios-standalone': isStandalone }"
-        class="min-h-screen bg-background text-foreground"
-        :style="appStyles"
+        class="app-shell min-h-screen bg-background text-foreground"
     >
         <router-view />
         <Toaster />
@@ -13,13 +12,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStateSync } from '@/composables/useStateSync';
+import { useAuthProfile } from '@/composables/useAuthProfile';
 
 // Sync UIStore resolvedTheme to <html> class (single source of truth)
 // Note: { immediate: true } is intentionally omitted to prevent FOUC.
@@ -28,23 +28,26 @@ import { useStateSync } from '@/composables/useStateSync';
 // initializes with DEFAULT_THEME before persistence restores the saved value.
 const ui = useUIStore();
 watch(() => ui.resolvedTheme, (theme) => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const html = document.documentElement;
+    // Suppress all CSS transitions during the swap — 200+ elements with
+    // transition-all would otherwise animate their colors over 150-500ms.
+    html.classList.add('no-transition');
+    html.classList.toggle('dark', theme === 'dark');
+    // Force a synchronous repaint so the browser applies the new colors
+    // in a single frame, then re-enable transitions.
+    html.offsetHeight;
+    html.classList.remove('no-transition');
 });
 
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();
 const { registerServiceWorker } = usePWA();
 
+// Initialize auth profile fetching (watches auth state)
+useAuthProfile();
+
 // Initialize state sync (preferences + history ↔ backend)
 useStateSync();
-
-// Add subtle paper texture to main background - simplified approach
-// App styles - only use background properties, not opacity/blend on the main container
-const appStyles = computed(() => ({
-    backgroundImage: 'var(--paper-clean-texture)',
-    backgroundAttachment: 'fixed',
-    backgroundSize: '60px 60px',
-}));
 
 // Engagement metric handlers (defined outside onMounted for proper cleanup)
 const handleWordSearched = () => {
@@ -86,3 +89,21 @@ onUnmounted(() => {
     window.removeEventListener('definition-viewed', handleDefinitionViewed);
 });
 </script>
+
+<style scoped>
+.app-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.app-shell::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--paper-clean-texture);
+    background-size: 60px 60px;
+    opacity: 0.9;
+}
+</style>

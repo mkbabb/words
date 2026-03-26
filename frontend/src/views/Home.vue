@@ -3,16 +3,9 @@
         <!-- Sidebar -->
         <Sidebar />
 
-        <div
-            :class="
-                cn('min-h-screen transition-all duration-300 ease-in-out', {
-                    'lg:ml-sidebar-expanded': !ui.sidebarCollapsed,
-                    'lg:ml-sidebar-collapsed': ui.sidebarCollapsed,
-                })
-            "
-        >
-        <!-- Main View -->
-        <div class="relative min-h-screen px-2 lg:p-4">
+        <div class="min-h-screen lg:ml-sidebar-collapsed">
+            <!-- Main View -->
+            <div class="relative min-h-screen px-2 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
                 <SearchBar
@@ -28,30 +21,26 @@
             <div class="border-b border-border lg:my-6"></div>
 
             <!-- Content Area with Sidebar -->
-            <div class="container mx-auto mt-4 lg:mt-6 max-w-6xl min-h-[calc(100dvh-8rem)]">
-                <div class="flex gap-6 relative">
-                    <!-- Progressive Sidebar (Sticky) -->
+            <div class="container mx-auto mt-5 lg:mt-6 max-w-6xl min-h-[calc(100dvh-8rem)]">
+                <div class="flex relative">
+                    <!-- Progressive Sidebar (Sticky) — instant show/hide, no width transition -->
                     <div
-                        class="hidden lg:block transition-all duration-200 ease-out"
-                        :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0 pointer-events-none'"
+                        v-if="shouldShowProgressiveSidebar"
+                        class="hidden lg:block w-[15rem] shrink-0 overflow-visible"
                     >
-                        <div
-                            v-if="shouldShowProgressiveSidebar"
-                            class="sticky w-48 top-[5.5rem]"
-                        >
+                        <div class="sticky top-[5.5rem] w-[15rem] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-clip scrollbar-thin pl-3 pr-4 pt-1 pb-4">
                             <ProgressiveSidebar v-if="searchBar.searchMode === 'lookup'" />
                             <WordlistProgressiveSidebar v-else-if="searchBar.searchMode === 'wordlist'" />
                         </div>
                     </div>
 
                     <!-- Main Content -->
-                    <div :class="['flex-1 max-w-5xl mx-auto', (lookupSubMode === 'suggestions' || searchBar.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
-                        <!-- Mode-level transition: lookup ↔ wordlist ↔ suggestions -->
-                        <Transition
-                    name="content-switch"
-                    mode="out-in"
-                    :duration="{ enter: 300, leave: 250 }"
-                >
+                    <div :class="['flex-1 min-w-0 max-w-5xl mx-auto', (lookupSubMode === 'suggestions' || searchBar.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
+                        <!-- Mode switch: instant swap, no transition.
+                             out-in transitions force Vue to keep the old component mounted
+                             during the leave phase — unmounting 100+ wordlist cards while
+                             animating causes severe jank. -->
+
                     <!-- Definition Content (stays mounted across word changes) -->
                     <div v-if="searchBar.searchMode === 'lookup' && lookupSubMode !== 'suggestions'" key="lookup">
                         <!-- Definition Display — mount when we have data OR are actively fetching -->
@@ -98,7 +87,8 @@
                             </div>
                         </div>
                     </div>
-                        </Transition>
+
+
                     </div>
                 </div>
             </div>
@@ -136,17 +126,14 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useScroll } from '@vueuse/core';
-import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
 import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
-import { useWordlistMode } from '@/stores/search/modes/wordlist';
-
 // Lazy-loaded: only parsed when the user switches to the relevant mode
 const WordListView = defineAsyncComponent(
-    () => import('@/components/custom/wordlist/WordListView.vue'),
+    () => import('@/components/custom/wordlist/views/WordListView.vue'),
 );
 const ProgressiveSidebar = defineAsyncComponent(
     () => import('@/components/custom/navigation/ProgressiveSidebar.vue'),
@@ -155,8 +142,7 @@ const WordlistProgressiveSidebar = defineAsyncComponent(
     () => import('@/components/custom/navigation/WordlistProgressiveSidebar.vue'),
 );
 
-const { searchBar, content, ui, loading } = useStores();
-const wordlistMode = useWordlistMode();
+const { searchBar, content, loading } = useStores();
 const route = useRoute();
 const router = useRouter();
 
@@ -317,6 +303,14 @@ watch(() => route.fullPath, async () => {
     } else if (routeName === 'Home') {
         searchBar.clearQuery();
         content.clearCurrentEntry();
+        // If in wordlist mode with a persisted wordlist, navigate to it
+        if (searchBar.searchMode === 'wordlist') {
+            const { wordlistMode } = useStores();
+            if (wordlistMode.selectedWordlist) {
+                router.replace({ name: 'Wordlist', params: { wordlistId: wordlistMode.selectedWordlist } });
+                return;
+            }
+        }
     }
 }, { immediate: true });
 
@@ -359,11 +353,9 @@ const searchBarClasses = computed(() => [
 ]);
 
 const shouldShowProgressiveSidebar = computed(() => {
-    // Hide when left sidebar is expanded — give main content more room
-    if (!ui.sidebarCollapsed) return false;
-
     if (searchBar.searchMode === 'wordlist') {
-        return !!wordlistMode.selectedWordlist;
+        // Show for both dashboard (wordlist list) and selected wordlist
+        return true;
     }
 
     const hasDefinition = !!currentEntry.value;
@@ -382,32 +374,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Content switch animation */
-.content-switch-enter-active,
-.content-switch-leave-active {
-    transition: opacity 0.3s var(--ease-apple-default),
-                transform 0.3s var(--ease-apple-default);
-}
-
-.content-switch-enter-from {
-    opacity: 0;
-    transform: translateY(10px);
-}
-
-.content-switch-enter-to {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.content-switch-leave-from {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.content-switch-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-}
 
 @keyframes cardFadeIn {
     from {

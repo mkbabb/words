@@ -10,7 +10,8 @@
     "test": "vitest",
     "type-check": "vue-tsc --noEmit",
     "type-check:watch": "vue-tsc --noEmit --watch",
-    "generate-favicon": "tsx scripts/favicon-generator/generate.ts"
+    "generate-favicon": "tsx scripts/favicon-generator/generate.ts",
+    "generate-api-types": "openapi-typescript http://localhost:8004/openapi.json -o src/types/api/generated.ts"
   },
   "dependencies": {
     "@clerk/vue": "^1.17.18",

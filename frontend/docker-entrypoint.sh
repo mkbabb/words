@@ -14,7 +14,7 @@ BASE_PATH="${BASE_PATH:-/}"
 # Create env.js file with runtime environment variables
 cat > /usr/share/nginx/html/env.js <<EOF
 window.__env__ = {
-  VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}",
+  VITE_API_URL: "${VITE_API_URL:-http://localhost:8003}",
   VITE_APP_TITLE: "${VITE_APP_TITLE:-Floridify}",
   VITE_ENVIRONMENT: "${VITE_ENVIRONMENT:-production}"
 };

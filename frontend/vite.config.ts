@@ -7,8 +7,8 @@ import http from 'http';
 import tailwindcss from '@tailwindcss/vite';
 import autoprefixer from 'autoprefixer';
 
-const API_TARGET = process.env.VITE_API_URL || 'http://127.0.0.1:8000';
-const VITE_PORT = Number(process.env.VITE_PORT) || 3000;
+const API_TARGET = process.env.VITE_API_URL || 'http://127.0.0.1:8003';
+const VITE_PORT = Number(process.env.VITE_PORT) || 3004;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -46,31 +46,29 @@ export default defineConfig({
           const proxyReq = http.request(
             {
               hostname: targetUrl.hostname,
-              port: Number(targetUrl.port) || 8000,
+              port: Number(targetUrl.port) || 8003,
               path: targetUrl.pathname + targetUrl.search,
               method: req.method || 'GET',
               headers: {
+                ...req.headers,
+                host: targetUrl.host,
                 'Accept': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Accept-Encoding': 'identity',
               },
             },
             (proxyRes) => {
-            res.writeHead(proxyRes.statusCode || 200, {
-              'Content-Type': 'text/event-stream; charset=utf-8',
-              'Cache-Control': 'no-cache',
-              'Connection': 'keep-alive',
-              'X-Accel-Buffering': 'no',
-              'Access-Control-Allow-Origin': '*',
+              res.writeHead(proxyRes.statusCode || 200, {
+                ...proxyRes.headers,
+                'Content-Type': 'text/event-stream; charset=utf-8',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
+                'Access-Control-Allow-Origin': '*',
+              });
+
+              proxyRes.pipe(res);
             });
-            // Pipe response directly — no buffering
-            proxyRes.on('data', (chunk: Buffer) => {
-              res.write(chunk);
-            });
-            proxyRes.on('end', () => {
-              res.end();
-            });
-          });
 
           proxyReq.on('error', (err: Error) => {
             console.error('[SSE Proxy] Error:', err.message);
@@ -80,8 +78,12 @@ export default defineConfig({
             }
           });
 
-          // If client disconnects, abort the proxy request
-          req.on('close', () => {
+          // Abort only on a real disconnect, not when the POST body finishes streaming.
+          req.on('aborted', () => {
+            proxyReq.destroy();
+          });
+
+          res.on('close', () => {
             proxyReq.destroy();
           });
 

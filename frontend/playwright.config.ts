@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000';
-const BACKEND_URL = process.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3004';
+const BACKEND_URL = process.env.VITE_API_URL || 'http://127.0.0.1:8003';
 
 // When PLAYWRIGHT_BASE_URL is set, assume servers are managed externally (e.g. Docker).
 const useExternalServers = !!process.env.PLAYWRIGHT_BASE_URL;

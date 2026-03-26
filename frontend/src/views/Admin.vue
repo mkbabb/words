@@ -18,7 +18,7 @@
       <!-- User Management -->
       <section>
         <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">User Management</h2>
+          <h2 class="text-subheading">User Management</h2>
           <button
             @click="loadUsers"
             :disabled="loading"
@@ -101,7 +101,7 @@
 
       <!-- Re-synthesis Tool -->
       <section>
-        <h2 class="mb-4 text-lg font-semibold">Re-synthesis Tool</h2>
+        <h2 class="mb-4 text-subheading">Re-synthesis Tool</h2>
         <div class="rounded-lg border border-border p-4">
           <p class="mb-3 text-sm text-muted-foreground">
             Force re-synthesis of a word's AI definition. This re-fetches provider data
@@ -135,7 +135,7 @@
       <!-- Wordlist Management -->
       <section>
         <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Wordlist Management</h2>
+          <h2 class="text-subheading">Wordlist Management</h2>
           <div class="flex items-center gap-2">
             <button
               @click="loadWordlists"
