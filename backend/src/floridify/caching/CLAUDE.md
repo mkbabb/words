@@ -6,7 +6,7 @@
 caching/
 ├── core.py                 # GlobalCacheManager: L1 memory + L2 disk
 ├── manager.py              # VersionedDataManager: L3, SHA-256, version chains
-├── config.py               # 13 namespace configs (TTL, compression, limits)
+├── config.py               # 14 namespace configs (TTL, compression, limits)
 ├── decorators.py           # @cached_api_call, @cached_computation, etc.
 ├── models.py               # CacheNamespace, BaseVersionedData, VersionInfo
 ├── filesystem.py           # DiskCache backend (10GB limit)
@@ -29,12 +29,12 @@ caching/
 
 ## Enums
 
-**CacheNamespace**: `DEFAULT`, `DICTIONARY`, `SEARCH`, `CORPUS`, `LANGUAGE`, `SEMANTIC`, `TRIE`, `LITERATURE`, `LEXICON`, `API`, `OPENAI` (stored as `"openai_structured"`), `SCRAPING`, `WOTD`
+**CacheNamespace**: `DEFAULT`, `DICTIONARY`, `SEARCH`, `CORPUS`, `LANGUAGE`, `SEMANTIC`, `TRIE`, `LITERATURE`, `LEXICON`, `API`, `OPENAI` (stored as `"openai_structured"`), `SCRAPING`, `WOTD`, `WORDLIST`
 **ResourceType**: `DICTIONARY`, `CORPUS`, `LANGUAGE`, `SEMANTIC`, `LITERATURE`, `SEARCH`, `TRIE`
 **CompressionType**: `ZSTD`, `LZ4`, `GZIP`
 **StorageType**: `MEMORY`, `CACHE`, `DATABASE`, `S3`
 
-## 13 Namespaces
+## 14 Namespaces
 
 | Namespace | Mem Limit | Mem TTL | Disk TTL | Compression |
 |-----------|-----------|---------|----------|-------------|
@@ -51,6 +51,7 @@ caching/
 | API | 100 | 1h | 12h | None |
 | LEXICON | 100 | 7d | 30d | None |
 | WOTD | 50 | 1d | 7d | None |
+| WORDLIST | 100 | 1h | 12h | None |
 
 ## Decorators
 

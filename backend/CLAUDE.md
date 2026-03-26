@@ -56,23 +56,37 @@ backend/src/floridify/
 │   └── user.py             # User(Document) for OAuth
 │
 ├── search/                 # Multi-method search → docs/search.md
-│   ├── core.py             # Search orchestrator, cascade logic
-│   ├── trie.py             # marisa-trie + Bloom filter
-│   ├── fuzzy.py            # RapidFuzz dual-scorer (WRatio + token_set_ratio)
-│   ├── bloom.py            # Bitarray-based membership testing
-│   ├── result.py           # SearchResult model
-│   ├── search_index.py     # SearchIndex model
-│   ├── trie_index.py       # TrieIndex document model
-│   ├── language.py         # Multi-corpus orchestration
-│   ├── constants.py        # SearchMethod, SearchMode enums
-│   ├── utils.py            # Length correction, frequency heuristics
+│   ├── engine.py           # Search orchestrator, cascade logic
+│   ├── index.py            # SearchIndex versioned model (links trie+fuzzy+semantic)
+│   ├── config.py           # All tunable constants (thresholds, budgets, boosts)
+│   ├── constants.py        # SearchMethod, SearchMode, FuzzySearchMethod enums
+│   ├── result.py           # SearchResult, MatchDetail
+│   ├── language.py         # LanguageSearch (multi-corpus delegation)
+│   ├── trie/               # Exact + prefix search
+│   │   ├── search.py       # TrieSearch (marisa-trie C++ backend)
+│   │   ├── index.py        # TrieIndex (versioned, includes Bloom filter bytes)
+│   │   └── bloom.py        # BloomFilter (xxHash, probabilistic membership)
+│   ├── fuzzy/              # Multi-strategy fuzzy matching
+│   │   ├── search.py       # FuzzySearch (candidate aggregation pipeline)
+│   │   ├── index.py        # FuzzyIndex (versioned, bundles BK+phonetic+suffix)
+│   │   ├── candidates.py   # Trigram inverted index + length buckets
+│   │   ├── bk_tree.py      # BKTree (Damerau-Levenshtein, adaptive k)
+│   │   ├── suffix_array.py # SuffixArray (pydivsufsort, O(m log n) substring)
+│   │   └── scoring.py      # Length correction, frequency heuristics
+│   ├── phonetic/           # Multilingual phonetic matching
+│   │   ├── index.py        # PhoneticIndex (composite + per-word codes)
+│   │   ├── encoder.py      # PhoneticEncoder (ICU normalization + jellyfish Metaphone)
+│   │   └── constants.py    # ICU transliteration rules (CLDR-sourced)
 │   └── semantic/           # FAISS vector search
-│       ├── core.py         # SemanticSearch: 5-tier index selection, embeddings
-│       ├── models.py       # SemanticIndex(Document)
-│       ├── constants.py    # Model catalog (Qwen3-0.6B), FAISS thresholds
-│       ├── embedding.py    # Embedding computation
-│       ├── index_builder.py # FAISS index construction
-│       └── persistence.py  # Index save/load
+│       ├── search.py       # SemanticSearch (from_corpus, query caching)
+│       ├── index.py        # SemanticIndex (versioned, binary data in GridFS)
+│       ├── constants.py    # Model catalog (Qwen3-0.6B), FAISS thresholds, HNSW config
+│       ├── encoder.py      # SemanticEncoder (text → embeddings)
+│       ├── embedding.py    # Model loading/caching, worker functions
+│       ├── builder.py      # SemanticEmbeddingBuilder (vocab → embeddings)
+│       ├── index_builder.py # FAISS index construction (5-tier by corpus size)
+│       ├── persistence.py  # GridFS save/load for binary data
+│       └── query_cache.py  # LRU query embedding cache
 │
 ├── ai/                     # AI integration → docs/synthesis.md
 │   ├── connector/          # AIConnector: async interface to OpenAI/Anthropic
@@ -105,7 +119,7 @@ backend/src/floridify/
 ├── caching/                # Multi-tier storage → docs/versioning.md
 │   ├── core.py             # GlobalCacheManager: L1 memory + L2 disk
 │   ├── manager.py          # VersionedDataManager: L3, SHA-256, version chains
-│   ├── config.py           # 13 namespace configs (TTL, compression, limits)
+│   ├── config.py           # 14 namespace configs (TTL, compression, limits)
 │   ├── decorators.py       # @cached_api_call, @cached_computation, etc.
 │   ├── models.py           # CacheNamespace, BaseVersionedData, VersionInfo
 │   ├── filesystem.py       # DiskCache backend (10GB limit)
@@ -230,10 +244,10 @@ Query → Search → Cache check
   → MongoDB + cache → Response
 ```
 
-**Search** ([`search/core.py`](src/floridify/search/core.py)):
+**Search** ([`search/engine.py`](src/floridify/search/engine.py)):
 ```
-Query → Exact (<1ms, marisa-trie) → Prefix → Fuzzy (RapidFuzz)
-  → Semantic (FAISS HNSW) → Deduplicate → Top N
+Query → Exact (<1ms, marisa-trie) → Prefix → Substring (suffix array)
+  → Fuzzy (BK-tree + phonetic + trigram) → Semantic (FAISS HNSW) → Deduplicate → Top N
 ```
 SearchEngineManager: hot-reload via 30s vocabulary_hash polling, atomic swap.
 
@@ -267,7 +281,7 @@ backend/tests/
 ├── corpus/                  # Tree ops, cascade deletion
 ├── caching/                 # L1/L2/L3 tiers
 ├── models/                  # Pydantic validation
-├── end_to_end/              # Full pipeline tests
+├── core/                    # Full pipeline tests (lookup, etc.)
 ├── utils/                   # Introspection
 └── fixtures/                # Test fixtures (epub, pdf)
 ```
@@ -280,7 +294,7 @@ backend/tests/
 cd backend
 uv venv && source .venv/bin/activate
 uv sync
-uv run scripts/run_api.py                      # Port 8000
+uv run scripts/run_api.py                      # Port 8003
 
 # Quality
 ruff check --fix && ruff format

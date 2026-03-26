@@ -8,12 +8,12 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 
 ```
 /
-├── backend/                    # Python 3.12+ FastAPI (port 8000) → backend/CLAUDE.md
-│   ├── src/floridify/          # 16 modules
+├── backend/                    # Python 3.12+ FastAPI (host port 8003 in Docker) → backend/CLAUDE.md
+│   ├── src/floridify/          # 17 modules
 │   │   ├── api/                # REST API: routers, repositories, middleware
 │   │   ├── core/               # Pipelines: lookup, search, WOTD, SSE streaming
 │   │   ├── models/             # Pydantic/Beanie models
-│   │   ├── search/             # Multi-method: exact, fuzzy, semantic (FAISS)
+│   │   ├── search/             # Multi-method: exact, prefix, substring, fuzzy (BK-tree + phonetic + trigram), semantic (FAISS)
 │   │   ├── ai/                 # OpenAI/Anthropic: 3-tier model selection
 │   │   ├── caching/            # L1 memory → L2 disk → L3 versioned MongoDB
 │   │   ├── corpus/             # UUID-based tree hierarchy, parsers
@@ -25,12 +25,13 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   │   ├── wotd/               # Word-of-the-Day ML pipeline
 │   │   ├── anki/               # .apkg flashcard export
 │   │   ├── audio/              # Multi-language TTS (KittenTTS + Kokoro-ONNX)
+│   │   ├── audit/              # Audit trail, fixtures
 │   │   └── utils/              # Logging, config, paths, validation
 │   ├── tests/                  # Integration tests (real MongoDB, real FAISS)
 │   ├── scripts/                # run_api.py, benchmark_performance.py
 │   └── pyproject.toml          # UV package manager
 │
-├── frontend/                   # Vue 3.5 TypeScript SPA (port 3000) → frontend/CLAUDE.md
+├── frontend/                   # Vue 3.5 TypeScript SPA (host port 3004 in Docker) → frontend/CLAUDE.md
 │   ├── src/
 │   │   ├── components/         # shadcn/ui + custom Vue components
 │   │   ├── stores/             # Pinia stores, mode-based delegation
@@ -66,13 +67,15 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   └── user_conf.d/floridify.conf  # SSL, HSTS, proxy routes, CORS
 │
 ├── docs/                       # Documentation
-│   ├── architecture.md         # System design
-│   ├── synthesis.md            # AI synthesis pipeline
-│   ├── search.md               # Multi-method search
-│   ├── versioning.md           # Versioning & caching
-│   ├── ai.md                   # AI integration details
+│   ├── architecture.md         # System design, module topology, deployment
+│   ├── api.md                  # REST API reference, auth, SSE, middleware
+│   ├── synthesis.md            # AI synthesis pipeline (consolidates ai.md)
+│   ├── search.md               # Multi-method search (DS, algorithms, math)
+│   ├── versioning.md           # Versioning & caching (3-tier, delta compression)
+│   ├── wordlist.md             # Wordlist pipeline (SM-2, mastery, Anki export)
+│   ├── corpus.md               # Corpus system (tree hierarchy, vocabulary)
+│   ├── audio.md                # Audio/TTS pipeline (KittenTTS, Kokoro-ONNX)
 │   ├── cli.md                  # CLI reference
-│   ├── anki.md                 # Flashcard export
 │   └── prompts/                # Deep research prompts
 │
 ├── docker-compose.yml          # Dev: backend, frontend, mongo, notifications
@@ -90,7 +93,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 
 **Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV
 **AI/ML**: OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, sentence-transformers (Qwen3-0.6B), FAISS
-**Search**: marisa-trie (exact), RapidFuzz (fuzzy), FAISS HNSW (semantic), Bloom filter
+**Search**: marisa-trie (exact), BK-tree + phonetic + trigram (fuzzy), suffix array (substring), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
 **Frontend**: Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk
 **TTS**: KittenTTS (English), Kokoro-ONNX (8 languages)
@@ -101,8 +104,8 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 **Lookup** ([`core/lookup_pipeline.py`](backend/src/floridify/core/lookup_pipeline.py)):
 Search → Cache check → Provider fetch (asyncio.gather) → AI synthesis → Store
 
-**Search** ([`search/core.py`](backend/src/floridify/search/core.py)):
-Exact (marisa-trie) → Prefix → Fuzzy (RapidFuzz) → Semantic (FAISS HNSW)—cascade with early termination. See [docs/search.md](docs/search.md).
+**Search** ([`search/engine.py`](backend/src/floridify/search/engine.py)):
+Exact (marisa-trie) → Prefix → Substring (suffix array) → Fuzzy (BK-tree + phonetic + trigram) → Semantic (FAISS HNSW)—cascade with early termination. See [docs/search.md](docs/search.md).
 
 **AI Synthesis** ([`ai/synthesizer.py`](backend/src/floridify/ai/synthesizer.py)):
 Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level components) → Save. See [docs/synthesis.md](docs/synthesis.md).
@@ -129,8 +132,8 @@ L1 memory → L2 disk → L3 versioned MongoDB with SHA-256 dedup and delta comp
 **Environment** (`.env`, not in git):
 ```bash
 ENVIRONMENT=development
-BACKEND_PORT=8000
-FRONTEND_PORT=3000
+BACKEND_PORT=8003
+FRONTEND_PORT=3004
 ```
 
 **API Keys** (`backend/auth/config.toml`, not in git—see [`config.example.toml`](config.example.toml)):

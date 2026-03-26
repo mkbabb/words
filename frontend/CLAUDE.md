@@ -13,32 +13,49 @@ frontend/src/
 │   │   ├── dropdown-menu/, hover-card/, input/, label/, multi-select/
 │   │   ├── notification/, popover/, progress/, select/, separator/
 │   │   ├── sheet/, skeleton/, slider/, tabs/, textarea/
-│   │   ├── toast/, tooltip/, infinite-scroll/
+│   │   ├── toast/, tooltip/
 │   │   └── index.ts
 │   └── custom/                 # Application components
 │       ├── search/             # SearchBar, SearchInput, AutocompleteOverlay, ModeToggle
-│       │   ├── components/     # SearchControls, SearchResults, ActionsRow, RainbowProgressBar
-│       │   ├── composables/    # useSearchOrchestrator, useAutocomplete, useFocusManagement
+│       │   ├── components/     # ActionsRow, ExpandModal, SearchInput, SparkleIndicator
+│       │   │   ├── controls/   # LookupControlsPanel, SearchControls, WordlistControlsPanel
+│       │   │   └── results/    # SearchResultItem, SearchResults
+│       │   ├── composables/    # useSearchOrchestrator, useFocusManagement, useLookupSearch
+│       │   │                   # useSearchBarBindings, useSearchBarNavigation, useWordlistSearch
 │       │   └── utils/          # keyboard, scroll, ai-query helpers
-│       ├── definition/         # DefinitionDisplay, DefinitionSkeleton
-│       │   ├── components/     # DefinitionCluster, WordHeader, Etymology, ThesaurusView
-│       │   │                   # ImageCarousel, AudioPlaybackButton, ProviderVersionSelector
-│       │   │                   # TimeMachineOverlay, VersionHistory, VersionDiffViewer
-│       │   │                   # InlineDiff, TextDiffBlock, AnimatedTitle, EmptyState, ErrorState
+│       ├── definition/         # DefinitionDisplay, WordSuggestionDisplay
+│       │   ├── components/     # WordHeader, Etymology, ThesaurusView, ProviderDataView
+│       │   │   │               # InlineDiff, TextDiffBlock, AnimatedTitle, EmptyState, ErrorState
+│       │   │   │               # DefinitionModals, DefinitionToolbar
+│       │   │   ├── content/    # DefinitionCluster, DefinitionContentRenderer, DefinitionContentView, DefinitionItem
+│       │   │   ├── editing/    # EditMetadataBlock, EditableField, SynonymChooser
+│       │   │   ├── media/      # AudioPlaybackButton, CarouselSlide, ImageCarousel, ImageUploader
+│       │   │   ├── metadata/   # ProviderIcons, ProviderMetadataCard, ProviderVersionSelector
+│       │   │   └── versioning/ # TimeMachineOverlay, VersionDiffViewer, VersionHistory
 │       │   ├── composables/    # useDefinitionEditMode, useImageManagement, useProviders
 │       │   │                   # useDefinitionGroups, useAudioPlayback, useTimeMachine
+│       │   │                   # useVirtualSectionWindow, virtualSectionLayout
 │       │   └── skeletons/      # Loading state skeletons
-│       ├── wordlist/           # WordListView, WordListCard, CreateWordListModal
-│       │   │                   # WordListUploadModal, WordListSortBuilder, WordlistStatsBar
-│       │   ├── composables/    # useWordlistOperations, useWordlistFiltering
-│       │   │                   # useWordlistFileParser, useWordlistUpload
-│       │   └── modals/         # EditWordNotesModal
-│       ├── sidebar/            # SidebarContent, SidebarHeader, SidebarFooter
+│       ├── wordlist/           # LeechPanel, MasteryBar, WordlistGrid, WordlistStatsBar
+│       │   │                   # WordlistTargetForm, UploadDropZone
+│       │   ├── cards/          # WordPreviewList
+│       │   ├── list/           # WordList, WordListRow, useWordListSelection
+│       │   ├── views/          # WordListView, WordlistDashboard
+│       │   ├── sorting/        # DashboardSortBuilder, WordListSortBuilder
+│       │   ├── composables/    # useWordlistFileParser, useWordlistUpload
+│       │   │                   # useWordlistReconcilePreview
+│       │   ├── modals/         # CreateWordListModal, EditWordlistModal, ReviewModal
+│       │   │                   # WordDetailModal, WordListUploadModal, ReviewCard
+│       │   │                   # ReviewQualityButtons, ReviewSessionComplete, EditWordNotesModal
+│       │   └── utils/          # formatting, sortWords
+│       ├── sidebar/            # SidebarContent, SidebarHeader
 │       │   │                   # SidebarLookupView, SidebarWordListView
-│       │   └── items/          # RecentLookupItem, VocabularySuggestionItem, YoshiAvatar
-│       ├── progressive-sidebar/ # ProgressiveSidebar, SidebarCluster, SidebarHoverCard
+│       │   │                   # GoldenSidebarSection, SidebarSection
+│       │   │                   # SidebarWordListItem, VocabularySuggestionItem
+│       ├── navigation/         # ProgressiveSidebar, WordlistProgressiveSidebar
+│       │   ├── components/     # PartOfSpeechPreview, SidebarCluster, SidebarHoverCard, SidebarPartOfSpeech
 │       │   ├── composables/    # useScrollTracking, useActiveTracking, useSidebarNavigation
-│       │   └── types.ts
+│       │   └── types/
 │       ├── auth/               # AuthGate, RoleBadge, UserMenu
 │       ├── loading/            # LoadingModal, LoadingProgress, pipeline-stages
 │       ├── icons/              # FloridifyIcon, FancyF, AppleIcon, OxfordIcon, etc.
@@ -79,7 +96,15 @@ frontend/src/
 │   ├── usePWA.ts               # PWA install/notification prompts
 │   ├── useTextureSystem.ts     # Paper texture management
 │   ├── useSlugGeneration.ts    # URL slug generation
-│   └── useStateSync.ts         # Cross-tab state synchronization
+│   ├── useStateSync.ts         # Cross-tab state synchronization
+│   ├── useAuthProfile.ts       # Auth profile management
+│   ├── useDockState.ts         # Dock state management
+│   ├── useInlineWordLookup.ts  # Inline word lookup popover
+│   ├── useVocabularySuggestions.ts # Vocabulary suggestions
+│   ├── useWordlistData.ts      # Wordlist data access
+│   └── virtual/                # Virtual scrolling composables
+│       ├── useVirtualGrid.ts, useVirtualSectionWindow.ts
+│       ├── useWindowedStore.ts, virtualSectionLayout.ts
 │
 ├── types/                      # Isomorphic types mirroring backend Pydantic
 │   ├── index.ts                # Re-exports
@@ -178,7 +203,7 @@ Fetch-based streaming (not `EventSource`—supports POST and custom headers). [`
 ## Development
 
 ```bash
-npm install && npm run dev       # Dev server on port 3000
+npm install && npm run dev       # Dev server on port 3004 via Docker, 3000 if run raw without env
 npm run type-check               # vue-tsc --noEmit
 npm run build                    # Production build
 prettier --write .               # Format
