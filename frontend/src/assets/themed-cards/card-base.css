@@ -3,8 +3,7 @@
 @layer utilities {
     /* Base themed card styles */
     .themed-card {
-        @apply relative overflow-hidden rounded-xl transition-all duration-300;
-        @apply bg-card text-card-foreground;
+        @apply relative overflow-hidden rounded-xl border border-border/35 bg-card text-card-foreground;
     }
 
     .themed-card[data-theme]:not([data-theme='default']) {
@@ -98,6 +97,11 @@
     .dark .themed-card[data-theme='bronze'].shadow-cartoon-md,
     .dark .themed-card[data-theme='bronze'].shadow-cartoon-lg {
         @apply border-orange-400/20;
+    }
+
+    /* Allow overflow-visible on themed cards that contain popovers/dropdowns */
+    .themed-card.overflow-visible {
+        overflow: visible;
     }
 
     /* Remove focus ring */

@@ -12,7 +12,7 @@
         aria-live="polite"
         :class="[
           'shadow-cartoon-sm rounded-2xl p-4 backdrop-blur-xl border-2',
-          'transition-all duration-300 hover-lift cursor-pointer',
+          'transition-normal hover-lift cursor-pointer',
           notificationClasses[notification.type]
         ]"
         @click="removeNotification(notification.id)"

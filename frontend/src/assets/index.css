@@ -9,8 +9,6 @@
 @layer base {
   body {
     font-family: 'Fraunces', Georgia, Cambria, 'Times New Roman', serif;
-    background-image: var(--paper-clean-texture);
-    background-attachment: fixed;
   }
 }
 
@@ -23,12 +21,55 @@
   }
 }
 
-/* Smooth color transitions only during intentional theme toggles.
-   Target specific elements with explicit backgrounds — NOT the universal wildcard (*).
-   Using * forces style recalculation on every DOM node (1500+ with wordlist cards),
-   causing severe jank. Body handles inherited text color; cards handle their own backgrounds. */
-.theme-transitioning,
-.theme-transitioning .themed-card,
-.theme-transitioning .stat-mastery {
-  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, fill 0.3s ease;
+/* Theme toggle is instant — no CSS transitions.
+   Any approach that touches DOM nodes (class-based transitions, View Transition API screenshots)
+   causes jank on pages with 100+ cards. Instant swap is the only performant option.
+   The .no-transition class is applied by App.vue during the toggle to suppress all transitions. */
+html.no-transition,
+html.no-transition *,
+html.no-transition *::before,
+html.no-transition *::after {
+  transition-duration: 0s !important;
+}
+
+@layer components {
+  .dialog-overlay {
+    @apply bg-background/72 backdrop-blur-md;
+  }
+
+  .dialog-surface {
+    @apply rounded-2xl border border-border/40 bg-background/94 backdrop-blur-xl shadow-2xl;
+    background-image: var(--paper-clean-texture);
+    background-blend-mode: multiply;
+  }
+
+  .popover-surface {
+    @apply rounded-2xl border border-border/40 bg-background/95 backdrop-blur-xl shadow-xl;
+    background-image: var(--paper-clean-texture);
+    background-blend-mode: multiply;
+  }
+
+  .card-surface {
+    @apply rounded-2xl border border-border/35 bg-background/92 backdrop-blur-sm shadow-card;
+    background-image: var(--paper-clean-texture);
+    background-blend-mode: multiply;
+  }
+
+  /* Lightweight card for virtualized grids — paper texture without
+     backdrop-blur or blend-mode (both are GPU-expensive in Safari
+     when multiplied across 100+ cards). */
+  .word-card {
+    background-image: var(--paper-clean-texture);
+    background-size: 60px 60px;
+  }
+
+  .interactive-item {
+    @apply rounded-xl outline-hidden select-none
+      transition-[background-color,color,border-color,box-shadow,transform] duration-200 ease-apple-default
+      hover:bg-accent/50
+      focus-visible:bg-accent focus-visible:text-accent-foreground
+      active:scale-[0.98]
+      disabled:pointer-events-none disabled:opacity-50
+      data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
+  }
 }

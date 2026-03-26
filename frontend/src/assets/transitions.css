@@ -1,4 +1,4 @@
-/* Transitions: Vue transition classes for result list animation */
+/* Transitions & Keyframes: shared animation definitions */
 
 @layer utilities {
   .result-list-enter-active,
@@ -19,4 +19,111 @@
   .result-list-move {
     transition: transform 0.3s ease;
   }
+}
+
+/* ─── Star shimmer animations (used by StarIcon) ─── */
+
+.star-shimmer-gold {
+    animation: star-shimmer-gold 4s ease-in-out infinite;
+}
+
+.star-shimmer-silver {
+    animation: star-shimmer-silver 5s ease-in-out infinite;
+}
+
+.star-shimmer-bronze {
+    animation: star-shimmer-bronze 4.5s ease-in-out infinite;
+}
+
+@keyframes star-shimmer-gold {
+    0%,
+    80% {
+        filter: brightness(1) saturate(1);
+    }
+    90% {
+        filter: brightness(1.4) saturate(1.3)
+            drop-shadow(0 0 8px rgb(251, 191, 36));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@keyframes star-shimmer-silver {
+    0%,
+    75% {
+        filter: brightness(1) saturate(1);
+    }
+    85% {
+        filter: brightness(1.3) saturate(1.2)
+            drop-shadow(0 0 6px rgb(203, 213, 225));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@keyframes star-shimmer-bronze {
+    0%,
+    85% {
+        filter: brightness(1) saturate(1);
+    }
+    92% {
+        filter: brightness(1.3) saturate(1.2)
+            drop-shadow(0 0 7px rgb(217, 119, 6));
+    }
+    100% {
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .star-shimmer-gold,
+    .star-shimmer-silver,
+    .star-shimmer-bronze {
+        animation: none;
+    }
+}
+
+/* ─── Standardized Vue Transition Classes ─── */
+
+/* Dropdown/popover appear — shared by search results, theme selector, etc. */
+.dropdown-enter-active { transition: opacity 120ms ease, transform 200ms var(--ease-apple-spring); }
+.dropdown-leave-active { transition: opacity 100ms ease, transform 150ms ease; }
+.dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: scale(0.96) translateY(4px); }
+
+/* Fade — generic crossfade for content switches */
+.fade-enter-active, .fade-leave-active { transition: opacity 150ms ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* Slide up — for docks, toasts, bottom sheets */
+.slide-up-enter-active { transition: opacity 200ms ease, transform 250ms var(--ease-apple-spring); }
+.slide-up-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
+.slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(8px); }
+
+/* Dock fade — for GlassDock expand/collapse content switching */
+.dock-fade-enter-active {
+    transition:
+        opacity 0.28s var(--ease-apple-smooth) 0.02s,
+        transform 0.28s var(--ease-apple-spring) 0.02s;
+}
+.dock-fade-leave-active {
+    transition:
+        opacity 0.18s var(--ease-apple-smooth),
+        transform 0.18s var(--ease-apple-smooth);
+    position: absolute;
+}
+.dock-fade-enter-from,
+.dock-fade-leave-to {
+    opacity: 0;
+    transform: scale(0.96) translateY(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dropdown-enter-active, .dropdown-leave-active,
+    .fade-enter-active, .fade-leave-active,
+    .slide-up-enter-active, .slide-up-leave-active,
+    .dock-fade-enter-active, .dock-fade-leave-active {
+        transition-duration: 0.01ms !important;
+    }
 }

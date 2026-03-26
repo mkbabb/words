@@ -58,7 +58,7 @@ const config: Config = {
         },
       },
       fontSize: {
-        'micro': '10px',
+        'micro': ['11px', { lineHeight: '1.2' }],
       },
       lineHeight: {
         'display': '1.2',
@@ -83,6 +83,7 @@ const config: Config = {
         'max': '9999',
       },
       borderRadius: {
+        '2xl': 'calc(var(--radius) + 8px)',
         xl: 'calc(var(--radius) + 4px)',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
@@ -251,6 +252,10 @@ const config: Config = {
         'card-hover': '0 8px 24px rgba(0, 0, 0, 0.12)',
         'subtle': '0 2px 8px rgba(0, 0, 0, 0.04)',
         'glow': '0 0 20px rgba(var(--color-primary), 0.3)',
+        'elevation-1': '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        'elevation-2': '0 4px 12px rgba(0, 0, 0, 0.08)',
+        'elevation-3': '0 8px 24px rgba(0, 0, 0, 0.12)',
+        'elevation-4': '0 16px 48px rgba(0, 0, 0, 0.16)',
       },
     },
   },
@@ -258,37 +263,8 @@ const config: Config = {
     animate,
     function({ addUtilities, matchUtilities, theme }) {
       const newUtilities = {
-        // Standardized hover effects
-        '.hover-lift': {
-          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.02]': {},
-        },
-        '.hover-lift-md': {
-          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.05]': {},
-        },
-        '.hover-lift-lg': {
-          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.1]': {},
-        },
         '.hover-shadow-lift': {
           '@apply transition-shadow duration-250 ease-apple-smooth hover:shadow-card-hover': {},
-        },
-        '.focus-ring': {
-          '@apply focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none': {},
-        },
-        // Standardized transition utilities
-        '.transition-micro': {
-          '@apply transition-all duration-150 ease-apple-smooth': {},
-        },
-        '.transition-fast': {
-          '@apply transition-all duration-250 ease-apple-default': {},
-        },
-        '.transition-normal': {
-          '@apply transition-all duration-350 ease-apple-default': {},
-        },
-        '.transition-smooth': {
-          '@apply transition-all duration-500 ease-apple-smooth': {},
-        },
-        '.transition-spring': {
-          '@apply transition-all duration-350 ease-apple-spring': {},
         },
         '.delay-0': {
           'animation-delay': '0ms',
@@ -349,22 +325,8 @@ const config: Config = {
           '@apply opacity-100 pointer-events-auto': {},
           transform: 'scale(1)',
         },
-        // Glass-morphism utilities
-        '.glass-light': {
-          '@apply bg-background/80 backdrop-blur-sm border border-border/30': {},
-        },
-        '.glass-medium': {
-          '@apply bg-background/80 backdrop-blur-md border border-border/30': {},
-        },
-        '.glass-heavy': {
-          '@apply bg-background/80 backdrop-blur-xl border border-border/30': {},
-        },
         '.glass-overlay': {
           '@apply bg-black/60 backdrop-blur-sm': {},
-        },
-        // Active states
-        '.active-scale': {
-          '@apply active:scale-[0.97] active:transition-transform active:duration-150': {},
         },
         // Paper texture utilities - visible textures that don't break elements
         '.texture-paper-clean': {
@@ -418,80 +380,49 @@ const config: Config = {
         '.bg-state-relearning':  { backgroundColor: 'color-mix(in srgb, var(--card-state-relearning) 10%, transparent)' },
         // Review quality button styles
         '.review-btn-again': {
-          '@apply border transition-all duration-200': {},
-          backgroundColor: 'color-mix(in srgb, var(--review-again) 15%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--review-again) 30%, transparent)',
+          '@apply border-2 transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-again) 18%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-again) 40%, transparent)',
           color: 'var(--review-again)',
           '&:hover': {
-            backgroundColor: 'color-mix(in srgb, var(--review-again) 25%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--review-again) 50%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--review-again) 30%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-again) 60%, transparent)',
           },
         },
         '.review-btn-hard': {
-          '@apply border transition-all duration-200': {},
-          backgroundColor: 'color-mix(in srgb, var(--review-hard) 15%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--review-hard) 30%, transparent)',
+          '@apply border-2 transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-hard) 18%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-hard) 40%, transparent)',
           color: 'var(--review-hard)',
           '&:hover': {
-            backgroundColor: 'color-mix(in srgb, var(--review-hard) 25%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--review-hard) 50%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--review-hard) 30%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-hard) 60%, transparent)',
           },
         },
         '.review-btn-good': {
-          '@apply border transition-all duration-200': {},
-          backgroundColor: 'color-mix(in srgb, var(--review-good) 15%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--review-good) 30%, transparent)',
+          '@apply border-2 transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-good) 18%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-good) 40%, transparent)',
           color: 'var(--review-good)',
           '&:hover': {
-            backgroundColor: 'color-mix(in srgb, var(--review-good) 25%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--review-good) 50%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--review-good) 30%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-good) 60%, transparent)',
           },
         },
         '.review-btn-easy': {
-          '@apply border transition-all duration-200': {},
-          backgroundColor: 'color-mix(in srgb, var(--review-easy) 15%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--review-easy) 30%, transparent)',
+          '@apply border-2 transition-all duration-200': {},
+          backgroundColor: 'color-mix(in srgb, var(--review-easy) 18%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--review-easy) 40%, transparent)',
           color: 'var(--review-easy)',
           '&:hover': {
-            backgroundColor: 'color-mix(in srgb, var(--review-easy) 25%, transparent)',
-            borderColor: 'color-mix(in srgb, var(--review-easy) 50%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--review-easy) 30%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--review-easy) 60%, transparent)',
           },
         },
         // Mastery stat card
         '.stat-mastery': {
           '@apply rounded-xl border p-3 backdrop-blur-md transition-all duration-200': {},
           '&:hover': { transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-        },
-        // ── Unified cartoon shadow system (WS1a) ──
-        '.shadow-cartoon-sm': {
-          boxShadow: '-6px 4px 1px var(--shadow-cartoon-color), 0 6px 1px var(--shadow-cartoon-color), -6px 6px 2px var(--shadow-cartoon-color-soft)',
-          border: '2px solid var(--color-border)',
-          transform: 'translateY(-2px)',
-        },
-        '.shadow-cartoon-md': {
-          boxShadow: '-8px 5px 1px var(--shadow-cartoon-color), 0 8px 2px var(--shadow-cartoon-color), -8px 8px 2px var(--shadow-cartoon-color-soft)',
-          border: '2px solid var(--color-border)',
-          transform: 'translateY(-2px)',
-        },
-        '.shadow-cartoon-lg': {
-          boxShadow: '-10px 6px 2px var(--shadow-cartoon-color), 0 10px 2px var(--shadow-cartoon-color), -10px 10px 3px var(--shadow-cartoon-color-soft)',
-          border: '2px solid var(--color-border)',
-          transform: 'translateY(-3px)',
-        },
-        '.shadow-cartoon-sm-hover': {
-          boxShadow: '-8px 6px 1px var(--shadow-cartoon-color-hover), 0 8px 1px var(--shadow-cartoon-color-hover), -8px 8px 2px var(--shadow-cartoon-color-hover-soft)',
-          border: '2px solid var(--color-border)',
-          transform: 'translateY(-4px)',
-        },
-        // ── Interactive state utilities (WS1b) ──
-        '.disabled-base': {
-          '@apply disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none': {},
-        },
-        '.card-hover': {
-          '@apply transition-all duration-200 hover:border-border/50 hover:bg-muted/30': {},
-        },
-        '.card-hover-interactive': {
-          '@apply transition-all duration-200 hover:bg-primary/5 hover:border-primary/30': {},
         },
         // ── Typography scale (WS1c) ──
         '.heading-1': { '@apply text-7xl font-serif font-bold leading-display': {} },

@@ -45,6 +45,21 @@
   --review-good: hsl(152 60% 42%);
   --review-easy: hsl(215 75% 55%);
 
+  /* Pre-computed color-mix() values for GlassDock (avoids real-time color space conversion) */
+  --color-card-82: hsl(48 12% 99% / 0.82);
+  --color-card-92: hsl(48 12% 99% / 0.92);
+  --color-card-96: hsl(48 12% 99% / 0.96);
+  --color-border-50: hsl(48 5% 89.8% / 0.50);
+  --color-border-70: hsl(48 5% 89.8% / 0.70);
+  --color-foreground-6: hsl(0 0% 3.9% / 0.06);
+  --color-foreground-8: hsl(0 0% 3.9% / 0.08);
+  --color-foreground-10: hsl(0 0% 3.9% / 0.10);
+  --color-foreground-12: hsl(0 0% 3.9% / 0.12);
+  --color-foreground-18: hsl(0 0% 3.9% / 0.18);
+
+  /* Design system radius token (consumed by tailwind.config.ts border-radius scale) */
+  --radius: 8px;
+
   /* Named easings as CSS custom properties (mirrors tailwind.config.ts) */
   --ease-apple-default: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1);
@@ -114,6 +129,18 @@
   --review-hard: hsl(25 75% 50%);
   --review-good: hsl(152 50% 45%);
   --review-easy: hsl(215 65% 55%);
+
+  /* Pre-computed color-mix() values for GlassDock (dark variants) */
+  --color-card-82: hsl(24 6% 7% / 0.82);
+  --color-card-92: hsl(24 6% 7% / 0.92);
+  --color-card-96: hsl(24 6% 7% / 0.96);
+  --color-border-50: hsl(24 4% 16% / 0.50);
+  --color-border-70: hsl(24 4% 16% / 0.70);
+  --color-foreground-6: hsl(48 10% 92% / 0.06);
+  --color-foreground-8: hsl(48 10% 92% / 0.08);
+  --color-foreground-10: hsl(48 10% 92% / 0.10);
+  --color-foreground-12: hsl(48 10% 92% / 0.12);
+  --color-foreground-18: hsl(48 10% 92% / 0.18);
 
   /* Dark mode texture variants */
   --paper-clean-texture: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.10'/%3E%3C/svg%3E");

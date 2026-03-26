@@ -53,38 +53,38 @@ export const TRANSFORM = {
 export const TRANSITION_CLASSES = {
   // Micro interactions (150ms)
   micro: {
-    enterActive: 'transition-all duration-150 ease-apple-smooth',
-    leaveActive: 'transition-all duration-150 ease-apple-smooth',
+    enterActive: 'transition-micro',
+    leaveActive: 'transition-micro',
   },
   
   // Fast transitions (250ms)
   fast: {
-    enterActive: 'transition-all duration-250 ease-apple-default',
-    leaveActive: 'transition-all duration-250 ease-apple-default',
+    enterActive: 'transition-fast',
+    leaveActive: 'transition-fast',
   },
   
   // Normal transitions (350ms)
   normal: {
-    enterActive: 'transition-all duration-350 ease-apple-default',
-    leaveActive: 'transition-all duration-350 ease-apple-default',
+    enterActive: 'transition-normal',
+    leaveActive: 'transition-normal',
   },
   
   // Spring transitions (350ms with bounce)
   spring: {
-    enterActive: 'transition-all duration-350 ease-apple-spring',
-    leaveActive: 'transition-all duration-250 ease-apple-bounce-in',
+    enterActive: 'transition-spring',
+    leaveActive: 'transition-[opacity,transform] duration-250 ease-apple-bounce-in',
   },
-  
+
   // Smooth transitions (500ms)
   smooth: {
-    enterActive: 'transition-all duration-500 ease-apple-smooth',
-    leaveActive: 'transition-all duration-350 ease-apple-ease-out',
+    enterActive: 'transition-smooth',
+    leaveActive: 'transition-[opacity,transform] duration-350 ease-apple-ease-out',
   },
-  
+
   // Elastic transitions (350ms with elastic bounce)
   elastic: {
-    enterActive: 'transition-all duration-350 ease-apple-elastic',
-    leaveActive: 'transition-all duration-200 ease-apple-bounce-in',
+    enterActive: 'transition-[opacity,transform] duration-350 ease-apple-elastic',
+    leaveActive: 'transition-[opacity,transform] duration-200 ease-apple-bounce-in',
   },
 } as const;
 

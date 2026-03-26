@@ -41,6 +41,162 @@
 }
 
 @layer utilities {
+  /* Shared interaction primitives.
+     Tailwind v4 does not reliably emit JS config utilities that themselves use `@apply`,
+     so the canonical versions live here in CSS. */
+  .hover-lift {
+    @apply transition-[transform,box-shadow] duration-250 ease-apple-default hover:-translate-y-px hover:shadow-md;
+  }
+
+  .hover-lift-md {
+    @apply transition-[transform,box-shadow] duration-250 ease-apple-default hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .hover-lift-lg {
+    @apply transition-[transform,box-shadow] duration-250 ease-apple-default hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  .hover-shadow-lift {
+    transition-property: box-shadow;
+    transition-duration: 250ms;
+    transition-timing-function: var(--ease-apple-smooth);
+  }
+
+  .hover-shadow-lift:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .focus-ring {
+    @apply focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none;
+  }
+
+  .transition-micro {
+    @apply transition-colors duration-150 ease-apple-smooth;
+  }
+
+  .transition-fast {
+    @apply transition-colors duration-200 ease-apple-default;
+  }
+
+  .transition-normal {
+    @apply transition-colors duration-250 ease-apple-default;
+  }
+
+  .transition-smooth {
+    @apply transition-colors duration-350 ease-apple-smooth;
+  }
+
+  .transition-spring {
+    @apply transition-colors duration-250 ease-apple-spring;
+  }
+
+  .glass-light {
+    @apply border border-border/30 bg-background/80 backdrop-blur-sm;
+  }
+
+  .glass-medium {
+    @apply border border-border/30 bg-background/80 backdrop-blur-md;
+  }
+
+  .glass-heavy {
+    @apply border border-border/30 bg-background/80 backdrop-blur-xl;
+  }
+
+  .glass-overlay {
+    @apply bg-black/60 backdrop-blur-sm;
+  }
+
+  .shadow-cartoon-sm {
+    box-shadow:
+      -3px 2px 1px var(--shadow-cartoon-color),
+      0 3px 1px var(--shadow-cartoon-color),
+      -3px 3px 1px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-1px);
+  }
+
+  .shadow-cartoon-md {
+    box-shadow:
+      -4px 3px 1px var(--shadow-cartoon-color),
+      0 4px 1px var(--shadow-cartoon-color),
+      -4px 4px 2px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-1px);
+  }
+
+  .shadow-cartoon-lg {
+    box-shadow:
+      -6px 4px 1px var(--shadow-cartoon-color),
+      0 6px 1px var(--shadow-cartoon-color),
+      -6px 6px 2px var(--shadow-cartoon-color-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-2px);
+  }
+
+  .shadow-cartoon-sm-hover {
+    box-shadow:
+      -4px 3px 1px var(--shadow-cartoon-color-hover),
+      0 4px 1px var(--shadow-cartoon-color-hover),
+      -4px 4px 2px var(--shadow-cartoon-color-hover-soft);
+    border: 2px solid var(--color-border);
+    transform: translateY(-2px);
+  }
+
+  /* ── Input focus ring (3B) ── */
+  .input-focus {
+    @apply outline-none ring-0
+      focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1
+      transition-shadow duration-200 ease-apple-smooth;
+  }
+
+  /* ── Progress gradient (rainbow) ── */
+  .progress-gradient {
+    background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d0, #3b82f6, #9333ea);
+  }
+
+  /* ── Review progress gradient (bronze → gold) ── */
+  .review-progress-gradient {
+    background: linear-gradient(90deg, var(--mastery-bronze), var(--mastery-gold));
+  }
+
+  /* ── Glassmorphic checkbox ── */
+  .checkbox-glass {
+    @apply h-5 w-5 rounded-lg border-2 border-border/60 backdrop-blur-sm shadow-sm
+      transition-[background-color,border-color,transform,box-shadow] duration-200 ease-apple-spring;
+  }
+
+  /* ── Mastery bar gradients (3C) ── */
+  .mastery-bar-gold {
+    background: linear-gradient(90deg, var(--color-chart-4), var(--color-chart-5));
+  }
+  .mastery-bar-silver {
+    background: linear-gradient(90deg, var(--color-chart-2), var(--color-chart-3));
+  }
+  .mastery-bar-bronze {
+    background: linear-gradient(90deg, var(--color-chart-1), var(--color-chart-2));
+  }
+
+  /* ── Sort button active gradient (3D) ── */
+  .sort-button-active {
+    @apply bg-primary/10 text-primary border-primary/30;
+  }
+
+  .active-scale {
+    @apply active:scale-[0.97] active:transition-transform active:duration-150;
+  }
+
+  .disabled-base {
+    @apply disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .card-hover {
+    @apply transition-[color,background-color,border-color,box-shadow] duration-250 ease-apple-default hover:border-border/50 hover:bg-muted/30;
+  }
+
+  .card-hover-interactive {
+    @apply transition-[color,background-color,border-color,box-shadow] duration-250 ease-apple-default hover:border-primary/30 hover:bg-primary/5;
+  }
+
   /* Custom scrollbar styles */
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -169,68 +325,6 @@
     animation: shake 0.5s ease-in-out;
   }
 
-  /* ── Cartoon shadow system ── */
-  .shadow-cartoon-sm {
-    box-shadow:
-      -6px 4px 1px var(--shadow-cartoon-color),
-      0 6px 1px var(--shadow-cartoon-color),
-      -6px 6px 2px var(--shadow-cartoon-color-soft);
-    border: 2px solid var(--color-border);
-    transform: translateY(-2px);
-  }
-
-  .shadow-cartoon-md {
-    box-shadow:
-      -8px 5px 1px var(--shadow-cartoon-color),
-      0 8px 2px var(--shadow-cartoon-color),
-      -8px 8px 2px var(--shadow-cartoon-color-soft);
-    border: 2px solid var(--color-border);
-    transform: translateY(-2px);
-  }
-
-  .shadow-cartoon-lg {
-    box-shadow:
-      -10px 6px 2px var(--shadow-cartoon-color),
-      0 10px 2px var(--shadow-cartoon-color),
-      -10px 10px 3px var(--shadow-cartoon-color-soft);
-    border: 2px solid var(--color-border);
-    transform: translateY(-3px);
-  }
-
-  .shadow-cartoon-sm-hover {
-    box-shadow:
-      -8px 6px 1px var(--shadow-cartoon-color-hover),
-      0 8px 1px var(--shadow-cartoon-color-hover),
-      -8px 8px 2px var(--shadow-cartoon-color-hover-soft);
-    border: 2px solid var(--color-border);
-    transform: translateY(-4px);
-  }
-
-  /* ── Focus ring ── */
-  .focus-ring:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 50%, transparent);
-  }
-
-  /* ── Glass morphism ── */
-  .glass-light {
-    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
-    backdrop-filter: blur(4px);
-    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
-  }
-
-  .glass-medium {
-    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
-    backdrop-filter: blur(12px);
-    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
-  }
-
-  .glass-heavy {
-    background-color: color-mix(in srgb, var(--color-background) 80%, transparent);
-    backdrop-filter: blur(24px);
-    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
-  }
-
   /* ── Divider utilities ── */
   .divider-h {
     height: 2px;
@@ -255,4 +349,15 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* ── Content hierarchy — golden-ratio scale (1.618) ── */
+@layer components {
+  .text-display    { @apply text-3xl font-serif font-bold tracking-tight; line-height: 1.2; }  /* 30px — page titles */
+  .text-title      { @apply text-2xl font-serif font-bold; }                                  /* 24px — section heads */
+  .text-heading    { @apply text-xl font-serif font-semibold; }                                /* 20px — subsections */
+  .text-subheading { @apply text-lg font-medium; }                                             /* 18px — card titles */
+  .text-body       { @apply text-sm leading-relaxed; }                                         /* 14px — body copy */
+  .text-caption    { @apply text-xs text-muted-foreground; }                                   /* 12px — labels, hints */
+  /* text-micro already exists at 11px via tailwind.config.ts fontSize extension */
 }
