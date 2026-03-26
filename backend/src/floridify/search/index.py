@@ -18,22 +18,16 @@ from ..caching.models import (
 from ..corpus.core import Corpus
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE
-from .trie_index import TrieIndex
+from .trie.index import TrieIndex
 
 logger = get_logger(__name__)
-
-
-def _get_default_semantic_model() -> str:
-    """Lazy import to avoid circular dependency."""
-    from .semantic.constants import DEFAULT_SENTENCE_MODEL
-
-    return DEFAULT_SENTENCE_MODEL
 
 
 class SearchIndex(BaseModel):
     """Complete search index data model for SearchEngine.
 
     Contains all configuration, references, and state for multi-method search.
+    Links to all component indices by ID for lifecycle management.
     """
 
     # Index identification
@@ -45,11 +39,12 @@ class SearchIndex(BaseModel):
     # Search configuration
     min_score: float = DEFAULT_MIN_SCORE
     semantic_enabled: bool = True
-    semantic_model: str = Field(default_factory=_get_default_semantic_model)
+    semantic_model: str = "Qwen/Qwen3-Embedding-0.6B"
 
-    # Component indices (embedded or referenced)
+    # Component index linkage (all managed by Search.initialize())
     trie_index_id: PydanticObjectId | None = None
     semantic_index_id: PydanticObjectId | None = None
+    fuzzy_index_id: PydanticObjectId | None = None
 
     # Statistics
     vocabulary_size: int = 0
@@ -161,7 +156,7 @@ class SearchIndex(BaseModel):
     async def create(
         cls,
         corpus: Corpus,
-        min_score: float = 0.75,
+        min_score: float = DEFAULT_MIN_SCORE,
         semantic: bool = True,
         semantic_model: str | None = None,
     ) -> SearchIndex:
@@ -186,7 +181,7 @@ class SearchIndex(BaseModel):
             vocabulary_hash=corpus.vocabulary_hash,
             min_score=min_score,
             semantic_enabled=semantic,
-            semantic_model=semantic_model or _get_default_semantic_model(),
+            semantic_model=semantic_model or "Qwen/Qwen3-Embedding-0.6B",
             vocabulary_size=len(corpus.vocabulary),
         )
 
@@ -194,7 +189,7 @@ class SearchIndex(BaseModel):
     async def get_or_create(
         cls,
         corpus: Corpus,
-        min_score: float = 0.75,
+        min_score: float = DEFAULT_MIN_SCORE,
         semantic: bool = True,
         semantic_model: str | None = None,
         config: VersionConfig | None = None,
@@ -285,11 +280,21 @@ class SearchIndex(BaseModel):
                     f"expected {self.vocabulary_hash}, got {saved.vocabulary_hash}"
                 )
 
-            # Verify component references are intact
+            # Reconcile component references — concurrent rebuilds may have
+            # updated the persisted index between our save and the verify read.
+            # Accept the saved state as canonical instead of crashing.
             if self.trie_index_id and saved.trie_index_id != self.trie_index_id:
-                raise ValueError("Trie index reference mismatch after save")
+                logger.warning(
+                    f"Trie index reference updated concurrently for {resource_id}: "
+                    f"{self.trie_index_id} → {saved.trie_index_id}"
+                )
+                self.trie_index_id = saved.trie_index_id
             if self.semantic_index_id and saved.semantic_index_id != self.semantic_index_id:
-                raise ValueError("Semantic index reference mismatch after save")
+                logger.warning(
+                    f"Semantic index reference updated concurrently for {resource_id}: "
+                    f"{self.semantic_index_id} → {saved.semantic_index_id}"
+                )
+                self.semantic_index_id = saved.semantic_index_id
 
             logger.info(f"Successfully saved and verified search index for {resource_id}")
 
@@ -339,7 +344,7 @@ class SearchIndex(BaseModel):
             try:
                 logger.info(f"Deleting SemanticIndex {self.semantic_index_id}...")
                 # Lazy: heavyweight module
-                from ..search.semantic.models import SemanticIndex
+                from .semantic.index import SemanticIndex
 
                 # SemanticIndex requires model_name, use the stored one
                 semantic_index = await SemanticIndex.get(

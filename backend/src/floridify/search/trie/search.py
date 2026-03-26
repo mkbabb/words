@@ -16,11 +16,18 @@ from typing import TYPE_CHECKING
 import marisa_trie
 import numpy as np
 
-from ..caching.models import VersionConfig
-from ..corpus.core import Corpus
-from ..text import normalize
-from ..utils.logging import get_logger
-from .trie_index import TrieIndex
+from ...caching.models import VersionConfig
+from ...corpus.core import Corpus
+from ...text import normalize
+from ...utils.logging import get_logger
+from ..config import (
+    BLOOM_ERROR_RATE_LARGE,
+    BLOOM_ERROR_RATE_MEDIUM,
+    BLOOM_ERROR_RATE_SMALL,
+    BLOOM_MEDIUM_CORPUS,
+    BLOOM_SMALL_CORPUS,
+)
+from .index import TrieIndex
 
 if TYPE_CHECKING:
     from .bloom import BloomFilter
@@ -103,12 +110,12 @@ class TrieSearch:
 
         # No persisted data — build from scratch
         word_count = self.index.word_count
-        if word_count < 10000:
-            error_rate = 0.001
-        elif word_count < 100000:
-            error_rate = 0.01
+        if word_count < BLOOM_SMALL_CORPUS:
+            error_rate = BLOOM_ERROR_RATE_SMALL
+        elif word_count < BLOOM_MEDIUM_CORPUS:
+            error_rate = BLOOM_ERROR_RATE_MEDIUM
         else:
-            error_rate = 0.05
+            error_rate = BLOOM_ERROR_RATE_LARGE
 
         self._bloom_filter = BloomFilter(capacity=word_count, error_rate=error_rate)
         self._bloom_filter.add_many(self.index.trie_data)

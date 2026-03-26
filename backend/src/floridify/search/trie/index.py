@@ -8,16 +8,16 @@ from typing import ClassVar
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..caching.core import get_versioned_content
-from ..caching.manager import get_version_manager
-from ..caching.models import (
+from ...caching.core import get_versioned_content
+from ...caching.manager import get_version_manager
+from ...caching.models import (
     BaseVersionedData,
     CacheNamespace,
     ResourceType,
     VersionConfig,
 )
-from ..corpus.core import Corpus
-from ..utils.logging import get_logger
+from ...corpus.core import Corpus
+from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -110,7 +110,7 @@ class TrieIndex(BaseModel):
             resource_id = f"{corpus_uuid}:trie"
         else:
             # Lookup uuid from corpus_name
-            from ..corpus.manager import get_tree_corpus_manager
+            from ...corpus.manager import get_tree_corpus_manager
 
             corpus_manager = get_tree_corpus_manager()
             corpus = await corpus_manager.get_corpus(
@@ -157,7 +157,7 @@ class TrieIndex(BaseModel):
 
         """
 
-        from .utils import calculate_default_frequency
+        from ..fuzzy.scoring import calculate_default_frequency
 
         start_time = time.perf_counter()
 

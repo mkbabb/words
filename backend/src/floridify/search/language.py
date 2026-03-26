@@ -15,9 +15,9 @@ from ..corpus.language.core import LanguageCorpus
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import SearchMode
-from .core import Search
+from .engine import Search
+from .index import SearchIndex
 from .result import SearchResult
-from .search_index import SearchIndex
 from .semantic.constants import DEFAULT_SENTENCE_MODEL
 
 logger = get_logger(__name__)
@@ -190,7 +190,7 @@ async def get_language_search(
             manager = get_tree_corpus_manager()
             corpus = await manager.get_corpus(corpus_name=corpus_name, config=config)
 
-            # If not found, create a new LanguageCorpus with sources
+            # If not found, create from scratch
             if not corpus:
                 logger.info(
                     f"Corpus not found: Creating new language corpus '{corpus_name}' with sources for {language.value}"
@@ -199,8 +199,31 @@ async def get_language_search(
                     corpus_name=corpus_name,
                     language=language,
                     semantic=semantic,
-                    model_name=DEFAULT_SENTENCE_MODEL,  # Use constant for model
+                    model_name=DEFAULT_SENTENCE_MODEL,
                 )
+            elif len(corpus.vocabulary) == 0 and corpus.corpus_uuid:
+                # Parent is empty — try aggregating children from the tree
+                logger.info(
+                    f"Parent corpus '{corpus_name}' has 0 words, attempting aggregation from children"
+                )
+                try:
+                    await manager.aggregate_vocabularies(corpus_uuid=corpus.corpus_uuid)
+                    corpus = await manager.get_corpus(
+                        corpus_name=corpus_name, config=VersionConfig(use_cache=False)
+                    )
+                except Exception as e:
+                    logger.warning(f"Aggregation failed: {e}")
+
+                if not corpus or len(corpus.vocabulary) == 0:
+                    logger.info(
+                        f"Aggregation produced no vocabulary, rebuilding '{corpus_name}' from scratch"
+                    )
+                    corpus = await LanguageCorpus.create_from_language(
+                        corpus_name=corpus_name,
+                        language=language,
+                        semantic=semantic,
+                        model_name=DEFAULT_SENTENCE_MODEL,
+                    )
 
         if not corpus:
             raise ValueError(f"Failed to get or create corpus '{corpus_name}'")

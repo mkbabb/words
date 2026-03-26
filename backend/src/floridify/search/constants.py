@@ -10,6 +10,7 @@ class SearchMethod(Enum):
 
     EXACT = "exact"  # Fastest: ~0.001ms - exact string matching
     PREFIX = "prefix"  # Fast: ~0.001ms - prefix/autocomplete matching
+    SUBSTRING = "substring"  # Fast: ~1ms - infix/substring matching via suffix array
     FUZZY = "fuzzy"  # Fast: ~0.01ms - typo tolerance, abbreviations
     SEMANTIC = "semantic"  # Slower: ~0.1ms - meaning-based similarity
     AUTO = "auto"  # Automatic method selection based on query

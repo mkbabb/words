@@ -16,7 +16,7 @@ from .persistence import save_embeddings_and_index
 
 if TYPE_CHECKING:
     from ...corpus.core import Corpus
-    from .models import SemanticIndex
+    from .index import SemanticIndex
 
 logger = get_logger(__name__)
 

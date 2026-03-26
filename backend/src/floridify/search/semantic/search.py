@@ -22,7 +22,7 @@ from .constants import (
 )
 from .encoder import SemanticEncoder
 from .index_builder import build_optimized_index, configure_faiss_threading
-from .models import SemanticIndex
+from .index import SemanticIndex
 from .persistence import (
     load_embeddings_from_binary_data,
     load_faiss_index_from_binary_data,

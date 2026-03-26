@@ -7,24 +7,38 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+from difflib import SequenceMatcher
 from typing import Any
 
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
 from ..utils.logging import get_logger
+from .config import (
+    HIGH_QUALITY_FUZZY_SCORE,
+    LEXICAL_GATE_SCORE_MARGIN,
+    LEXICAL_SANITY_THRESHOLD,
+    SEMANTIC_FALLBACK_MIN_SCORE,
+    SEMANTIC_PHRASE_MIN_SCORE,
+    SEMANTIC_SINGLE_WORD_MIN_SCORE,
+    SEMANTIC_SMALL_CORPUS_PHRASE_FLOOR,
+    SEMANTIC_SMALL_CORPUS_SIZE,
+    SEMANTIC_SMALL_CORPUS_WORD_FLOOR,
+)
 from .constants import DEFAULT_MIN_SCORE, SearchError, SearchMethod, SearchMode
-from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
-from .result import SearchResult
-from .search_index import SearchIndex
+from .fuzzy.bk_tree import BKTree
+from .fuzzy.index import FuzzyIndex
+from .fuzzy.search import FuzzySearch  # Multi-strategy fuzzy pipeline
+from .fuzzy.suffix_array import SuffixArray
+from .index import SearchIndex
+from .phonetic.index import PhoneticIndex
+from .result import MatchDetail, SearchResult
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
-from .semantic.core import SemanticSearch
-from .trie import TrieSearch
+from .semantic.search import SemanticSearch
+from .cache import get_cached_search, put_cached_search
+from .trie.search import TrieSearch
 
 logger = get_logger(__name__)
-
-# Module-level cache for Search instances keyed by (corpus_name, semantic_model)
-_search_instance_cache: dict[tuple[str, str], Search] = {}
 
 
 class Search:
@@ -35,8 +49,9 @@ class Search:
 
     # Method priority for deduplication (higher = preferred when same word appears)
     METHOD_PRIORITY = {
-        SearchMethod.EXACT: 4,
-        SearchMethod.PREFIX: 3,
+        SearchMethod.EXACT: 5,
+        SearchMethod.PREFIX: 4,
+        SearchMethod.SUBSTRING: 3,
         SearchMethod.SEMANTIC: 2,
         SearchMethod.FUZZY: 1,
     }
@@ -46,6 +61,7 @@ class Search:
     METHOD_SORT_BONUS = {
         SearchMethod.EXACT: 0.03,
         SearchMethod.PREFIX: 0.02,
+        SearchMethod.SUBSTRING: 0.015,
         SearchMethod.SEMANTIC: 0.01,
         SearchMethod.FUZZY: 0.0,
     }
@@ -70,6 +86,7 @@ class Search:
         self.trie_search: TrieSearch | None = None
         self.fuzzy_search: FuzzySearch | None = None
         self.semantic_search: SemanticSearch | None = None
+        self.suffix_array: SuffixArray | None = None
 
         # Track semantic initialization separately with proper synchronization
         self._semantic_ready = False
@@ -148,9 +165,9 @@ class Search:
         force_rebuild = config.force_rebuild if config else False
         cache_key = (corpus_name, str(semantic_model))
 
-        if not force_rebuild and cache_key in _search_instance_cache:
-            cached = _search_instance_cache[cache_key]
-            if cached._initialized:
+        if not force_rebuild:
+            cached = get_cached_search(cache_key)
+            if cached is not None:
                 return cached
 
         instance = await cls.from_corpus(
@@ -160,7 +177,7 @@ class Search:
             semantic_model=semantic_model,
             config=config,
         )
-        _search_instance_cache[cache_key] = instance
+        put_cached_search(cache_key, instance)
         return instance
 
     async def initialize(self) -> None:
@@ -258,19 +275,68 @@ class Search:
                     self.index.trie_index_id = trie_index_id
                     index_linkage_changed = True
 
-            logger.debug("Initializing Fuzzy search")
+            logger.debug("Initializing Fuzzy search (multi-strategy)")
             self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
 
-        # Initialize semantic search if enabled - non-blocking background task
-        if self.index.semantic_enabled and not self._semantic_ready:
-            logger.debug("Semantic search enabled - initializing in background")
-            # CRITICAL FIX: Use lock to prevent duplicate initialization tasks
-            async with self._semantic_init_lock:
-                # Double-check after acquiring lock
-                if not self._semantic_ready and self._semantic_init_task is None:
-                    self._semantic_init_task = asyncio.create_task(
-                        self._initialize_semantic_background()
-                    )
+            # Load or build fuzzy structures (BK-tree, phonetic, suffix array)
+            # Uses versioned storage with vocabulary_hash for cache invalidation.
+            try:
+                fuzzy_index = await FuzzyIndex.get_or_create(
+                    self.corpus,
+                    config=VersionConfig(),
+                )
+                bk_tree, phonetic_index, suffix_array = fuzzy_index.deserialize()
+                self.fuzzy_search.bk_tree = bk_tree
+                self.fuzzy_search.phonetic_index = phonetic_index
+                self.suffix_array = suffix_array
+
+                # Persist linkage in SearchIndex
+                if self.index.fuzzy_index_id != fuzzy_index.index_id:
+                    self.index.fuzzy_index_id = fuzzy_index.index_id
+                    index_linkage_changed = True
+
+                logger.debug(
+                    f"Loaded fuzzy structures from cache "
+                    f"(BK={'yes' if bk_tree else 'no'}, "
+                    f"phonetic={'yes' if phonetic_index else 'no'}, "
+                    f"suffix={'yes' if suffix_array else 'no'})"
+                )
+            except Exception as e:
+                # Fallback: build in-memory without persistence (e.g., no DB connection)
+                logger.warning(f"FuzzyIndex cache unavailable, building in-memory: {e}")
+                self.fuzzy_search.bk_tree = BKTree.build(combined_vocab)
+                self.fuzzy_search.phonetic_index = PhoneticIndex(combined_vocab)
+                self.suffix_array = SuffixArray(combined_vocab)
+
+        # Initialize semantic search if enabled
+        # If semantic is already "ready" but from a stale vocabulary (different hash),
+        # invalidate it and rebuild. This prevents serving misaligned embeddings.
+        if self.index.semantic_enabled:
+            needs_semantic_init = not self._semantic_ready
+            if (
+                self._semantic_ready
+                and self.semantic_search
+                and self.semantic_search.index
+                and self.semantic_search.index.vocabulary_hash != self.index.vocabulary_hash
+            ):
+                logger.warning(
+                    f"Semantic index vocab hash mismatch "
+                    f"(index={self.semantic_search.index.vocabulary_hash[:8]}, "
+                    f"corpus={self.index.vocabulary_hash[:8]}), invalidating stale semantic search"
+                )
+                async with self._semantic_init_lock:
+                    self.semantic_search = None
+                    self._semantic_ready = False
+                    self._semantic_init_task = None
+                needs_semantic_init = True
+
+            if needs_semantic_init:
+                logger.debug("Semantic search enabled - initializing in background")
+                async with self._semantic_init_lock:
+                    if not self._semantic_ready and self._semantic_init_task is None:
+                        self._semantic_init_task = asyncio.create_task(
+                            self._initialize_semantic_background()
+                        )
 
         self._initialized = True
 
@@ -436,7 +502,23 @@ class Search:
         if self.trie_search:
             self.trie_search = await TrieSearch.from_corpus(updated_corpus)
 
-        # Note: FuzzySearch uses corpus on-demand, no rebuild needed
+        # Rebuild fuzzy structures (BK-tree, phonetic, suffix array)
+        if self.fuzzy_search:
+            try:
+                fuzzy_index = await FuzzyIndex.get_or_create(
+                    updated_corpus,
+                    config=VersionConfig(force_rebuild=True),
+                )
+                bk_tree, phonetic_index, suffix_array = fuzzy_index.deserialize()
+                self.fuzzy_search.bk_tree = bk_tree
+                self.fuzzy_search.phonetic_index = phonetic_index
+                self.suffix_array = suffix_array
+            except Exception as e:
+                logger.warning(f"FuzzyIndex rebuild failed, building in-memory: {e}")
+                self.fuzzy_search.bk_tree = BKTree.build(updated_corpus.vocabulary)
+                self.fuzzy_search.phonetic_index = PhoneticIndex(updated_corpus.vocabulary)
+                self.suffix_array = SuffixArray(updated_corpus.vocabulary)
+
         # Update semantic search if enabled and hash changed
         if self.semantic_search:
             await self.semantic_search.update_corpus(updated_corpus)
@@ -451,7 +533,7 @@ class Search:
 
         # Create minimal index if not present
         if not self.index:
-            from .search_index import SearchIndex
+            from .index import SearchIndex
 
             self.index = SearchIndex(
                 corpus_name=self.corpus.corpus_name,
@@ -478,6 +560,7 @@ class Search:
         max_results: int = 20,
         min_score: float | None = None,
         method: SearchMethod | None = None,
+        collect_all_matches: bool = False,
     ) -> list[SearchResult]:
         """Smart cascading search with early termination optimization and caching.
 
@@ -488,6 +571,7 @@ class Search:
             max_results: Maximum results to return
             min_score: Minimum score threshold
             method: Optional specific search method to use
+            collect_all_matches: If True, collect all (method, score) pairs per word
 
         """
         # Normalize query once at entry point
@@ -528,22 +612,31 @@ class Search:
                         )
                     )
                 return results
+            elif method == SearchMethod.SUBSTRING:
+                return self.search_substring(normalized_query, max_results)
             elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
-                results = self.fuzzy_search.search(normalized_query, self.corpus)
+                results = self.fuzzy_search.search(normalized_query, self.corpus, suffix_array=self.suffix_array)
                 if min_score is not None:
                     results = [r for r in results if r.score >= min_score]
                 # Restore diacritics
                 for result in results:
                     result.word = self._get_original_word(result.word)
                 return results[:max_results]
-            elif method == SearchMethod.SEMANTIC and self.semantic_search:
-                results = await self.semantic_search.search(
-                    normalized_query, max_results=max_results
-                )
-                # Restore diacritics
-                for result in results:
-                    result.word = self._get_original_word(result.word)
-                return results
+            elif method == SearchMethod.SEMANTIC:
+                # If semantic was explicitly requested but still initializing, await it
+                if not self.semantic_search and self._semantic_init_task:
+                    try:
+                        await self._semantic_init_task
+                    except Exception:
+                        pass  # Fall through to smart mode on failure
+                if self.semantic_search:
+                    # Route through search_semantic() which applies strict floor
+                    # thresholds and lexical sanity gating
+                    effective_min_score = min_score if min_score is not None else DEFAULT_MIN_SCORE
+                    return await self.search_semantic(
+                        normalized_query, max_results, effective_min_score
+                    )
+                # Semantic unavailable — fall through to smart mode
 
         # Otherwise use smart mode (pass already-normalized query)
         return await self.search_with_mode(
@@ -551,6 +644,7 @@ class Search:
             mode=SearchMode.SMART,
             max_results=max_results,
             min_score=min_score,
+            collect_all_matches=collect_all_matches,
         )
 
     async def search_with_mode(
@@ -559,6 +653,7 @@ class Search:
         mode: SearchMode,
         max_results: int = 20,
         min_score: float | None = None,
+        collect_all_matches: bool = False,
     ) -> list[SearchResult]:
         """Search with explicit mode selection.
 
@@ -567,6 +662,7 @@ class Search:
             mode: Search mode (SMART, EXACT, FUZZY, SEMANTIC)
             max_results: Maximum results to return
             min_score: Minimum score threshold
+            collect_all_matches: If True, collect all (method, score) pairs per word
 
         """
         # Ensure initialization
@@ -576,7 +672,7 @@ class Search:
         # The corpus hash is checked during initialization only
         # This saves ~0.5-1ms per search by avoiding redundant DB queries
 
-        # Normalize query using global normalize function
+        # Normalize query (idempotent — LRU-cached if already normalized by caller)
         normalized_query = normalize(query)
         if not normalized_query:
             return []
@@ -594,6 +690,7 @@ class Search:
                 max_results,
                 min_score,
                 self.index.semantic_enabled if self.index else False,
+                collect_all_matches=collect_all_matches,
             )
         elif mode == SearchMode.EXACT:
             results = self.search_exact(normalized_query)
@@ -691,6 +788,7 @@ class Search:
                 corpus=self.corpus,
                 max_results=max_results,
                 min_score=min_score,
+                suffix_array=self.suffix_array,
             )
 
             # Set method and get original words with diacritics
@@ -702,6 +800,77 @@ class Search:
         except Exception as e:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
+
+    def search_substring(
+        self,
+        query: str,
+        max_results: int = 20,
+    ) -> list[SearchResult]:
+        """Search for words containing the query as a substring/infix.
+
+        Uses suffix array for large corpora, trigram-based fallback for small ones.
+
+        Args:
+            query: Substring to search for (>= 3 chars for meaningful results)
+            max_results: Maximum results to return
+
+        """
+        if not query or len(query) < 2:
+            return []
+
+        normalized_query = normalize(query)
+        results: list[SearchResult] = []
+
+        # Primary: suffix array (O(m log n), available for all corpus sizes)
+        if self.suffix_array:
+            matches = self.suffix_array.search(normalized_query, max_results=max_results)
+            for word_idx, coverage in matches:
+                original_word = self._get_original_word(
+                    self.corpus.vocabulary[word_idx] if self.corpus else str(word_idx)
+                )
+                # Score: 70% coverage ratio + 30% position bonus (earlier = better)
+                if self.corpus:
+                    word = self.corpus.vocabulary[word_idx]
+                    pos = word.find(normalized_query)
+                    position_bonus = 1.0 - (pos / max(1, len(word))) if pos >= 0 else 0.0
+                else:
+                    position_bonus = 0.0
+                score = 0.7 * coverage + 0.3 * position_bonus
+                results.append(
+                    SearchResult(
+                        word=original_word,
+                        score=score,
+                        method=SearchMethod.SUBSTRING,
+                        lemmatized_word=None,
+                        language=self.corpus.language if self.corpus else None,
+                        metadata=None,
+                    )
+                )
+        # Fallback: trigram-based substring search
+        elif self.corpus:
+            candidates = self.corpus.get_substring_candidates(
+                normalized_query, max_results=max_results
+            )
+            for word_idx in candidates:
+                word = self.corpus.vocabulary[word_idx]
+                original_word = self._get_original_word(word)
+                coverage = len(normalized_query) / len(word)
+                pos = word.find(normalized_query)
+                position_bonus = 1.0 - (pos / max(1, len(word))) if pos >= 0 else 0.0
+                score = 0.7 * coverage + 0.3 * position_bonus
+                results.append(
+                    SearchResult(
+                        word=original_word,
+                        score=score,
+                        method=SearchMethod.SUBSTRING,
+                        lemmatized_word=None,
+                        language=self.corpus.language if self.corpus else None,
+                        metadata=None,
+                    )
+                )
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results[:max_results]
 
     def search_prefix(
         self,
@@ -751,7 +920,42 @@ class Search:
         try:
             # Normalize at entry point
             normalized_query = normalize(query)
-            results = await self.semantic_search.search(normalized_query, max_results, min_score)
+            strict_floor = (
+                self.SEMANTIC_PHRASE_MIN_SCORE
+                if " " in normalized_query
+                else self.SEMANTIC_SINGLE_WORD_MIN_SCORE
+            )
+            # For small corpora (<2000 words), the semantic space is too sparse —
+            # unrelated words can score 0.80+ simply because there aren't enough
+            # neighbours to push them down.  Raise the floor to compensate.
+            if self.corpus and len(self.corpus.vocabulary) < SEMANTIC_SMALL_CORPUS_SIZE:
+                strict_floor = max(strict_floor, SEMANTIC_SMALL_CORPUS_WORD_FLOOR if " " not in normalized_query else SEMANTIC_SMALL_CORPUS_PHRASE_FLOOR)
+            effective_min_score = max(min_score, strict_floor)
+            results = await self.semantic_search.search(
+                normalized_query,
+                max_results,
+                effective_min_score,
+            )
+
+            # Lexical sanity gate — reject semantic matches that are textually
+            # unrelated.  The previous gate (lexical < 0.2) was too permissive:
+            # most real words exceed 0.2 against each other so they sailed
+            # through unchecked.  Raise the bar to 0.35 and widen the score
+            # margin so that only genuinely close results survive.
+            filtered_results: list[SearchResult] = []
+            for result in results:
+                candidate = normalize(result.word)
+                if candidate == normalized_query:
+                    filtered_results.append(result)
+                    continue
+
+                lexical_similarity = SequenceMatcher(None, normalized_query, candidate).ratio()
+                # For small corpora, require higher lexical overlap
+                if lexical_similarity < LEXICAL_SANITY_THRESHOLD and result.score < effective_min_score + LEXICAL_GATE_SCORE_MARGIN:
+                    continue
+                filtered_results.append(result)
+
+            results = filtered_results[:max_results]
             # Restore diacritics in semantic results
             for result in results:
                 result.word = self._get_original_word(result.word)
@@ -801,7 +1005,9 @@ class Search:
     # Minimum semantic score when there are no exact/fuzzy/prefix results to anchor to.
     # Prevents garbage semantic results for partial words like "exampl" → "table" (0.73)
     # while keeping useful matches like "wise" → "acute" (0.81).
-    SEMANTIC_FALLBACK_MIN_SCORE = 0.75
+    SEMANTIC_FALLBACK_MIN_SCORE = SEMANTIC_FALLBACK_MIN_SCORE
+    SEMANTIC_SINGLE_WORD_MIN_SCORE = SEMANTIC_SINGLE_WORD_MIN_SCORE
+    SEMANTIC_PHRASE_MIN_SCORE = SEMANTIC_PHRASE_MIN_SCORE
 
     async def _smart_search_cascade(
         self,
@@ -809,6 +1015,7 @@ class Search:
         max_results: int,
         min_score: float,
         semantic: bool,
+        collect_all_matches: bool = False,
     ) -> list[SearchResult]:
         """Sequential search cascade that always includes prefix results for autocomplete.
 
@@ -816,7 +1023,7 @@ class Search:
         alongside exact search. For a search dropdown/autocomplete, users expect to see
         words that START WITH their query, not just an exact match.
 
-        Order: exact (if any) → prefix matches → fuzzy → semantic.
+        Order: exact → prefix → substring → fuzzy → semantic.
         """
         # 1. Exact search (fastest — marisa-trie O(m))
         exact_results = self.search_exact(query)
@@ -849,24 +1056,30 @@ class Search:
                 f"Early exit: {len(exact_results)} exact + {len(prefix_results)} prefix matches"
             )
             all_results = list(itertools.chain(exact_results, prefix_results))
-            unique_results = self._deduplicate_results(all_results)
+            dedup = self._deduplicate_results_multi if collect_all_matches else self._deduplicate_results
+            unique_results = dedup(all_results)
             return sorted(
                 unique_results,
                 key=lambda r: r.score + self.METHOD_SORT_BONUS.get(r.method, 0.0),
                 reverse=True,
             )[:max_results]
 
-        # 3. Fuzzy search (most comprehensive for misspellings)
+        # 3. Substring search (for infix matches like "graph" → "paragraph")
+        substring_results: list[SearchResult] = []
+        if len(query) >= 3:
+            substring_results = self.search_substring(query, max_results=max_results)
+
+        # 4. Fuzzy search (most comprehensive for misspellings)
         fuzzy_results = self.search_fuzzy(query, max_results, min_score)
 
-        # 4. Semantic search — quality-based gating
+        # 5. Semantic search — quality-based gating
         # Only supplement when exact/fuzzy/prefix provide some anchor results.
         # When there are NO text-based results, require a much higher semantic
         # score to avoid garbage (e.g., "exampl" → "table" at 73%).
         semantic_results = []
-        has_text_results = bool(exact_results or prefix_results or fuzzy_results)
+        has_text_results = bool(exact_results or prefix_results or substring_results or fuzzy_results)
         if semantic and self._semantic_ready and self.semantic_search:
-            high_quality = [r for r in fuzzy_results if r.score >= 0.7]
+            high_quality = [r for r in fuzzy_results if r.score >= HIGH_QUALITY_FUZZY_SCORE]
             semantic_limit = max(
                 0, max_results - len(high_quality) - len(prefix_results) - len(exact_results)
             )
@@ -874,15 +1087,18 @@ class Search:
                 semantic_min = min_score if has_text_results else self.SEMANTIC_FALLBACK_MIN_SCORE
                 semantic_results = await self.search_semantic(query, semantic_limit, semantic_min)
 
-        # 5. Merge and deduplicate with memory-efficient generators
+        # 6. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
         semantic_gen = (r for r in semantic_results if r.score >= min_score)
 
         # Chain all results without creating intermediate lists
-        all_results = list(itertools.chain(exact_results, prefix_results, fuzzy_gen, semantic_gen))
+        all_results = list(itertools.chain(
+            exact_results, prefix_results, substring_results, fuzzy_gen, semantic_gen
+        ))
 
         # Deduplicate and sort
-        unique_results = self._deduplicate_results(all_results)
+        dedup = self._deduplicate_results_multi if collect_all_matches else self._deduplicate_results
+        unique_results = dedup(all_results)
 
         return sorted(
             unique_results,
@@ -938,6 +1154,47 @@ class Search:
 
         return list(word_to_result.values())
 
+    def _deduplicate_results_multi(self, results: list[SearchResult]) -> list[SearchResult]:
+        """Deduplicate results, collecting all (method, score) pairs per word.
+
+        Keeps the highest-priority method as primary but stores all matches.
+        """
+        word_to_result: dict[str, SearchResult] = {}
+        word_to_matches: dict[str, dict[SearchMethod, float]] = {}
+
+        for result in results:
+            key = result.word.lower()
+
+            # Collect match detail (keep best score per method)
+            if key not in word_to_matches:
+                word_to_matches[key] = {}
+            method_scores = word_to_matches[key]
+            if result.method not in method_scores or result.score > method_scores[result.method]:
+                method_scores[result.method] = result.score
+
+            # Track best primary result (same logic as _deduplicate_results)
+            if key not in word_to_result:
+                word_to_result[key] = result
+            else:
+                existing = word_to_result[key]
+                result_priority = self.METHOD_PRIORITY.get(result.method, 0)
+                existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
+                if (result_priority > existing_priority) or (
+                    result_priority == existing_priority and result.score > existing.score
+                ):
+                    word_to_result[key] = result
+
+        # Attach collected matches to each result
+        for key, result in word_to_result.items():
+            method_scores = word_to_matches[key]
+            result.matches = sorted(
+                [MatchDetail(method=m, score=s) for m, s in method_scores.items()],
+                key=lambda md: (self.METHOD_PRIORITY.get(md.method, 0), md.score),
+                reverse=True,
+            )
+
+        return list(word_to_result.values())
+
     def get_stats(self) -> dict[str, Any]:
         """Get search engine statistics."""
         if not self.index:
@@ -959,9 +1216,4 @@ class Search:
         }
 
 
-def reset_search_cache() -> None:
-    """Clear the search instance cache."""
-    _search_instance_cache.clear()
-
-
-__all__ = ["Search", "SearchMode", "SearchResult", "reset_search_cache"]
+__all__ = ["Search", "SearchMode", "SearchResult"]

@@ -259,12 +259,21 @@ class SemanticIndex(BaseModel):
             corpus=corpus,
         )
 
-        # FIX: Check if embeddings actually exist before returning cached
+        # FIX: Check embeddings exist AND match the current vocabulary size.
         # Reject cached indices with 0 embeddings (corrupted/incomplete builds)
+        # or with a different vocabulary size (stale from different aggregation).
+        vocab_size = len(corpus.vocabulary) if corpus.vocabulary else 0
+        if existing:
+            logger.info(
+                f"Semantic cache check for '{corpus.corpus_name}': "
+                f"cached_hash={existing.vocabulary_hash[:8]}, corpus_hash={corpus.vocabulary_hash[:8]}, "
+                f"cached_embeddings={existing.num_embeddings}, corpus_vocab={vocab_size}"
+            )
         if (
             existing
             and existing.vocabulary_hash == corpus.vocabulary_hash
             and existing.num_embeddings > 0
+            and (vocab_size == 0 or abs(existing.num_embeddings - vocab_size) < vocab_size * 0.05)
         ):
             logger.debug(
                 f"Using cached semantic index for corpus '{corpus.corpus_name}' "

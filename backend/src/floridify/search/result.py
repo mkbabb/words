@@ -10,6 +10,13 @@ from ..models.base import Language
 from .constants import SearchMethod
 
 
+class MatchDetail(BaseModel):
+    """A single method+score pair from the search cascade."""
+
+    method: SearchMethod
+    score: float = Field(..., ge=0.0, le=1.0)
+
+
 class SearchResult(BaseModel):
     """Unified search result across all search methods."""
 
@@ -22,6 +29,10 @@ class SearchResult(BaseModel):
     method: SearchMethod = Field(
         ...,
         description="Search method used (exact, fuzzy, semantic)",
+    )
+    matches: list[MatchDetail] | None = Field(
+        None,
+        description="All methods that matched this word (when collect_all_matches=True)",
     )
     language: Language | None = Field(None, description="Language code if applicable")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
@@ -44,5 +55,6 @@ class SearchResult(BaseModel):
 
 
 __all__ = [
+    "MatchDetail",
     "SearchResult",
 ]

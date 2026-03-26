@@ -178,6 +178,11 @@ class SemanticQueryCache:
         self, query: str, max_results: int, min_score: float, results: list[SearchResult]
     ) -> None:
         """Cache search results with LRU eviction. Stores full result set."""
+        # Never cache empty results — they may come from a race where semantic
+        # wasn't ready yet and would poison all future lookups for this query.
+        if not results:
+            return
+
         cache_key = self._get_result_cache_key(query)
 
         # LRU eviction if cache is full
@@ -208,7 +213,7 @@ class SemanticQueryCache:
             return
         count = 0
         for key, results_data in cached.items():
-            if isinstance(results_data, list):
+            if isinstance(results_data, list) and results_data:
                 self.result_cache[key] = [SearchResult.model_validate(r) for r in results_data]
                 self.result_cache_order.append(key)
                 count += 1

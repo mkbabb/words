@@ -1,6 +1,6 @@
 """Semantic search functionality."""
 
-from .core import SemanticSearch
+from .search import SemanticSearch
 
 __all__ = [
     "SemanticSearch",

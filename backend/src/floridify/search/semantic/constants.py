@@ -84,14 +84,13 @@ ENABLE_GPU_ACCELERATION = True  # Enable GPU acceleration when available
 MEMORY_MAP_EMBEDDINGS = True  # Use memory-mapped storage for zero-copy access
 
 # Quantization Configuration
-USE_QUANTIZATION = True  # Enable embedding quantization for speed/memory
-QUANTIZATION_PRECISION: Literal["float32", "int8", "uint8", "binary", "ubinary"] = "int8"
-# Precision levels:
-# - float32: No quantization (baseline)
-# - int8: 75% memory reduction, ~2-3x speedup, <2% quality loss [RECOMMENDED]
-# - uint8: 75% memory reduction, ~2-3x speedup, <2% quality loss
-# - binary: 97% memory reduction, ~10x speedup, ~5-10% quality loss
-# - ubinary: 97% memory reduction, ~10x speedup, ~5-10% quality loss
+# int8 quantization is DISABLED. sentence-transformers computes calibration ranges
+# from the encoding batch; single-word vocabularies have too narrow a value
+# distribution, causing catastrophic score compression (cosine 0.80 → 0.19).
+# Our corpora are always word-level, so float32 is the only safe choice.
+# Storage cost: 300k words × 512D × 4B = ~585MB — acceptable.
+USE_QUANTIZATION = False
+QUANTIZATION_PRECISION: Literal["float32", "int8", "uint8", "binary", "ubinary"] = "float32"
 
 # HNSW Configuration (Hierarchical Navigable Small World)
 # Can be overridden via environment variables or config file

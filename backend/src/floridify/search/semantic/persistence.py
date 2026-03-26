@@ -18,7 +18,7 @@ import numpy as np
 from ...caching.filesystem import safe_pickle_loads
 from ...caching.models import VersionConfig
 from ...utils.logging import get_logger
-from .models import SemanticIndex
+from .index import SemanticIndex
 
 logger = get_logger(__name__)
 

@@ -164,10 +164,15 @@ class SemanticEncoder:
         except AttributeError:
             available_cpus = os.cpu_count() or 8
 
-        # Use 2 workers to avoid OOM (each worker loads ~600MB model with spawn method)
-        # With spawn, each worker gets its own copy (no memory sharing)
-        # 2 workers x 600MB + main process = ~2GB total (safe under 7GB limit)
-        num_workers = 2
+        # On Linux (Docker), fork shares parent memory via COW — workers are cheap.
+        # On macOS, spawn copies the full model (~600MB each) — cap at 2 to avoid OOM.
+        # Scale with available CPUs but cap at 6 to avoid diminishing returns from
+        # GIL contention in the parent process during result aggregation.
+        is_fork = platform.system() != "Darwin"
+        if is_fork:
+            num_workers = min(available_cpus, 6)
+        else:
+            num_workers = min(available_cpus, 2)
 
         logger.info(
             f"Encoding {len(texts)} texts with {num_workers} parallel processes "
@@ -246,7 +251,6 @@ class SemanticEncoder:
             device=self.device,
             normalize_embeddings=True,
         )
-        # Model name not available here, but truncate_matryoshka handles None gracefully
         return embeddings
 
     @staticmethod
