@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
+from ....models.user import User
 from ....wordlist.constants import MasteryLevel
 from ....wordlist.models import WordListItemDoc
 from ...core import CurrentUserDep, ListResponse, ResourceResponse
@@ -46,6 +47,8 @@ async def get_due_words(
 ) -> ListResponse[dict[str, Any]]:
     """Get words due for review based on spaced repetition."""
     due_words = await repo.get_due_words(wordlist_id, limit)
+    # Exclude suspended items
+    due_words = [w for w in due_words if not w.suspended]
 
     # Fetch Word documents to get text
     word_ids = [w.word_id for w in due_words if w.word_id]
@@ -100,12 +103,20 @@ async def get_review_session(
     allowed_levels = [level for level in MasteryLevel if level <= params.mastery_threshold]
     allowed_level_values = [level.value for level in allowed_levels]
 
-    # Query items due for review below mastery threshold
-    items = await WordListItemDoc.find({
-        "wordlist_id": wordlist_id,
-        "review_data.next_review_date": {"$lte": now},
-        "mastery_level": {"$in": allowed_level_values},
-    }).sort([("review_data.next_review_date", 1)]).limit(params.limit).to_list()
+    # Query items due for review below mastery threshold (exclude suspended)
+    items = (
+        await WordListItemDoc.find(
+            {
+                "wordlist_id": wordlist_id,
+                "review_data.next_review_date": {"$lte": now},
+                "mastery_level": {"$in": allowed_level_values},
+                "suspended": {"$ne": True},
+            }
+        )
+        .sort([("review_data.next_review_date", 1)])
+        .limit(params.limit)
+        .to_list()
+    )
 
     # Sort by urgency (most overdue first)
     items.sort(key=lambda w: w.get_overdue_days(), reverse=True)
@@ -137,6 +148,23 @@ async def get_review_session(
             },
         )
 
+    # Compute difficulty distribution
+    difficulty_distribution: dict[str, int] = {}
+    for item in items:
+        state = item.review_data.card_state
+        difficulty_distribution[state] = difficulty_distribution.get(state, 0) + 1
+
+    # Compute streak context
+    streak_context = {
+        "current_streak": wordlist.learning_stats.streak_days,
+        "is_active": wordlist.learning_stats.is_streak_active(),
+        "will_break_if_skip": wordlist.learning_stats.is_streak_active()
+        and wordlist.learning_stats.last_study_date is not None,
+    }
+
+    # Estimated time (0.5 min per word average)
+    estimated_time_minutes = round(len(session_words) * 0.5, 1)
+
     return ResourceResponse(
         data={
             "session_id": str(wordlist.id) + "_" + str(int(now.timestamp())),
@@ -144,6 +172,9 @@ async def get_review_session(
             "words": session_words,
             "total_words": len(session_words),
             "created_at": now.isoformat(),
+            "estimated_time_minutes": estimated_time_minutes,
+            "difficulty_distribution": difficulty_distribution,
+            "streak_context": streak_context,
         },
         metadata={
             "wordlist_name": wordlist.name,
@@ -191,6 +222,21 @@ async def submit_review(
 
     # Get predicted intervals for next review
     predicted_intervals = item.review_data.get_predicted_intervals()
+
+    # Update global learning stats for the user
+    try:
+        user = await User.find_one({"clerk_id": user_id})
+        if user:
+            user.global_learning_stats.total_reviews += 1
+            if item.mastery_level == MasteryLevel.GOLD and previous_mastery != MasteryLevel.GOLD:
+                user.global_learning_stats.words_mastered += 1
+            elif previous_mastery == MasteryLevel.GOLD and item.mastery_level != MasteryLevel.GOLD:
+                user.global_learning_stats.words_mastered = max(
+                    0, user.global_learning_stats.words_mastered - 1
+                )
+            await user.save()
+    except Exception:
+        pass  # Don't fail review on global stats update
 
     return ResourceResponse(
         data={
@@ -246,9 +292,7 @@ async def submit_bulk_reviews(
             failed_words.append(review.word)
             continue
 
-        item = await WordListItemDoc.find_one(
-            {"wordlist_id": wordlist_id, "word_id": word_doc.id}
-        )
+        item = await WordListItemDoc.find_one({"wordlist_id": wordlist_id, "word_id": word_doc.id})
         if not item:
             failed_words.append(review.word)
             continue
@@ -317,4 +361,100 @@ async def record_study_session(
             "wordlist": f"/wordlists/{wordlist_id}",
             "statistics": f"/wordlists/{wordlist_id}/stats",
         },
+    )
+
+
+@router.get("/{wordlist_id}/review/leeches", response_model=ListResponse[dict[str, Any]])
+async def get_leeches(
+    wordlist_id: PydanticObjectId,
+    user_id: CurrentUserDep,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ListResponse[dict[str, Any]]:
+    """Get all leech items in a wordlist."""
+    await repo.get(wordlist_id, raise_on_missing=True)
+
+    items = await WordListItemDoc.find(
+        {
+            "wordlist_id": wordlist_id,
+            "review_data.is_leech": True,
+        }
+    ).to_list()
+
+    # Fetch word texts
+    word_ids = [w.word_id for w in items if w.word_id]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(word.id): word.text for word in words}
+
+    result = []
+    for item in items:
+        result.append(
+            {
+                "word": word_text_map.get(str(item.word_id), ""),
+                "mastery_level": item.mastery_level,
+                "lapse_count": item.review_data.lapse_count,
+                "ease_factor": item.review_data.ease_factor,
+                "suspended": item.suspended,
+                "last_reviewed": item.review_data.last_review_date.isoformat()
+                if item.review_data.last_review_date
+                else None,
+            }
+        )
+
+    return ListResponse(
+        items=result,
+        total=len(result),
+        offset=0,
+        limit=len(result),
+    )
+
+
+@router.post("/{wordlist_id}/review/leeches/{word}/suspend", response_model=ResourceResponse)
+async def suspend_leech(
+    wordlist_id: PydanticObjectId,
+    word: str,
+    user_id: CurrentUserDep,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Suspend a leech word from reviews."""
+    await repo.get(wordlist_id, raise_on_missing=True)
+
+    word_doc = await Word.find_one({"text": word})
+    if not word_doc:
+        raise HTTPException(404, f"Word '{word}' not found")
+
+    item = await WordListItemDoc.find_one({"wordlist_id": wordlist_id, "word_id": word_doc.id})
+    if not item:
+        raise HTTPException(404, f"Word '{word}' not in wordlist")
+
+    item.suspended = True
+    await item.save()
+
+    return ResourceResponse(
+        data={"word": word, "suspended": True},
+    )
+
+
+@router.post("/{wordlist_id}/review/leeches/{word}/unsuspend", response_model=ResourceResponse)
+async def unsuspend_leech(
+    wordlist_id: PydanticObjectId,
+    word: str,
+    user_id: CurrentUserDep,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Unsuspend a leech word, re-enabling it for reviews."""
+    await repo.get(wordlist_id, raise_on_missing=True)
+
+    word_doc = await Word.find_one({"text": word})
+    if not word_doc:
+        raise HTTPException(404, f"Word '{word}' not found")
+
+    item = await WordListItemDoc.find_one({"wordlist_id": wordlist_id, "word_id": word_doc.id})
+    if not item:
+        raise HTTPException(404, f"Word '{word}' not in wordlist")
+
+    item.suspended = False
+    await item.save()
+
+    return ResourceResponse(
+        data={"word": word, "suspended": False},
     )

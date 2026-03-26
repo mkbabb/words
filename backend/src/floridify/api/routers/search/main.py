@@ -9,9 +9,9 @@ from ....core.search_pipeline import get_search_engine_manager
 from ....corpus.manager import get_tree_corpus_manager
 from ....models.parameters import SearchParams
 from ....models.responses import SearchResponse
-from ....search.constants import SearchMethod, SearchMode
-from ....search.core import Search
-from ....search.search_index import SearchIndex
+from ....search.constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
+from ....search.engine import Search
+from ....search.index import SearchIndex
 from ....utils.logging import get_logger
 from ....utils.sanitization import sanitize_mongodb_input
 
@@ -31,7 +31,7 @@ def _validate_search_query(query: str) -> str:
 def parse_search_params(
     languages: list[str] = Query(default=["en"], description="Language codes"),
     max_results: int = Query(default=20, ge=1, le=100, description="Maximum results"),
-    min_score: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum score"),
+    min_score: float = Query(default=0.3, ge=0.0, le=1.0, description="Minimum score"),
     mode: str = Query(default="smart", description="Search mode: smart, exact, fuzzy, semantic"),
     force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
     corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
@@ -79,6 +79,7 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
         method_bonus = {
             SearchMethod.EXACT: 0.03,
             SearchMethod.PREFIX: 0.02,
+            SearchMethod.SUBSTRING: 0.015,
             SearchMethod.SEMANTIC: 0.01,
             SearchMethod.FUZZY: 0.0,
         }
@@ -300,7 +301,7 @@ async def get_search_suggestions(
     suggestion_params = SearchParams(
         languages=params.languages,
         max_results=limit,
-        min_score=0.3,  # Lower threshold for suggestions
+        min_score=DEFAULT_MIN_SCORE,
         mode=params.mode,
     )
 

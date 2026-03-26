@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ...models.user import User, UserHistory, UserRole
+from ...wordlist.models import WordList
 from ..core import AdminDep, CurrentUserDep, CurrentUserObjectDep
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -146,6 +147,34 @@ async def get_my_history(user_id: CurrentUserDep):
         lookup_history=history.lookup_history,
         updated_at=history.updated_at,
     )
+
+
+@router.get("/me/learning-stats")
+async def get_my_learning_stats(
+    user: CurrentUserObjectDep,
+) -> dict[str, Any]:
+    """Get aggregated global learning stats and per-wordlist breakdown."""
+    # Global stats from user document
+    global_stats = user.global_learning_stats.model_dump(mode="json")
+
+    # Per-wordlist breakdown
+    wordlists = await WordList.find({"owner_id": user.clerk_id}).to_list()
+    per_wordlist = []
+    for wl in wordlists:
+        per_wordlist.append(
+            {
+                "wordlist_id": str(wl.id),
+                "name": wl.name,
+                "unique_words": wl.unique_words,
+                "total_words": wl.total_words,
+                "learning_stats": wl.learning_stats.model_dump(mode="json"),
+            }
+        )
+
+    return {
+        "global": global_stats,
+        "per_wordlist": per_wordlist,
+    }
 
 
 @router.post("/me/history/sync", response_model=HistoryResponse)

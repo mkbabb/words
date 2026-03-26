@@ -27,6 +27,7 @@ from .word_repository import WordCreate, WordFilter, WordRepository, WordUpdate
 from .wordlist_repository import (
     StudySessionRequest,
     WordAddRequest,
+    WordListEntryInput,
     WordListCreate,
     WordListFilter,
     WordListRepository,
@@ -57,6 +58,7 @@ __all__ = [
     "SynthesisFilter",
     "WordListRepository",
     "WordListCreate",
+    "WordListEntryInput",
     "WordListUpdate",
     "WordListFilter",
     "WordAddRequest",

@@ -20,6 +20,11 @@ from ....models import Word
 from ....models.dictionary import Definition
 from ....models.user import UserRole
 from ....wordlist.models import WordList, WordListItemDoc
+from ....wordlist.reconcile import (
+    ReconcilePreviewRequest,
+    ReconcilePreviewResponse,
+    build_reconcile_preview,
+)
 from ....wordlist.parser import parse_file
 from ....wordlist.utils import generate_wordlist_name
 from ...core import (
@@ -34,6 +39,7 @@ from ...core import (
 from ...repositories import (
     WordListCreate,
     WordListFilter,
+    WordListEntryInput,
     WordListRepository,
     WordListUpdate,
 )
@@ -42,6 +48,26 @@ from ...repositories import (
 _MAX_WORDLIST_ITEMS = 10_000
 
 router = APIRouter()
+
+
+def _upload_suffix(filename: str | None) -> str:
+    """Preserve the source extension so parse_file can pick the right parser."""
+    if not filename:
+        return ".txt"
+    suffix = Path(filename).suffix.lower()
+    return suffix or ".txt"
+
+
+def _parsed_entries_to_inputs(entries: list[Any]) -> list[WordListEntryInput]:
+    """Convert parser output into the structured repository input model."""
+    return [
+        WordListEntryInput(
+            source_text=entry.source_text,
+            frequency=entry.frequency,
+            notes=entry.notes,
+        )
+        for entry in entries
+    ]
 
 
 def get_wordlist_repo() -> WordListRepository:
@@ -168,6 +194,31 @@ async def generate_wordlist_slug() -> dict[str, str]:
         return {"name": f"wordlist-{timestamp}"}
 
 
+@router.post("/reconcile-preview", response_model=ReconcilePreviewResponse)
+async def preview_wordlist_reconciliation(
+    request: ReconcilePreviewRequest,
+    wordlist_id: PydanticObjectId | None = Query(
+        default=None,
+        description="Optional wordlist id for duplicate-aware previews",
+    ),
+    user_id: OptionalUserDep = None,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ReconcilePreviewResponse:
+    """Preview candidate reconciliations before committing uploads or word adds."""
+    if wordlist_id is not None:
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+        await verify_wordlist_ownership(wordlist, user_id)
+
+    return await build_reconcile_preview(
+        request.entries,
+        limit=request.limit,
+        min_score=request.min_score,
+        wordlist_id=wordlist_id,
+    )
+
+
 @router.get("/{wordlist_id}", response_model=ResourceResponse)
 async def get_wordlist(
     wordlist_id: PydanticObjectId,
@@ -187,7 +238,8 @@ async def get_wordlist(
         {"$group": {"_id": "$mastery_level", "count": {"$sum": 1}}},
     ]
     mastery_distribution: dict[str, int] = {}
-    async for doc in WordListItemDoc.aggregate(pipeline):
+    collection = WordListItemDoc.get_pymongo_collection()
+    async for doc in collection.aggregate(pipeline):
         mastery_distribution[doc["_id"]] = doc["count"]
 
     wordlist_data = wordlist.model_dump(mode="json")
@@ -196,7 +248,8 @@ async def get_wordlist(
         data=wordlist_data,
         metadata={
             "statistics": {
-                "total_words": wordlist.unique_words,
+                "total_words": wordlist.total_words,
+                "unique_words": wordlist.unique_words,
                 "mastery_distribution": mastery_distribution,
                 "study_sessions": wordlist.learning_stats.total_reviews,
                 "total_study_time": wordlist.learning_stats.study_time_minutes,
@@ -454,7 +507,11 @@ async def upload_wordlist(
     try:
         content = await file.read()
 
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            delete=False,
+            suffix=_upload_suffix(file.filename),
+        ) as tmp_file:
             tmp_file.write(content)
             tmp_path = Path(tmp_file.name)
 
@@ -469,7 +526,7 @@ async def upload_wordlist(
                 description=description or parsed.metadata.get("description", ""),
                 is_public=is_public,
                 tags=parsed.metadata.get("tags", []),
-                words=parsed.words,
+                words=_parsed_entries_to_inputs(parsed.entries),
                 owner_id=user_id,
             )
 
@@ -480,11 +537,15 @@ async def upload_wordlist(
                     "id": str(wordlist.id),
                     "name": wordlist.name,
                     "word_count": wordlist.unique_words,
+                    "unique_words": wordlist.unique_words,
+                    "total_words": wordlist.total_words,
                     "created_at": wordlist.created_at.isoformat() if wordlist.created_at else None,
                 },
                 metadata={
                     "uploaded_filename": file.filename,
-                    "parsed_words": len(parsed.words),
+                    "parsed_words": sum(entry.frequency for entry in parsed.entries),
+                    "unique_words": len(parsed.entries),
+                    "total_words": sum(entry.frequency for entry in parsed.entries),
                     "created": created,
                 },
                 links={
@@ -525,7 +586,11 @@ async def upload_wordlist_stream(
                 stage=Stages.UPLOAD_READING, message="File read successfully"
             )
 
-            with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as tmp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                delete=False,
+                suffix=_upload_suffix(file.filename),
+            ) as tmp_file:
                 tmp_file.write(content)
                 tmp_path = Path(tmp_file.name)
 
@@ -535,12 +600,13 @@ async def upload_wordlist_stream(
                     stage=Stages.UPLOAD_PARSING, message="Parsing words from file..."
                 )
                 parsed = parse_file(tmp_path)
-                total_words = len(parsed.words)
+                total_words = sum(entry.frequency for entry in parsed.entries)
+                unique_words = len(parsed.entries)
 
                 await state_tracker.update(
                     stage=Stages.UPLOAD_PARSING,
                     progress=35,
-                    message=f"Found {total_words} words",
+                    message=f"Found {total_words} words ({unique_words} unique)",
                 )
 
                 final_name = name
@@ -557,7 +623,7 @@ async def upload_wordlist_stream(
                     description=description or parsed.metadata.get("description", ""),
                     is_public=is_public,
                     tags=parsed.metadata.get("tags", []),
-                    words=parsed.words,
+                    words=_parsed_entries_to_inputs(parsed.entries),
                     owner_id=user_id,
                 )
 

@@ -23,26 +23,29 @@ from ...models.dictionary import (
     DictionaryProvider,
     Word as WordModel,
 )
-from ...models.richness import compute_entry_richness
 from ...models.parameters import LookupParams
+from ...models.richness import compute_entry_richness
 from ...models.user import UserRole
 from ...storage.mongodb import get_best_existing_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
-from ..core import AdminDep, OptionalUserRoleDep
+from ..core import AdminDep, OptionalUserDep, OptionalUserRoleDep
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 # Deduplicates concurrent background synthesis requests
 _background_synthesis_in_flight: set[str] = set()
+_background_synthesis_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def _background_synthesize(word: str, params: LookupParams) -> None:
     """Fire-and-forget AI synthesis using existing provider data in the DB."""
-    if word in _background_synthesis_in_flight:
-        return
-    _background_synthesis_in_flight.add(word)
+    async with _background_synthesis_lock:
+        if word in _background_synthesis_in_flight:
+            return
+        _background_synthesis_in_flight.add(word)
+
     try:
         await lookup_word_pipeline(
             word=word,
@@ -56,7 +59,8 @@ async def _background_synthesize(word: str, params: LookupParams) -> None:
     except Exception as e:
         logger.warning(f"Background synthesis failed for '{word}': {e}")
     finally:
-        _background_synthesis_in_flight.discard(word)
+        async with _background_synthesis_lock:
+            _background_synthesis_in_flight.discard(word)
 
 
 # Models specific to lookup endpoints
@@ -153,6 +157,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
 async def lookup_word(
     word: str,
     user_role: OptionalUserRoleDep,
+    user_id: OptionalUserDep = None,
     params: LookupParams = Depends(parse_lookup_params),
 ) -> DictionaryEntryResponse:
     """Comprehensive word definition lookup with AI-enhanced synthesis.
@@ -211,6 +216,7 @@ async def lookup_word(
                 force_refresh=True,
                 no_ai=params.no_ai,
                 state_tracker=None,
+                user_id=user_id,
             )
             if not entry:
                 raise HTTPException(
@@ -224,6 +230,18 @@ async def lookup_word(
 
         if not result:
             raise HTTPException(status_code=404, detail=f"No definition found for word: {word}")
+
+        # Track lookup server-side if user is authenticated
+        if user_id:
+            try:
+                from ...models.user import UserHistory
+
+                history = await UserHistory.find_one({"clerk_id": user_id})
+                if history:
+                    history.add_lookup(word)
+                    await history.save()
+            except Exception:
+                pass  # Don't fail lookup on history tracking error
 
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -259,6 +277,7 @@ async def _lookup_with_tracking(
     word: str,
     params: LookupParams,
     state_tracker: StateTracker,
+    user_id: str | None = None,
 ) -> DictionaryEntryResponse | None:
     """Perform lookup with state tracking and unified caching."""
     try:
@@ -341,6 +360,7 @@ async def _lookup_with_tracking(
             no_ai=params.no_ai,
             skip_search=True,
             state_tracker=state_tracker,
+            user_id=user_id,
         )
 
         if not entry:
@@ -372,6 +392,7 @@ async def _lookup_with_tracking(
 async def lookup_word_stream(
     word: str,
     user_role: OptionalUserRoleDep,
+    user_id: OptionalUserDep = None,
     params: LookupParams = Depends(parse_lookup_params),
 ) -> StreamingResponse:
     """Stream word lookup progress via Server-Sent Events (SSE).
@@ -416,7 +437,7 @@ async def lookup_word_stream(
 
     async def lookup_process() -> DictionaryEntryResponse | None:
         """Perform the lookup process while updating state tracker."""
-        return await _lookup_with_tracking(word, params, state_tracker)
+        return await _lookup_with_tracking(word, params, state_tracker, user_id=user_id)
 
     # Use the generalized streaming system
     return await create_streaming_response(

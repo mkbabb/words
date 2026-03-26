@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
+from ...caching.gridfs import gridfs_cleanup_stale
 from ...caching.manager import get_version_manager
 from ...models.parameters import CacheClearParams, CacheStatsParams
 from ...models.responses import CacheStatsResponse, SuccessResponse
 from ...utils.logging import get_logger
+from ..core import AdminDep
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -297,6 +299,33 @@ async def get_cache_disk_usage() -> DiskUsageResponse:
     except Exception as e:
         logger.error(f"Failed to get disk usage: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get disk usage: {e!s}")
+
+
+class GridFSCleanupRequest(BaseModel):
+    """Request for GridFS stale file cleanup."""
+
+    corpus_uuid: str | None = Field(None, description="Only clean files for this corpus UUID")
+    dry_run: bool = Field(default=True, description="Preview stale files without deleting")
+
+
+@router.post("/cache/gridfs/cleanup")
+async def cleanup_gridfs(
+    _admin: AdminDep,
+    request: GridFSCleanupRequest = GridFSCleanupRequest(),
+) -> dict:
+    """Find and optionally delete stale GridFS files not referenced by live versioned data.
+
+    Admin-only. Use dry_run=true to preview before deleting.
+    """
+    try:
+        result = await gridfs_cleanup_stale(
+            corpus_uuid=request.corpus_uuid,
+            dry_run=request.dry_run,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Failed to cleanup GridFS: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to cleanup GridFS: {e!s}")
 
 
 def _format_bytes(bytes_count: int) -> str:

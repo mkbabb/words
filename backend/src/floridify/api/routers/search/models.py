@@ -8,103 +8,35 @@ from ....models.base import Language
 
 
 class RebuildIndexRequest(BaseModel):
-    """Enhanced request for rebuilding search index with unified corpus management."""
+    """Request for rebuilding search index — per-corpus or language-level."""
 
-    # Language and source options
+    corpus_name: str | None = Field(
+        None, description="Target corpus by name (e.g. 'language_english', 'wordlist_69b73006...')"
+    )
+    corpus_uuid: str | None = Field(None, description="Target corpus by UUID")
     languages: list[Language] = Field(
-        default=[Language.ENGLISH],
-        description="Languages to rebuild (defaults to English)",
+        default=[Language.ENGLISH], description="Languages (used when no corpus specified)"
     )
-    force_download: bool = Field(default=True, description="Force re-download of lexicon sources")
-
-    # Unified corpus management options
-    corpus_types: list[str] = Field(
-        default=["language_search"],
-        description="Corpus types to rebuild: 'language_search', 'wordlist', 'wordlist_names', 'custom'",
+    components: list[str] = Field(
+        default=["all"], description="Components to rebuild: 'trie', 'semantic', 'all'"
     )
-    rebuild_all_corpora: bool = Field(default=False, description="Rebuild all corpus types")
-
-    # Semantic search options
-    rebuild_semantic: bool = Field(default=True, description="Rebuild semantic search indices")
-    semantic_force_rebuild: bool = Field(
-        default=False,
-        description="Force rebuild semantic even if cached",
-    )
-    quantization_type: str = Field(
-        default="binary",
-        description="Quantization method: 'binary', 'scalar', 'none'",
-    )
-    auto_semantic_small_corpora: bool = Field(
-        default=True,
-        description="Auto-enable semantic for small corpora (<10k words)",
-    )
-
-    # Cache management options
-    clear_existing_cache: bool = Field(
-        default=False,
-        description="Clear all existing caches before rebuild",
-    )
-    clear_semantic_cache: bool = Field(default=False, description="Clear only semantic caches")
-    clear_lexicon_cache: bool = Field(default=False, description="Clear only lexicon caches")
-
-    # Performance options
-    enable_lemmatization_cache: bool = Field(
-        default=True,
-        description="Enable lemmatization memoization",
-    )
-    batch_size: int = Field(default=1000, ge=100, le=5000, description="Batch size for processing")
-
-    # Validation options
-    validate_vocabulary: bool = Field(default=True, description="Validate vocabulary quality")
-    min_word_length: int = Field(default=2, ge=1, le=10, description="Minimum word length")
-    max_word_length: int = Field(default=50, ge=10, le=100, description="Maximum word length")
+    clear_caches: bool = Field(default=True, description="Clear L1/L2/L3 caches for target")
+    clean_gridfs: bool = Field(default=False, description="Delete stale GridFS entries")
 
 
 class RebuildIndexResponse(BaseModel):
-    """Enhanced response for index rebuild operation with unified corpus management."""
+    """Response for index rebuild operation."""
 
-    status: str = Field(..., description="Rebuild status")
-    languages: list[Language] = Field(..., description="Languages rebuilt")
-    statistics: dict[str, Any] = Field(default_factory=dict, description="Index statistics")
-    message: str = Field(..., description="Status message")
-
-    # Performance metrics
-    total_time_seconds: float = Field(..., description="Total rebuild time in seconds")
-    semantic_build_time_seconds: float = Field(default=0.0, description="Semantic index build time")
-    vocabulary_optimization_ratio: float = Field(
-        default=1.0,
-        description="Vocabulary reduction ratio",
-    )
-
-    # Unified corpus management results
-    corpus_results: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Corpus rebuild results by type",
-    )
-    corpus_manager_stats: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Corpus manager statistics",
-    )
-
-    # Cache management results
-    caches_cleared: dict[str, int] = Field(
-        default_factory=dict,
-        description="Caches cleared counts",
-    )
-    compression_stats: dict[str, float] = Field(
-        default_factory=dict,
-        description="Compression statistics",
-    )
-
-    # Quality metrics
-    vocabulary_quality: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Vocabulary validation results",
-    )
-    lemmatization_stats: dict[str, int] = Field(
-        default_factory=dict,
-        description="Lemmatization cache statistics",
-    )
+    status: str
+    message: str
+    corpus_name: str
+    corpus_uuid: str | None = None
+    components_rebuilt: list[str]
+    vocabulary_size: int = 0
+    caches_cleared: dict[str, int] = Field(default_factory=dict)
+    gridfs_cleaned: int = 0
+    total_time_seconds: float
+    semantic_info: dict[str, Any] = Field(default_factory=dict)
 
 
 class SemanticStatusResponse(BaseModel):

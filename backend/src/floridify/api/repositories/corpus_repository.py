@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from ...corpus.core import Corpus
 from ...corpus.crud import get_stats as get_corpus_stats
 from ...corpus.manager import get_tree_corpus_manager
-from ...search.core import Search
+from ...search.engine import Search
 
 
 class CorpusCreate(BaseModel):

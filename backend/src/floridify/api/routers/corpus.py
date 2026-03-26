@@ -1,5 +1,6 @@
 """Corpus management endpoints."""
 
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -15,9 +16,10 @@ from ...models.base import Language
 from ...models.parameters import CorpusCreateParams, CorpusListParams, PaginationParams
 from ...models.responses import CorpusListResponse, CorpusResponse
 from ...search.constants import SearchMode
-from ...search.core import Search
-from ...search.search_index import SearchIndex
+from ...search.engine import Search
+from ...search.index import SearchIndex
 from ...utils.logging import get_logger
+from ..core import AdminDep
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -537,3 +539,110 @@ async def delete_corpus(
     except Exception as e:
         logger.error(f"Failed to delete corpus {corpus_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete corpus: {e!s}")
+
+
+# -- Corpus Rebuild --
+
+
+class CorpusRebuildRequest(BaseModel):
+    """Request for rebuilding a corpus and its search indices."""
+
+    re_aggregate: bool = Field(default=True, description="Re-aggregate vocabulary from children")
+    rebuild_search: bool = Field(default=True, description="Rebuild search indices after")
+    components: list[str] = Field(
+        default=["all"], description="Search components to rebuild: 'trie', 'semantic', 'all'"
+    )
+
+
+class CorpusRebuildResponse(BaseModel):
+    """Response for corpus rebuild operation."""
+
+    status: str
+    corpus_name: str
+    corpus_uuid: str
+    vocabulary_size: int
+    children_rebuilt: list[str] = Field(default_factory=list)
+    search_rebuilt: bool = False
+    total_time_seconds: float
+
+
+@router.post("/corpus/{corpus_id}/rebuild", response_model=CorpusRebuildResponse)
+async def rebuild_corpus(
+    _admin: AdminDep,
+    request: CorpusRebuildRequest = CorpusRebuildRequest(),
+    corpus_id: str = Path(..., description="Corpus ID"),
+) -> CorpusRebuildResponse:
+    """Rebuild a corpus: re-aggregate vocabulary and optionally rebuild search indices.
+
+    Admin-only. Useful after fixing stale caches or corrupted search indices.
+    """
+    start_time = time.perf_counter()
+
+    try:
+        # Parse and load corpus
+        try:
+            obj_id = PydanticObjectId(corpus_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid corpus ID format")
+
+        manager = get_tree_corpus_manager()
+        corpus = await manager.get_corpus(
+            corpus_id=obj_id, config=VersionConfig(use_cache=False)
+        )
+        if not corpus:
+            raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
+
+        children_rebuilt: list[str] = []
+
+        # Re-aggregate vocabulary from children
+        if request.re_aggregate and corpus.child_uuids:
+            logger.info(
+                f"Re-aggregating vocabulary for '{corpus.corpus_name}' "
+                f"({len(corpus.child_uuids)} children)"
+            )
+            await manager.aggregate_vocabularies(
+                corpus_id=obj_id,
+                corpus_uuid=corpus.corpus_uuid,
+                config=VersionConfig(use_cache=False),
+                update_parent=True,
+            )
+            children_rebuilt = corpus.child_uuids
+
+            # Reload corpus after aggregation
+            corpus = await manager.get_corpus(
+                corpus_id=obj_id, config=VersionConfig(use_cache=False)
+            )
+            if not corpus:
+                raise HTTPException(status_code=500, detail="Corpus lost after aggregation")
+
+        # Rebuild search indices
+        search_rebuilt = False
+        if request.rebuild_search:
+            from .search.rebuild import _rebuild_corpus
+
+            await _rebuild_corpus(
+                corpus_name=corpus.corpus_name,
+                corpus_uuid=corpus.corpus_uuid,
+                components=request.components,
+                clear_caches=True,
+                clean_gridfs=False,
+            )
+            search_rebuilt = True
+
+        elapsed = time.perf_counter() - start_time
+
+        return CorpusRebuildResponse(
+            status="success",
+            corpus_name=corpus.corpus_name,
+            corpus_uuid=corpus.corpus_uuid or "",
+            vocabulary_size=len(corpus.vocabulary),
+            children_rebuilt=children_rebuilt,
+            search_rebuilt=search_rebuilt,
+            total_time_seconds=elapsed,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to rebuild corpus {corpus_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to rebuild corpus: {e!s}")

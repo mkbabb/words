@@ -1,10 +1,12 @@
 """WordList words management endpoints."""
 
+import base64
+import json
 from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
@@ -53,10 +55,10 @@ class WordListSearchQueryParams(WordListQueryParams):
         100, ge=1, le=500, description="Maximum search results before filtering"
     )
     min_score: float = Field(0.4, ge=0.0, le=1.0, description="Minimum match score")
-    semantic: bool | None = Field(
+    mode: str | None = Field(
         None,
-        description="Enable semantic search. If not set, automatically enabled "
-        "for wordlists with more than 100 words.",
+        description="Search mode: smart, exact, fuzzy, semantic. "
+        "If not set, defaults to smart cascade.",
     )
     sort_by: str = Field(
         "relevance",
@@ -69,13 +71,32 @@ def get_wordlist_repo() -> WordListRepository:
     return WordListRepository()
 
 
+def _decode_cursor(cursor: str) -> dict[str, Any]:
+    """Decode a base64-encoded JSON cursor."""
+    try:
+        decoded = base64.b64decode(cursor).decode("utf-8")
+        return json.loads(decoded)
+    except Exception:
+        return {}
+
+
+def _encode_cursor(data: dict[str, Any]) -> str:
+    """Encode cursor data as base64 JSON."""
+    return base64.b64encode(json.dumps(data).encode("utf-8")).decode("utf-8")
+
+
 @router.get("/{wordlist_id}/words", response_model=ListResponse[dict[str, Any]])
 async def list_words(
     wordlist_id: PydanticObjectId,
+    cursor: str | None = Query(None, description="Cursor for keyset pagination (base64 JSON)"),
     params: WordListQueryParams = Depends(),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
-    """List words in a wordlist with filtering and sorting."""
+    """List words in a wordlist with filtering and sorting.
+
+    Supports both offset-based and cursor-based pagination.
+    When `cursor` is provided, it takes precedence over `offset`.
+    """
     # Verify wordlist exists
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
 
@@ -110,6 +131,7 @@ async def list_words(
         sort_orders.append(sort_orders[-1] if sort_orders else "asc")
 
     sort_list = []
+    mapped_sort_fields = []
     for field, order in zip(sort_fields, sort_orders, strict=False):
         field = field.strip()
         # Map field names
@@ -117,12 +139,38 @@ async def list_words(
             field = "added_date"
         direction = -1 if order.strip().lower() == "desc" else 1
         sort_list.append((field, direction))
+        mapped_sort_fields.append((field, direction))
+
+    # Apply cursor-based pagination if cursor is provided
+    if cursor:
+        cursor_data = _decode_cursor(cursor)
+        if cursor_data and mapped_sort_fields:
+            # Build cursor condition using the primary sort field
+            primary_field, primary_dir = mapped_sort_fields[0]
+            cursor_value = cursor_data.get(primary_field)
+            cursor_id = cursor_data.get("_id")
+            if cursor_value is not None and cursor_id is not None:
+                op = "$gt" if primary_dir == 1 else "$lt"
+                # Compound condition: (sort_field > cursor_value) OR
+                # (sort_field == cursor_value AND _id > cursor_id)
+                query["$or"] = [
+                    {primary_field: {op: cursor_value}},
+                    {
+                        primary_field: cursor_value,
+                        "_id": {"$gt": PydanticObjectId(cursor_id)},
+                    },
+                ]
 
     # Query with pagination
     items_cursor = WordListItemDoc.find(query)
     if sort_list:
         items_cursor = items_cursor.sort(sort_list)
-    items = await items_cursor.skip(params.offset).limit(params.limit).to_list()
+
+    if cursor:
+        # Cursor-based: no skip needed
+        items = await items_cursor.limit(params.limit).to_list()
+    else:
+        items = await items_cursor.skip(params.offset).limit(params.limit).to_list()
 
     # Apply lazy temperature cooling
     for item in items:
@@ -134,6 +182,28 @@ async def list_words(
 
     # Convert to response format
     result = [item.model_dump(mode="json") for item in items]
+
+    # Build next_cursor from the last item
+    next_cursor = None
+    if items and len(items) == params.limit and mapped_sort_fields:
+        last_item = items[-1]
+        primary_field, _ = mapped_sort_fields[0]
+        last_dump = last_item.model_dump(mode="json")
+        # Navigate dotted field paths
+        cursor_val = last_dump
+        for part in primary_field.split("."):
+            if isinstance(cursor_val, dict):
+                cursor_val = cursor_val.get(part)
+            else:
+                cursor_val = None
+                break
+        if cursor_val is not None:
+            next_cursor = _encode_cursor(
+                {
+                    primary_field: cursor_val,
+                    "_id": str(last_item.id),
+                }
+            )
 
     # Populate word text
     word_ids = [item.get("word_id") for item in result if item.get("word_id")]
@@ -150,12 +220,20 @@ async def list_words(
             item.pop("id", None)
             item.pop("revision_id", None)
 
-    return ListResponse(
+    response_data = ListResponse(
         items=result,
         total=total,
         offset=params.offset,
         limit=params.limit,
     )
+
+    # Include next_cursor in the response dict
+    if next_cursor:
+        response_dict = response_data.model_dump(mode="json")
+        response_dict["next_cursor"] = next_cursor
+        return response_dict
+
+    return response_data
 
 
 @router.post("/{wordlist_id}/words", response_model=ResourceResponse)
@@ -171,12 +249,18 @@ async def add_word(
     await verify_wordlist_ownership(wordlist, user_id, user_role)
 
     updated_list = await repo.add_word(wordlist_id, request)
+    from .search import invalidate_wordlist_corpus
+    await invalidate_wordlist_corpus(wordlist_id)
+
+    collapsed_added = repo._collapse_entries(request.words)
 
     return ResourceResponse(
         data={
             "id": str(updated_list.id),
             "word_count": updated_list.unique_words,
-            "added_words": request.words,
+            "unique_words": updated_list.unique_words,
+            "total_words": updated_list.total_words,
+            "added_words": [word.model_dump(mode="json") for word in collapsed_added],
         },
         metadata={
             "version": updated_list.version,
@@ -254,6 +338,8 @@ async def remove_word(
 
     assert word_doc.id is not None
     await repo.remove_word(wordlist_id, word_doc.id, version=version)
+    from .search import invalidate_wordlist_corpus
+    await invalidate_wordlist_corpus(wordlist_id)
 
 
 class BulkDeleteRequest(BaseModel):
@@ -291,6 +377,8 @@ async def bulk_delete_words(
 
     # Recompute denormalized stats via aggregation pipeline
     await repo.recompute_stats(wordlist_id)
+    from .search import invalidate_wordlist_corpus
+    await invalidate_wordlist_corpus(wordlist_id)
 
     return ResourceResponse(
         data={
