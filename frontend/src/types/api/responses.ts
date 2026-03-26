@@ -11,12 +11,15 @@ import type {
     Etymology,
     Example,
     ImageMedia,
-    Language,
-    ModelInfo,
     SearchMethod,
-    DictionaryProvider,
-    SourceReference,
 } from './models';
+
+import type {
+    Language,
+    DictionaryProvider,
+    ModelInfoResponse,
+    SourceReference,
+} from './schemas';
 
 // Generic API Response Types
 export interface ListResponse<T> {
@@ -72,7 +75,7 @@ export interface DictionaryEntryResponse {
     >;
     etymology?: Etymology;
     last_updated: string;
-    model_info?: ModelInfo | null;
+    model_info?: ModelInfoResponse | null;
     id?: string | null;
     images?: ImageMedia[];
     source_entries?: SourceReference[];
@@ -111,16 +114,7 @@ export interface ProgressEvent {
     details?: any;
 }
 
-// Semantic Status Types
-export interface SemanticStatusResponse {
-    enabled: boolean;
-    ready: boolean;
-    building: boolean;
-    languages: Language[];
-    model_name: string | null;
-    vocabulary_size: number;
-    message: string;
-}
+// SemanticStatusResponse: now in schemas.ts (generated)
 
 // Health Check Types
 export interface HealthResponse {
@@ -146,7 +140,7 @@ export interface AIRequest {
 
 export interface AIResponse<T = any> {
     result: T;
-    model_info: ModelInfo;
+    model_info: ModelInfoResponse;
     usage?: {
         prompt_tokens: number;
         completion_tokens: number;

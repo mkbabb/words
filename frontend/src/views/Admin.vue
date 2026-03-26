@@ -209,7 +209,7 @@ import { usersApi } from '@/api/users';
 import { lookupApi } from '@/api/lookup';
 import { wordlistApi } from '@/api';
 import { RoleBadge } from '@/components/custom/auth';
-import type { UserProfile, UserRole } from '@/types/api/models';
+import type { UserProfile, UserRole } from '@/types/api';
 import { useRouter } from 'vue-router';
 
 const auth = useAuthStore();

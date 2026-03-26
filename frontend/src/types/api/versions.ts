@@ -1,15 +1,12 @@
 /**
- * Backend API Type Definitions - Version History
+ * Frontend-only version/diff types.
  *
- * Isomorphic to backend VersionSummary, VersionHistoryResponse, VersionDiffResponse.
+ * Types with backend equivalents (VersionSummary, FieldChangeSummary,
+ * EditMetadataSummary, VersionHistoryResponse, VersionDiffResponse) are
+ * now in schemas.ts (generated from OpenAPI).
  */
 
-export interface FieldChangeSummary {
-    field_path: string;
-    change_type: 'added' | 'removed' | 'modified';
-    old_value: string | null;
-    new_value: string | null;
-}
+// Frontend-only types (no generated equivalent)
 
 export interface SynthesisAuditSummary {
     model_name: string;
@@ -32,40 +29,6 @@ export type OperationType =
     | 'component_regeneration'
     | 'auto_correct'
     | 'import';
-
-export interface EditMetadataSummary {
-    user_id?: string;
-    username?: string;
-    operation_type: OperationType;
-    change_reason?: string;
-    field_changes: FieldChangeSummary[];
-    synthesis_audit?: SynthesisAuditSummary;
-}
-
-export interface VersionSummary {
-    version: string;
-    created_at: string;
-    data_hash: string;
-    storage_mode: 'snapshot' | 'delta';
-    is_latest: boolean;
-    edit_metadata?: EditMetadataSummary;
-}
-
-export interface VersionHistoryResponse {
-    resource_id: string;
-    total_versions: number;
-    versions: VersionSummary[];
-    timestamp: string;
-    version: string;
-}
-
-export interface VersionDiffResponse {
-    from_version: string;
-    to_version: string;
-    changes: Record<string, any>;
-    timestamp: string;
-    version: string;
-}
 
 export interface VersionDetailResponse {
     resource_id: string;

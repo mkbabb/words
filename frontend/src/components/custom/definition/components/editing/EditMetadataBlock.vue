@@ -26,15 +26,15 @@
             v-if="metadata.synthesis_audit"
             class="flex flex-wrap gap-1.5 text-micro text-muted-foreground/50"
         >
-            <span class="font-mono">{{ metadata.synthesis_audit.model_name }}</span>
-            <span v-if="metadata.synthesis_audit.total_tokens">
-                {{ metadata.synthesis_audit.total_tokens.toLocaleString() }} tok
+            <span class="font-mono">{{ synthesisAudit?.model_name }}</span>
+            <span v-if="synthesisAudit?.total_tokens">
+                {{ synthesisAudit?.total_tokens.toLocaleString() }} tok
             </span>
             <span>
-                {{ metadata.synthesis_audit.definitions_input }}&rarr;{{ metadata.synthesis_audit.definitions_output }} defs
+                {{ synthesisAudit?.definitions_input }}&rarr;{{ synthesisAudit?.definitions_output }} defs
             </span>
-            <span v-if="metadata.synthesis_audit.dedup_removed > 0">
-                &minus;{{ metadata.synthesis_audit.dedup_removed }} dedup
+            <span v-if="(synthesisAudit?.dedup_removed ?? 0) > 0">
+                &minus;{{ synthesisAudit?.dedup_removed }} dedup
             </span>
         </div>
 
@@ -65,6 +65,7 @@
 import { computed } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import type { EditMetadataSummary } from '@/types/api';
+import type { SynthesisAuditSummary } from '@/types/api/versions';
 
 const MAX_VISIBLE_CHANGES = 5;
 
@@ -91,6 +92,10 @@ const props = defineProps<{
 const operationLabel = computed(() =>
     OPERATION_LABELS[props.metadata?.operation_type ?? ''] ??
     (props.metadata?.operation_type ?? '').replace(/_/g, ' '),
+);
+
+const synthesisAudit = computed(() =>
+    props.metadata?.synthesis_audit as SynthesisAuditSummary | undefined,
 );
 
 const visibleChanges = computed(() =>

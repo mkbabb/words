@@ -1,5 +1,5 @@
 import { api } from './core';
-import type { UserProfile, UserPreferences, UserHistoryData, UserRole } from '@/types/api/models';
+import type { UserProfile, UserPreferences, UserHistoryData, UserRole } from '@/types/api';
 
 export const usersApi = {
   /** Get the current user's profile */

@@ -4,7 +4,8 @@
  * Runtime type guard functions for API model validation.
  */
 
-import type { Word, Definition, Example, MeaningCluster } from './models';
+import type { Word, Definition, Example } from './models';
+import type { MeaningClusterResponse } from './schemas';
 
 export function isWord(obj: any): obj is Word {
     return (
@@ -30,6 +31,6 @@ export function isExample(obj: any): obj is Example {
     );
 }
 
-export function isMeaningCluster(obj: any): obj is MeaningCluster {
+export function isMeaningCluster(obj: any): obj is MeaningClusterResponse {
     return obj && typeof obj.id === 'string' && typeof obj.slug === 'string' && typeof obj.name === 'string';
 }

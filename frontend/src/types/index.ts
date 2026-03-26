@@ -15,27 +15,32 @@ import type {
 } from './modes';
 
 // Re-export backend-aligned types
-export { 
-  type Example,
-  type MeaningCluster,
-  type Definition,
-  type SearchResult,
-  type SearchMethod,
+export {
+  // From schemas.ts (generated from OpenAPI)
   Language,
   DictionaryProvider,
-  SearchMethod as SearchMethodEnum,
-  type DictionaryEntryResponse,
   type SearchResponse,
+  type SemanticStatusResponse,
+  type SourceReference,
+  type MeaningClusterResponse,
+  type WordFormResponse,
+  type UsageNoteResponse,
+  type GrammarPatternResponse,
+  type CollocationResponse,
+  type ModelInfoResponse,
+  type VersionSummary,
+  // From models.ts (frontend-only)
+  type Example,
+  type Definition,
   type Pronunciation,
   type AudioFile,
   type ImageMedia,
-  type WordForm,
-  type UsageNote,
-  type GrammarPattern,
-  type Collocation,
   type Etymology,
-  type ModelInfo,
-  type LiteratureSource
+  type LiteratureSource,
+  SearchMethod,
+  // From responses.ts
+  type SearchResult,
+  type DictionaryEntryResponse,
 } from './api';
 
 // Frontend version of Definition - extends the definition from a DictionaryEntryResponse

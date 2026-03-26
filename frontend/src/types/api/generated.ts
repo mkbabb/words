@@ -3042,6 +3042,24 @@ export interface components {
             confidence: number;
         };
         /**
+         * AudioFileResponse
+         * @description Serialized audio file from AudioMedia.model_dump().
+         */
+        AudioFileResponse: {
+            /** Url */
+            url: string;
+            /** Format */
+            format?: string | null;
+            /** Accent */
+            accent?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+        };
+        /**
          * AudioUpdate
          * @description Schema for updating audio metadata.
          */
@@ -3294,6 +3312,18 @@ export interface components {
             definition: string;
             /** Part Of Speech */
             part_of_speech: string;
+        };
+        /**
+         * CollocationResponse
+         * @description Serialized collocation.
+         */
+        CollocationResponse: {
+            /** Text */
+            text: string;
+            /** Frequency */
+            frequency?: string | null;
+            /** Type */
+            type?: string | null;
         };
         /**
          * ComponentRegenerationRequest
@@ -3799,6 +3829,100 @@ export interface components {
             dictionary_entry_id?: components["schemas"]["PydanticObjectId"] | null;
         };
         /**
+         * DefinitionResponse
+         * @description Serialized definition from DefinitionLoader.load_with_relations().
+         */
+        "DefinitionResponse-Input": {
+            /** Id */
+            id: string;
+            /** Part Of Speech */
+            part_of_speech?: string | null;
+            /** Text */
+            text: string;
+            /** Sense Number */
+            sense_number?: number | null;
+            meaning_cluster?: components["schemas"]["MeaningClusterResponse"] | null;
+            /** Word Forms */
+            word_forms?: components["schemas"]["WordFormResponse"][];
+            /** Synonyms */
+            synonyms?: string[];
+            /** Antonyms */
+            antonyms?: string[];
+            /** Language Register */
+            language_register?: string | null;
+            /** Domain */
+            domain?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Usage Notes */
+            usage_notes?: components["schemas"]["UsageNoteResponse"][];
+            /** Grammar Patterns */
+            grammar_patterns?: components["schemas"]["GrammarPatternResponse"][];
+            /** Collocations */
+            collocations?: components["schemas"]["CollocationResponse"][];
+            /** Transitivity */
+            transitivity?: string | null;
+            /** Cefr Level */
+            cefr_level?: string | null;
+            /** Frequency Band */
+            frequency_band?: number | null;
+            /** Examples */
+            examples?: components["schemas"]["floridify__api__routers__lookup__ExampleResponse"][];
+            /** Images */
+            images?: components["schemas"]["ImageResponse"][];
+            /** Providers Data */
+            providers_data?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * DefinitionResponse
+         * @description Serialized definition from DefinitionLoader.load_with_relations().
+         */
+        "DefinitionResponse-Output": {
+            /** Id */
+            id: string;
+            /** Part Of Speech */
+            part_of_speech?: string | null;
+            /** Text */
+            text: string;
+            /** Sense Number */
+            sense_number?: number | null;
+            meaning_cluster?: components["schemas"]["MeaningClusterResponse"] | null;
+            /** Word Forms */
+            word_forms?: components["schemas"]["WordFormResponse"][];
+            /** Synonyms */
+            synonyms?: string[];
+            /** Antonyms */
+            antonyms?: string[];
+            /** Language Register */
+            language_register?: string | null;
+            /** Domain */
+            domain?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Usage Notes */
+            usage_notes?: components["schemas"]["UsageNoteResponse"][];
+            /** Grammar Patterns */
+            grammar_patterns?: components["schemas"]["GrammarPatternResponse"][];
+            /** Collocations */
+            collocations?: components["schemas"]["CollocationResponse"][];
+            /** Transitivity */
+            transitivity?: string | null;
+            /** Cefr Level */
+            cefr_level?: string | null;
+            /** Frequency Band */
+            frequency_band?: number | null;
+            /** Examples */
+            examples?: components["schemas"]["floridify__api__routers__lookup__ExampleResponse"][];
+            /** Images */
+            images?: components["schemas"]["ImageResponse"][];
+            /** Providers Data */
+            providers_data?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
          * DefinitionUpdate
          * @description Schema for updating a definition - partial updates allowed.
          */
@@ -3843,6 +3967,9 @@ export interface components {
         /**
          * DictionaryEntryResponse
          * @description Complete dictionary entry response with all resolved data.
+         *
+         *     Sub-models are typed so that the OpenAPI schema is precise — enabling
+         *     openapi-typescript to generate accurate frontend types.
          */
         DictionaryEntryResponse: {
             /**
@@ -3866,13 +3993,8 @@ export interface components {
              * @description When this entry was last updated
              */
             last_updated: string;
-            /**
-             * Model Info
-             * @description AI model information (null for non-AI entries)
-             */
-            model_info?: {
-                [key: string]: unknown;
-            } | null;
+            /** @description AI model information */
+            model_info?: components["schemas"]["ModelInfoResponse"] | null;
             /**
              * Version
              * @description Current version string (e.g. 1.0.3)
@@ -3883,39 +4005,17 @@ export interface components {
              * @description Total number of versions in history
              */
             version_count?: number | null;
-            /**
-             * Pronunciation
-             * @description Pronunciation information
-             */
-            pronunciation?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Etymology
-             * @description Etymology information
-             */
-            etymology?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Images
-             * @description Images attached to the synthesized entry
-             */
-            images?: {
-                [key: string]: unknown;
-            }[];
+            pronunciation?: components["schemas"]["floridify__api__routers__lookup__PronunciationResponse"] | null;
+            etymology?: components["schemas"]["EtymologyResponse"] | null;
+            /** Images */
+            images?: components["schemas"]["ImageResponse"][];
+            /** Definitions */
+            definitions?: components["schemas"]["DefinitionResponse-Output"][];
             /**
              * Richness Score
              * @description Entry richness score (0.0–1.0)
              */
             richness_score?: number | null;
-            /**
-             * Definitions
-             * @description Word definitions with all resolved data
-             */
-            definitions?: {
-                [key: string]: unknown;
-            }[];
         };
         /**
          * DictionaryProvider
@@ -4000,6 +4100,22 @@ export interface components {
             synthesis_audit?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * EtymologyResponse
+         * @description Serialized etymology from Etymology.model_dump().
+         */
+        EtymologyResponse: {
+            /** Text */
+            text?: string | null;
+            /** Origin Language */
+            origin_language?: string | null;
+            /** Root Words */
+            root_words?: string[];
+            /** First Known Use */
+            first_known_use?: string | null;
+            /** Cognates */
+            cognates?: string[];
         };
         /**
          * Example
@@ -4132,18 +4248,6 @@ export interface components {
             count: number;
         };
         /**
-         * ExampleResponse
-         * @description Response for example generation.
-         */
-        ExampleResponse: {
-            /** Word */
-            word: string;
-            /** Examples */
-            examples: string[];
-            /** Confidence */
-            confidence: number;
-        };
-        /**
          * ExampleUpdate
          * @description Schema for updating an example.
          */
@@ -4247,6 +4351,18 @@ export interface components {
             part_of_speech: string;
         };
         /**
+         * GrammarPatternResponse
+         * @description Serialized grammar pattern.
+         */
+        GrammarPatternResponse: {
+            /** Pattern */
+            pattern: string;
+            /** Description */
+            description?: string | null;
+            /** Examples */
+            examples?: string[];
+        };
+        /**
          * GridFSCleanupRequest
          * @description Request for GridFS stale file cleanup.
          */
@@ -4333,6 +4449,24 @@ export interface components {
              * @description Currently loaded languages
              */
             languages?: string[] | null;
+        };
+        /**
+         * ImageResponse
+         * @description Serialized image from ImageMedia.model_dump().
+         */
+        ImageResponse: {
+            /** Url */
+            url?: string | null;
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Caption */
+            caption?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Content Type */
+            content_type?: string | null;
         };
         /**
          * ImageUpdate
@@ -4561,6 +4695,22 @@ export interface components {
             relevance: number;
         };
         /**
+         * MeaningClusterResponse
+         * @description Serialized meaning cluster.
+         */
+        MeaningClusterResponse: {
+            /** Slug */
+            slug?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Order */
+            order?: number | null;
+            /** Relevance */
+            relevance?: number | null;
+        };
+        /**
          * MetricsResponse
          * @description Response for operational metrics endpoint.
          */
@@ -4655,24 +4805,24 @@ export interface components {
             last_generated?: string;
         };
         /**
+         * ModelInfoResponse
+         * @description Serialized AI model info from ModelInfo.model_dump().
+         */
+        ModelInfoResponse: {
+            /** Name */
+            name?: string | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Temperature */
+            temperature?: number | null;
+        };
+        /**
          * PronunciationRequest
          * @description Request for pronunciation generation.
          */
         PronunciationRequest: {
             /** Word */
             word: string;
-        };
-        /**
-         * PronunciationResponse
-         * @description Response for pronunciation generation.
-         */
-        PronunciationResponse: {
-            /** Word */
-            word: string;
-            /** Pronunciation */
-            pronunciation: {
-                [key: string]: unknown;
-            };
         };
         /**
          * ProviderStatusResponse
@@ -5409,6 +5559,16 @@ export interface components {
             text: string;
         };
         /**
+         * UsageNoteResponse
+         * @description Serialized usage note.
+         */
+        UsageNoteResponse: {
+            /** Type */
+            type?: string | null;
+            /** Text */
+            text: string;
+        };
+        /**
          * UsageNotesRequest
          * @description Request for usage notes generation.
          */
@@ -5784,6 +5944,16 @@ export interface components {
             text: string;
         };
         /**
+         * WordFormResponse
+         * @description Serialized word form.
+         */
+        WordFormResponse: {
+            /** Form Type */
+            form_type: string;
+            /** Text */
+            text: string;
+        };
+        /**
          * WordFormsRequest
          * @description Request for word forms generation.
          */
@@ -5951,6 +6121,30 @@ export interface components {
             tags?: string[] | null;
         };
         /**
+         * ExampleResponse
+         * @description Response for example generation.
+         */
+        floridify__api__routers__ai__base__ExampleResponse: {
+            /** Word */
+            word: string;
+            /** Examples */
+            examples: string[];
+            /** Confidence */
+            confidence: number;
+        };
+        /**
+         * PronunciationResponse
+         * @description Response for pronunciation generation.
+         */
+        floridify__api__routers__ai__base__PronunciationResponse: {
+            /** Word */
+            word: string;
+            /** Pronunciation */
+            pronunciation: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * HealthResponse
          * @description Extended health check response with specific service details.
          */
@@ -6011,6 +6205,38 @@ export interface components {
             connection_pool?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ExampleResponse
+         * @description Serialized example from Example.model_dump().
+         */
+        floridify__api__routers__lookup__ExampleResponse: {
+            /** Text */
+            text: string;
+            /** Source */
+            source?: string | null;
+            /** Author */
+            author?: string | null;
+            /** Year */
+            year?: number | null;
+            /** Translation */
+            translation?: string | null;
+        };
+        /**
+         * PronunciationResponse
+         * @description Serialized pronunciation from PronunciationLoader.load_with_audio().
+         */
+        floridify__api__routers__lookup__PronunciationResponse: {
+            /** Phonetic */
+            phonetic?: string | null;
+            /** Ipa */
+            ipa?: string | null;
+            /** Syllables */
+            syllables?: string[];
+            /** Stress Pattern */
+            stress_pattern?: string | null;
+            /** Audio Files */
+            audio_files?: components["schemas"]["AudioFileResponse"][];
         };
         /**
          * HealthResponse
@@ -6815,7 +7041,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PronunciationResponse"];
+                    "application/json": components["schemas"]["floridify__api__routers__ai__base__PronunciationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6947,7 +7173,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExampleResponse"];
+                    "application/json": components["schemas"]["floridify__api__routers__ai__base__ExampleResponse"];
                 };
             };
             /** @description Validation Error */

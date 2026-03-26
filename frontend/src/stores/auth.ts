@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, type Ref } from 'vue';
 import { useAuth, useUser } from '@clerk/vue';
 import { setAuthTokenGetter } from '@/api/core';
-import type { UserProfile, UserRole } from '@/types/api/models';
+import type { UserProfile, UserRole } from '@/types/api';
 
 // Dev mode: grant admin access without Clerk login
 const DEV_ADMIN = import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN === 'true';

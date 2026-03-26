@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { Shield, Sparkles } from 'lucide-vue-next';
 import { cn } from '@/utils';
-import type { UserRole } from '@/types/api/models';
+import type { UserRole } from '@/types/api';
 
 interface Props {
   role: UserRole;
