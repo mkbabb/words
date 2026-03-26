@@ -63,44 +63,165 @@ async def _background_synthesize(word: str, params: LookupParams) -> None:
             _background_synthesis_in_flight.discard(word)
 
 
-# Models specific to lookup endpoints
-class DictionaryEntryResponse(BaseModel):
-    """Complete dictionary entry response with all resolved data."""
+# ── Response sub-models ──────────────────────────────────────────────
+# Typed shapes for the serialized output of DictionaryEntryLoader.
+# These drive the OpenAPI schema so that openapi-typescript generates
+# precise frontend types — no dict[str, Any].
 
-    # Entry metadata
+
+class AudioFileResponse(BaseModel):
+    """Serialized audio file from AudioMedia.model_dump()."""
+
+    url: str
+    format: str | None = None
+    accent: str | None = None
+    language: str | None = None
+    duration_ms: int | None = None
+    size_bytes: int | None = None
+
+
+class PronunciationResponse(BaseModel):
+    """Serialized pronunciation from PronunciationLoader.load_with_audio()."""
+
+    phonetic: str | None = None
+    ipa: str | None = None
+    syllables: list[str] = Field(default_factory=list)
+    stress_pattern: str | None = None
+    audio_files: list[AudioFileResponse] = Field(default_factory=list)
+
+
+class EtymologyResponse(BaseModel):
+    """Serialized etymology from Etymology.model_dump()."""
+
+    text: str | None = None
+    origin_language: str | None = None
+    root_words: list[str] = Field(default_factory=list)
+    first_known_use: str | None = None
+    cognates: list[str] = Field(default_factory=list)
+
+
+class ImageResponse(BaseModel):
+    """Serialized image from ImageMedia.model_dump()."""
+
+    url: str | None = None
+    alt_text: str | None = None
+    caption: str | None = None
+    width: int | None = None
+    height: int | None = None
+    content_type: str | None = None
+
+
+class ModelInfoResponse(BaseModel):
+    """Serialized AI model info from ModelInfo.model_dump()."""
+
+    name: str | None = None
+    confidence: float | None = None
+    temperature: float | None = None
+
+
+class WordFormResponse(BaseModel):
+    """Serialized word form."""
+
+    form_type: str
+    text: str
+
+
+class MeaningClusterResponse(BaseModel):
+    """Serialized meaning cluster."""
+
+    slug: str | None = None
+    name: str | None = None
+    description: str | None = None
+    order: int | None = None
+    relevance: float | None = None
+
+
+class UsageNoteResponse(BaseModel):
+    """Serialized usage note."""
+
+    type: str | None = None
+    text: str
+
+
+class GrammarPatternResponse(BaseModel):
+    """Serialized grammar pattern."""
+
+    pattern: str
+    description: str | None = None
+    examples: list[str] = Field(default_factory=list)
+
+
+class CollocationResponse(BaseModel):
+    """Serialized collocation."""
+
+    text: str
+    frequency: str | None = None
+    type: str | None = None
+
+
+class ExampleResponse(BaseModel):
+    """Serialized example from Example.model_dump()."""
+
+    text: str
+    source: str | None = None
+    author: str | None = None
+    year: int | None = None
+    translation: str | None = None
+
+
+class DefinitionResponse(BaseModel):
+    """Serialized definition from DefinitionLoader.load_with_relations()."""
+
+    id: str
+    part_of_speech: str | None = None
+    text: str
+    sense_number: int | None = None
+    meaning_cluster: MeaningClusterResponse | None = None
+    word_forms: list[WordFormResponse] = Field(default_factory=list)
+    synonyms: list[str] = Field(default_factory=list)
+    antonyms: list[str] = Field(default_factory=list)
+    language_register: str | None = None
+    domain: str | None = None
+    region: str | None = None
+    usage_notes: list[UsageNoteResponse] = Field(default_factory=list)
+    grammar_patterns: list[GrammarPatternResponse] = Field(default_factory=list)
+    collocations: list[CollocationResponse] = Field(default_factory=list)
+    transitivity: str | None = None
+    cefr_level: str | None = None
+    frequency_band: int | None = None
+    examples: list[ExampleResponse] = Field(default_factory=list)
+    images: list[ImageResponse] = Field(default_factory=list)
+    providers_data: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ── Main response model ─────────────────────────────────────────────
+
+
+class DictionaryEntryResponse(BaseModel):
+    """Complete dictionary entry response with all resolved data.
+
+    Sub-models are typed so that the OpenAPI schema is precise — enabling
+    openapi-typescript to generate accurate frontend types.
+    """
+
     word: str = Field(..., description="The word that was looked up")
     languages: list[str] = Field(..., description="Language precedence list (primary first)")
     id: str | None = Field(None, description="ID of the synthesized dictionary entry")
     last_updated: datetime = Field(..., description="When this entry was last updated")
-    model_info: dict[str, Any] | None = Field(
-        None,
-        description="AI model information (null for non-AI entries)",
-    )
+    model_info: ModelInfoResponse | None = Field(None, description="AI model information")
 
     # Version provenance
     version: str | None = Field(None, description="Current version string (e.g. 1.0.3)")
     version_count: int | None = Field(None, description="Total number of versions in history")
 
-    # Pronunciation
-    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
-
-    # Etymology
-    etymology: dict[str, Any] | None = Field(None, description="Etymology information")
-
-    # Images attached to the entry
-    images: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Images attached to the synthesized entry",
-    )
+    # Typed sub-objects
+    pronunciation: PronunciationResponse | None = Field(None)
+    etymology: EtymologyResponse | None = Field(None)
+    images: list[ImageResponse] = Field(default_factory=list)
+    definitions: list[DefinitionResponse] = Field(default_factory=list)
 
     # Richness score (0.0–1.0)
     richness_score: float | None = Field(None, description="Entry richness score (0.0–1.0)")
-
-    # Definitions with all resolved data
-    definitions: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Word definitions with all resolved data",
-    )
 
 
 def parse_lookup_params(
