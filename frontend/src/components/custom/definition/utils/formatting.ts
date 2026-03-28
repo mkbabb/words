@@ -1,4 +1,4 @@
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import { MasteryLevel } from '@/types/wordlist';
 import type { CardVariant } from '@/types';
 

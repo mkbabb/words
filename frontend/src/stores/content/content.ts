@@ -159,45 +159,42 @@ export const useContentStore = defineStore('content', () => {
   }
   
   // ==========================================================================
-  // DELEGATED CONTENT OPERATIONS
+  // DELEGATED PURE STATE MUTATIONS
+  // (API calls live in useContentMutations composable)
   // ==========================================================================
-  
-  const updateDefinition = async (definitionId: string, updates: Partial<Definition>) => {
+
+  const setRegeneratingDefinitionIndex = (index: number | null) => {
     if (searchBarStore.searchMode === 'lookup') {
-      return lookupContent.updateDefinition(definitionId, updates)
+      lookupContent.setRegeneratingDefinitionIndex(index)
     }
-    throw new Error('Update definition not supported in current mode')
   }
-  
-  const updateExample = async (definitionId: string, exampleId: string, newText: string) => {
+
+  const applyDefinitionUpdate = (definitionId: string, updates: Partial<Definition>) => {
     if (searchBarStore.searchMode === 'lookup') {
-      return lookupContent.updateExample(definitionId, exampleId, newText)
+      lookupContent.applyDefinitionUpdate(definitionId, updates)
     }
-    throw new Error('Update example not supported in current mode')
   }
-  
-  const regenerateDefinitionComponent = async (
+
+  const touchCurrentEntry = () => {
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.touchCurrentEntry()
+    }
+  }
+
+  const applyDefinitionComponentRegeneration = (
     definitionId: string,
-    component: 'definition' | 'examples' | 'usage_notes'
+    component: string,
+    response: Record<string, unknown>
   ) => {
     if (searchBarStore.searchMode === 'lookup') {
-      return lookupContent.regenerateDefinitionComponent(definitionId, component)
+      lookupContent.applyDefinitionComponentRegeneration(definitionId, component, response)
     }
-    throw new Error('Regenerate definition component not supported in current mode')
   }
-  
-  const regenerateExamples = async (definitionIndex: number) => {
+
+  const applyExamplesRegeneration = (definitionIndex: number, response: { examples?: unknown }) => {
     if (searchBarStore.searchMode === 'lookup') {
-      return lookupContent.regenerateExamples(definitionIndex)
+      lookupContent.applyExamplesRegeneration(definitionIndex, response)
     }
-    throw new Error('Regenerate examples not supported in current mode')
-  }
-  
-  const refreshEntryImages = async () => {
-    if (searchBarStore.searchMode === 'lookup') {
-      return lookupContent.refreshEntryImages()
-    }
-    throw new Error('Refresh entry images not supported in current mode')
   }
   
   // ==========================================================================
@@ -307,12 +304,12 @@ export const useContentStore = defineStore('content', () => {
     setStreamingState,
     setError,
     
-    // Delegated operations
-    updateDefinition,
-    updateExample,
-    regenerateDefinitionComponent,
-    regenerateExamples,
-    refreshEntryImages,
+    // Pure state mutations (API calls live in useContentMutations composable)
+    setRegeneratingDefinitionIndex,
+    applyDefinitionUpdate,
+    touchCurrentEntry,
+    applyDefinitionComponentRegeneration,
+    applyExamplesRegeneration,
     
     // State management
     clearCurrentEntry,

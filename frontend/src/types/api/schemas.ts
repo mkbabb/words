@@ -24,7 +24,9 @@ export const Language = {
     ITALIAN: 'it',
 } as const satisfies Record<string, Language>;
 
-export type DictionaryProvider = components['schemas']['DictionaryProvider'];
+// Extend the generated union with new providers until OpenAPI types are regenerated
+export type DictionaryProvider = components['schemas']['DictionaryProvider']
+    | 'wordnet' | 'gcide' | 'wikipedia' | 'moby_thesaurus';
 export const DictionaryProvider = {
     WIKTIONARY: 'wiktionary',
     OXFORD: 'oxford',
@@ -32,6 +34,10 @@ export const DictionaryProvider = {
     MERRIAM_WEBSTER: 'merriam_webster',
     FREE_DICTIONARY: 'free_dictionary',
     WORDHIPPO: 'wordhippo',
+    WORDNET: 'wordnet',
+    GCIDE: 'gcide',
+    WIKIPEDIA: 'wikipedia',
+    MOBY_THESAURUS: 'moby_thesaurus',
     AI_FALLBACK: 'ai_fallback',
     SYNTHESIS: 'synthesis',
 } as const satisfies Record<string, DictionaryProvider>;

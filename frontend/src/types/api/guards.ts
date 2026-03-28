@@ -5,6 +5,7 @@
  */
 
 import type { Word, Definition, Example } from './models';
+import type { DictionaryEntryResponse, SearchResult } from './responses';
 import type { MeaningClusterResponse } from './schemas';
 
 export function isWord(obj: any): obj is Word {
@@ -33,4 +34,22 @@ export function isExample(obj: any): obj is Example {
 
 export function isMeaningCluster(obj: any): obj is MeaningClusterResponse {
     return obj && typeof obj.id === 'string' && typeof obj.slug === 'string' && typeof obj.name === 'string';
+}
+
+export function isDictionaryEntryResponse(obj: any): obj is DictionaryEntryResponse {
+    return (
+        obj &&
+        typeof obj.word === 'string' &&
+        Array.isArray(obj.definitions) &&
+        typeof obj.last_updated === 'string'
+    );
+}
+
+export function isSearchResult(obj: any): obj is SearchResult {
+    return (
+        obj &&
+        typeof obj.word === 'string' &&
+        typeof obj.score === 'number' &&
+        typeof obj.method === 'string'
+    );
 }

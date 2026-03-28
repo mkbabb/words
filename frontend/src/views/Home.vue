@@ -26,9 +26,9 @@
                     <!-- Progressive Sidebar (Sticky) — instant show/hide, no width transition -->
                     <div
                         v-if="shouldShowProgressiveSidebar"
-                        class="hidden lg:block w-[15rem] shrink-0 overflow-visible"
+                        class="hidden lg:block w-[14rem] shrink-0 overflow-visible"
                     >
-                        <div class="sticky top-[5.5rem] w-[15rem] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-clip scrollbar-thin pl-3 pr-4 pt-1 pb-4">
+                        <div class="sticky top-[5.5rem] w-[14rem] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-clip scrollbar-thin px-2 pt-1 pb-4">
                             <ProgressiveSidebar v-if="searchBar.searchMode === 'lookup'" />
                             <WordlistProgressiveSidebar v-else-if="searchBar.searchMode === 'wordlist'" />
                         </div>
@@ -121,17 +121,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, defineAsyncComponent } from 'vue';
 import { useStores } from '@/stores';
-import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useScroll } from '@vueuse/core';
 import { SearchBar } from '@/components/custom/search';
 import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
-// Lazy-loaded: only parsed when the user switches to the relevant mode
+import { useRouteOrchestration } from './composables/useRouteOrchestration';
+
 const WordListView = defineAsyncComponent(
     () => import('@/components/custom/wordlist/views/WordListView.vue'),
 );
@@ -143,233 +142,55 @@ const WordlistProgressiveSidebar = defineAsyncComponent(
 );
 
 const { searchBar, content, loading } = useStores();
-const route = useRoute();
-const router = useRouter();
 
-const orchestrator = useSearchOrchestrator({
-    query: computed(() => searchBar.searchQuery)
-});
+// Route orchestration (watchers, API calls, navigation)
+useRouteOrchestration();
 
-// Loading modal bindings driven by global loading store
-// Show for ALL lookups (removed isDirectLookup gate that suppressed it)
+// Loading modal bindings
 const showLoadingModal = computed({
     get: () => loading.showLoadingModal.value && searchBar.searchMode === 'lookup',
-    set: (value: boolean) => loading.setShowLoadingModal(value)
+    set: (value: boolean) => loading.setShowLoadingModal(value),
 });
 
 const showSuggestionsModal = computed({
     get: () => loading.isSuggestingWords.value,
     set: (value: boolean) => {
-        if (!value) {
-            loading.stopSuggestions();
-        }
-    }
+        if (!value) loading.stopSuggestions();
+    },
 });
 
-// Computed for current lookup submode
 const lookupSubMode = computed(() => searchBar.getSubMode('lookup'));
-
-// Route orchestration — watch fullPath to catch same-route param changes (e.g. /search/hello → /search/world)
-watch(() => route.fullPath, async () => {
-    const routeName = route.name;
-    if (routeName === 'Definition' && route.params.word) {
-        const word = route.params.word as string;
-        searchBar.setMode('lookup');
-        searchBar.setSubMode('lookup', 'dictionary');
-        searchBar.setQuery(word);
-
-        // Close controls and results dropdowns on definition route entry
-        searchBar.hideControls();
-        searchBar.hideDropdown();
-
-        // Always fetch when the word changes — skip only if we already have this exact word.
-        // This is the single source of truth for definition fetches on route changes.
-        if (!content.currentEntry || content.currentEntry.word !== word) {
-            // Clear the old entry so child components (ProviderViewTabs) reset.
-            // The card stays mounted because isStreamingData becomes true when
-            // the SSE starts, before currentEntry is set.
-            content.clearCurrentEntry();
-            try {
-                const definition = await orchestrator.getDefinition(word, {
-                    onProgress: (stage, progress) => {
-                        loading.setLoadingStage(stage);
-                        loading.setLoadingProgress(progress);
-                    }
-                });
-                if (definition) {
-                    content.setCurrentEntry(definition);
-                    // Close dropdowns after lookup completes
-                    searchBar.hideControls();
-                    searchBar.hideDropdown();
-                }
-            } catch (error: any) {
-                const message = error?.message || '';
-                // Silently ignore aborts (e.g. user navigated away before completion)
-                if (message.includes('aborted') || error?.name === 'AbortError') {
-                    return;
-                }
-                content.setError({
-                    hasError: true,
-                    errorType: 'unknown',
-                    errorMessage: message || 'Failed to look up word',
-                    canRetry: true,
-                    originalWord: word,
-                });
-            }
-        }
-    } else if (routeName === 'Thesaurus' && route.params.word) {
-        const word = route.params.word as string;
-        searchBar.setMode('lookup');
-        searchBar.setSubMode('lookup', 'thesaurus');
-        searchBar.setQuery(word);
-
-        // Close controls and results dropdowns on thesaurus route entry
-        searchBar.hideControls();
-        searchBar.hideDropdown();
-
-        // Ensure we have the definition entry first (thesaurus needs it for the card shell)
-        if (!content.currentEntry || content.currentEntry.word !== word) {
-            try {
-                const definition = await orchestrator.getDefinition(word, {
-                    onProgress: (stage, progress) => {
-                        loading.setLoadingStage(stage);
-                        loading.setLoadingProgress(progress);
-                    }
-                });
-                if (definition) {
-                    content.setCurrentEntry(definition);
-                }
-            } catch (error: any) {
-                const message = error?.message || '';
-                if (message.includes('aborted') || error?.name === 'AbortError') {
-                    return;
-                }
-                // If definition fetch fails, fall back to dictionary mode
-                searchBar.setSubMode('lookup', 'dictionary');
-                router.replace({ name: 'Definition', params: { word } });
-                return;
-            }
-        }
-
-        // Now fetch thesaurus data
-        const hasThesaurus = content.currentThesaurus &&
-            content.currentThesaurus.word === word;
-        if (!hasThesaurus) {
-            try {
-                const data = await orchestrator.getThesaurusData(word);
-                if (data) {
-                    content.setCurrentThesaurus(data);
-                    searchBar.hideControls();
-                    searchBar.hideDropdown();
-                }
-            } catch (error: any) {
-                const message = error?.message || '';
-                if (message.includes('aborted') || error?.name === 'AbortError') {
-                    return;
-                }
-                content.setError({
-                    hasError: true,
-                    errorType: 'unknown',
-                    errorMessage: message || 'Failed to load thesaurus data',
-                    canRetry: true,
-                    originalWord: word,
-                });
-            }
-        }
-    } else if (routeName === 'Search' && route.params.query) {
-        const query = route.params.query as string;
-        searchBar.setMode('lookup');
-        searchBar.setQuery(query);
-        await orchestrator.performSearch();
-    } else if (routeName === 'Wordlist' && route.params.wordlistId) {
-        const wordlistId = route.params.wordlistId as string;
-        searchBar.clearQuery();
-        content.clearCurrentEntry();
-        searchBar.setMode('wordlist');
-        const { wordlistMode } = useStores();
-        wordlistMode.setWordlist(wordlistId);
-    } else if (routeName === 'WordlistSearch' && route.params.wordlistId) {
-        const wordlistId = route.params.wordlistId as string;
-        const query = (route.params.query as string) || '';
-        content.clearCurrentEntry();
-        searchBar.setMode('wordlist');
-        const { wordlistMode } = useStores();
-        wordlistMode.setWordlist(wordlistId);
-        if (query) {
-            searchBar.setQuery(query);
-        } else {
-            searchBar.clearQuery();
-        }
-    } else if (routeName === 'Home') {
-        searchBar.clearQuery();
-        content.clearCurrentEntry();
-        // If in wordlist mode with a persisted wordlist, navigate to it
-        if (searchBar.searchMode === 'wordlist') {
-            const { wordlistMode } = useStores();
-            if (wordlistMode.selectedWordlist) {
-                router.replace({ name: 'Wordlist', params: { wordlistId: wordlistMode.selectedWordlist } });
-                return;
-            }
-        }
-    }
-}, { immediate: true });
-
-// Watch search mode changes for clearing content
-watch(() => searchBar.searchMode, (newMode, oldMode) => {
-    if (newMode !== oldMode && newMode !== 'lookup') {
-        content.clearCurrentEntry();
-    }
-});
-
-// State from stores
 const currentEntry = computed(() => content.currentEntry);
 
-// Scroll handling with responsive thresholds
+// Scroll handling
 const { y } = useScroll(typeof window !== 'undefined' ? window : null);
 
 const scrollThreshold = computed(() => {
-    const hasContent = currentEntry.value || content.wordSuggestions;
-    return hasContent ? 50 : 100;
+    return (currentEntry.value || content.wordSuggestions) ? 50 : 100;
 });
 
 const scrollProgress = computed(() => {
-    const threshold = scrollThreshold.value;
-    const scrollPos = y.value;
-    const maxScroll = threshold * 2;
-    const progress = Math.min(scrollPos / maxScroll, 1);
+    const maxScroll = scrollThreshold.value * 2;
+    const progress = Math.min(y.value / maxScroll, 1);
     return 1 - Math.pow(1 - progress, 3);
 });
 
 const shrinkPercentage = computed(() => {
-    const progress = scrollProgress.value;
     const baseline = searchBar.isFocused ? 0 : 0.35;
-    return Math.max(baseline, Math.min(progress * 0.85, 0.85));
+    return Math.max(baseline, Math.min(scrollProgress.value * 0.85, 0.85));
 });
 
 const searchBarClasses = computed(() => [
-    'relative top-0 z-40 bg-transparent',
-    'sticky',
-    'py-1 sm:py-1.5',
+    'relative top-0 z-dock bg-transparent sticky py-1 sm:py-1.5',
 ]);
 
 const shouldShowProgressiveSidebar = computed(() => {
-    if (searchBar.searchMode === 'wordlist') {
-        // Show for both dashboard (wordlist list) and selected wordlist
-        return true;
-    }
+    if (searchBar.searchMode === 'wordlist') return true;
+    if (searchBar.searchMode !== 'lookup') return false;
 
-    const hasDefinition = !!currentEntry.value;
-    const isLookupMode = searchBar.searchMode === 'lookup';
-    const isSuggestionsSubMode = lookupSubMode.value === 'suggestions';
-    const hasSuggestions = !!content.wordSuggestions;
+    if (lookupSubMode.value === 'suggestions') return !!content.wordSuggestions;
 
-    return isLookupMode && (hasDefinition || (isSuggestionsSubMode && hasSuggestions));
-});
-
-onMounted(async () => {
-    if (searchBar.searchMode === 'wordlist') {
-        // Wordlist initialization handled by mode store
-    }
+    return !!currentEntry.value?.definitions?.length;
 });
 </script>
 

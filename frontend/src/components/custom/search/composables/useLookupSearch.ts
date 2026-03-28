@@ -4,7 +4,7 @@ import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useHistoryStore } from '@/stores/content/history';
 import { useContentStore } from '@/stores/content/content';
 import { useLoadingState } from '@/stores/ui/loading';
-import { lookupApi, aiApi } from '@/api';
+import { lookupApi, searchApi, aiApi } from '@/api';
 import { logger } from '@/utils/logger';
 import type {
     SearchResult,
@@ -42,35 +42,71 @@ export function useLookupSearch(options: UseLookupSearchOptions) {
             return [];
         }
 
-        const results = await lookupMode.search(queryText);
+        // Prepare search state (cancel previous, get abort controller)
+        const { controller, generation } = lookupMode.prepareSearch();
 
-        // Don't update UI if query changed while we were waiting (stale response)
-        const currentQuery = query.value?.trim() || '';
-        if (currentQuery !== queryText) {
-            return results;
+        try {
+            const normalized = queryText.trim().toLowerCase();
+            const searchResults = await searchApi.search(normalized, {
+                signal: controller.signal,
+                mode: Array.isArray(lookupMode.searchMode)
+                    ? lookupMode.searchMode.join(',')
+                    : String(lookupMode.searchMode || 'smart'),
+            });
+
+            // Stale generation -- a newer search was started
+            if (!lookupMode.isCurrentGeneration(generation)) {
+                return searchResults;
+            }
+
+            // Don't update UI if query changed while we were waiting
+            const currentQuery = query.value?.trim() || '';
+            if (currentQuery !== queryText) {
+                return searchResults;
+            }
+
+            // Guard against mode switches while request was in flight.
+            if (searchBar.searchMode !== 'lookup') {
+                return searchResults;
+            }
+
+            const method = lookupMode.detectSearchMethod(
+                searchResults,
+                normalized
+            );
+            lookupMode.setResults(searchResults, method);
+
+            if (searchBar.isDirectLookup || !searchBar.isFocused) {
+                searchBar.clearResults();
+                searchBar.hideDropdown();
+                return searchResults;
+            }
+
+            if (searchResults.length > 0) {
+                searchBar.openDropdown();
+                searchBar.setSelectedIndex(0);
+                history.addToHistory(queryText, searchResults);
+            } else {
+                searchBar.clearResults();
+                searchBar.hideDropdown();
+            }
+
+            return searchResults;
+        } catch (error: any) {
+            if (
+                error.name === 'AbortError' ||
+                error.name === 'CanceledError' ||
+                error.code === 'ERR_CANCELED'
+            ) {
+                return [];
+            }
+            if (lookupMode.isCurrentGeneration(generation)) {
+                lookupMode.clearResults();
+            }
+            throw error;
+        } finally {
+            lookupMode.finalizeSearch(generation);
         }
-
-        // Guard against mode switches while request was in flight.
-        if (searchBar.searchMode !== 'lookup') {
-            return results;
-        }
-
-        if (searchBar.isDirectLookup || !searchBar.isFocused) {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-            return results;
-        }
-
-        if (results.length > 0) {
-            searchBar.openDropdown();
-            searchBar.setSelectedIndex(0);
-            history.addToHistory(queryText, results);
-        } else {
-            searchBar.clearResults();
-            searchBar.hideDropdown();
-        }
-
-        return results;
     };
 
     const getDefinition = async (

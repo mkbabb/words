@@ -4,6 +4,7 @@ import { useContentStore, useNotificationStore } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useRouterSync } from '@/stores/composables/useRouterSync';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
+import { useContentMutations } from './useContentMutations';
 import { lookupApi } from '@/api/lookup';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
@@ -20,6 +21,7 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
     const { entry, editModeEnabled } = options;
 
     const contentStore = useContentStore();
+    const mutations = useContentMutations();
     const notificationStore = useNotificationStore();
     const searchBar = useSearchBarStore();
 
@@ -37,7 +39,7 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
     // Event handlers
     const handleRegenerateExamples = async (definitionIndex: number) => {
         try {
-            await contentStore.regenerateExamples(definitionIndex);
+            await mutations.regenerateExamples(definitionIndex);
         } catch (error) {
             logger.error('Failed to regenerate examples:', error);
         }
@@ -45,7 +47,7 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
 
     const handleImagesUpdated = async (_newImages: ImageMedia[]) => {
         try {
-            await contentStore.refreshEntryImages();
+            await mutations.refreshEntryImages();
         } catch (error) {
             logger.error('Failed to refresh entry images:', error);
             notificationStore.showNotification({
@@ -59,7 +61,7 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
 
     const handleImageDeleted = async (_imageId: string) => {
         try {
-            await contentStore.refreshEntryImages();
+            await mutations.refreshEntryImages();
 
             notificationStore.showNotification({
                 type: 'success',
@@ -91,7 +93,7 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
         );
 
         if (definition?.id) {
-            await contentStore.updateDefinition(definition.id, {
+            await mutations.updateDefinition(definition.id, {
                 meaning_cluster: {
                     ...definition.meaning_cluster,
                     name: newName,

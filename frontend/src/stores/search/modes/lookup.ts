@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { ref, readonly, computed, shallowRef } from 'vue';
-import { searchApi } from '@/api';
 import type { ModeHandler } from '@/stores/types/mode-types';
 import type { SearchMode, SearchResult, CardVariant } from '@/types';
 import type { SemanticStatusResponse } from '@/types/api';
@@ -246,44 +245,37 @@ export const useLookupMode = defineStore(
             selectedCardVariant.value = variants[nextIndex];
         };
 
-        const search = async (query: string): Promise<SearchResult[]> => {
+        /**
+         * Prepare for a new search: cancel any in-flight request and
+         * return a fresh AbortController + generation token.
+         *
+         * The actual API call lives in the useLookupSearch composable.
+         */
+        const prepareSearch = (): {
+            controller: AbortController;
+            generation: number;
+        } => {
             cancelSearch();
-            const myGeneration = searchGeneration;
+            const generation = searchGeneration;
             abortController = new AbortController();
+            return { controller: abortController, generation };
+        };
 
-            try {
-                const normalized = query.trim().toLowerCase();
-                const searchResults = await searchApi.search(normalized, {
-                    signal: abortController.signal,
-                    mode: Array.isArray(searchMode.value)
-                        ? searchMode.value.join(',')
-                        : String(searchMode.value || 'smart'),
-                });
+        /**
+         * Check whether a generation token is still current
+         * (i.e. no newer search has been started).
+         */
+        const isCurrentGeneration = (generation: number): boolean => {
+            return generation === searchGeneration;
+        };
 
-                // Only update state if this is still the latest request
-                if (myGeneration !== searchGeneration) {
-                    return searchResults;
-                }
-
-                const method = detectSearchMethod(searchResults, normalized);
-                setResults(searchResults, method);
-                return searchResults;
-            } catch (error: any) {
-                if (
-                    error.name === 'AbortError' ||
-                    error.name === 'CanceledError' ||
-                    error.code === 'ERR_CANCELED'
-                ) {
-                    return [];
-                }
-                if (myGeneration === searchGeneration) {
-                    clearResults();
-                }
-                throw error;
-            } finally {
-                if (myGeneration === searchGeneration) {
-                    abortController = null;
-                }
+        /**
+         * Clean up after a search completes (clear abort controller
+         * if generation is still current).
+         */
+        const finalizeSearch = (generation: number) => {
+            if (generation === searchGeneration) {
+                abortController = null;
             }
         };
 
@@ -429,8 +421,10 @@ export const useLookupMode = defineStore(
             togglePronunciation,
             setPronunciationMode,
 
-            // Search Operations
-            search,
+            // Search Operations (API call lives in useLookupSearch composable)
+            prepareSearch,
+            isCurrentGeneration,
+            finalizeSearch,
             cancelSearch,
 
             // Results Operations

@@ -1,4 +1,4 @@
-import type { FlatSection } from './virtualSectionLayout';
+import type { FlatSection } from '@mkbabb/glass-ui';
 import type { GroupedDefinition } from '../types';
 
 export interface FlatDefinitionCluster extends FlatSection {

@@ -1,5 +1,18 @@
 import { api } from './core';
 import type { UserProfile, UserPreferences, UserHistoryData, UserRole } from '@/types/api';
+import type { LearningStats } from '@/types/wordlist';
+
+/** Aggregated learning stats response from GET /users/me/learning-stats */
+export interface GlobalLearningStatsResponse {
+  global: LearningStats;
+  per_wordlist: Array<{
+    wordlist_id: string;
+    name: string;
+    unique_words: number;
+    total_words: number;
+    learning_stats: LearningStats;
+  }>;
+}
 
 export const usersApi = {
   /** Get the current user's profile */
@@ -42,8 +55,8 @@ export const usersApi = {
   },
 
   /** Get aggregated global learning stats across all wordlists */
-  async getLearningStats(): Promise<any> {
-    const { data } = await api.get('/users/me/learning-stats');
+  async getLearningStats(): Promise<GlobalLearningStatsResponse> {
+    const { data } = await api.get<GlobalLearningStatsResponse>('/users/me/learning-stats');
     return data;
   },
 

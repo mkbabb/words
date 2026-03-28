@@ -9,7 +9,7 @@ let lastFetchTime = 0
  * Manages wordlist data fetching with 5-minute TTL cache.
  * Extracts API calls from the wordlist mode store.
  */
-export function useWordlistData() {
+export function useWordlistCache() {
   const wordlistMode = useWordlistMode()
 
   async function fetchAllWordlists(force = false): Promise<void> {

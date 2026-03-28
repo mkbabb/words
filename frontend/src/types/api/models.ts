@@ -178,7 +178,7 @@ export interface Definition extends BaseMetadata {
     relevancy?: number;
     validation_status?: string;
     metadata: Record<string, any>;
-    providers_data?: Record<string, any>;
+    providers_data?: Array<Record<string, any>>;
     source_definitions?: SourceReference[];
 }
 

@@ -1,3 +1,11 @@
+import type { InjectionKey } from 'vue';
+
+/**
+ * Typed injection key for the virtual-windowing `ensureTargetWindow` function.
+ * Provided by DefinitionContentView, injected by ProgressiveSidebar.
+ */
+export const EnsureTargetWindowKey: InjectionKey<(id: string) => void> = Symbol('ensureTargetWindow');
+
 export const PART_OF_SPEECH_ORDER: Record<string, number> = {
     noun: 1,
     verb: 2,

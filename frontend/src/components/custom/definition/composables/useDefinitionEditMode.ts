@@ -1,5 +1,6 @@
 import { ref, reactive, computed, watch, toRaw, type Ref } from 'vue';
 import { useContentStore, useAuthStore } from '@/stores';
+import { useContentMutations } from './useContentMutations';
 import type { Definition } from '@/types/api';
 import { useDebounceFn } from '@vueuse/core';
 import { logger } from '@/utils/logger';
@@ -45,6 +46,7 @@ export function useDefinitionEditMode(
 ) {
     const auth = useAuthStore();
     const contentStore = useContentStore();
+    const mutations = useContentMutations();
     const { debounceMs = 500 } = options;
 
     // Gate: non-admin users get disabled edit mode
@@ -252,11 +254,11 @@ export function useDefinitionEditMode(
                 };
             }
 
-            // Call save handler or default store method
+            // Call save handler or default mutations method
             if (options.onSave) {
                 await options.onSave(updateData);
             } else {
-                await contentStore.updateDefinition(
+                await mutations.updateDefinition(
                     definition.value.id,
                     updateData
                 );
@@ -333,8 +335,8 @@ export function useDefinitionEditMode(
             if (options.onRegenerate) {
                 await options.onRegenerate(component);
             } else {
-                // Use ContentStore to regenerate component
-                await contentStore.regenerateDefinitionComponent(
+                // Use mutations composable to regenerate component
+                await mutations.regenerateDefinitionComponent(
                     definition.value.id,
                     component as any
                 );

@@ -10,6 +10,7 @@ export { useModalManagement } from './useModalManagement';
 
 // Export utility composables
 export { useAutocomplete } from './useAutocomplete';
+export { useAnimationToggle } from './useAnimationToggle';
 
 // Export extracted store-side-effect composables
 export { useAIQueryDetection } from './useAIQueryDetection';

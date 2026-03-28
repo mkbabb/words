@@ -2,7 +2,7 @@ import { watch, ref } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth';
 import { useHistoryStore } from '@/stores/content/history';
-import { useUIStore } from '@/stores/ui/ui-state';
+import { useGlobalDark } from '@mkbabb/glass-ui';
 import { usersApi } from '@/api/users';
 import { logger } from '@/utils/logger';
 
@@ -39,7 +39,7 @@ async function syncWithRetry(fn: () => Promise<void>, maxRetries = 3) {
 export function useStateSync() {
   const auth = useAuthStore();
   const history = useHistoryStore();
-  const ui = useUIStore();
+  const { isDark } = useGlobalDark();
 
   /** Reactive sync status */
   const syncStatus = ref<SyncStatusValue>('synced');
@@ -51,7 +51,7 @@ export function useStateSync() {
     try {
       await syncWithRetry(async () => {
         await usersApi.updatePreferences({
-          theme: ui.theme,
+          theme: isDark.value ? 'dark' : 'light',
           // Add other prefs as needed
         });
       });
@@ -96,8 +96,9 @@ export function useStateSync() {
       await syncWithRetry(async () => {
         // Fetch and merge preferences
         const prefs = await usersApi.getPreferences();
-        if (prefs.theme && prefs.theme !== ui.theme) {
-          ui.setTheme(prefs.theme as any);
+        const currentTheme = isDark.value ? 'dark' : 'light';
+        if (prefs.theme && prefs.theme !== currentTheme) {
+          isDark.value = prefs.theme === 'dark';
         }
       });
     } catch (e) {
@@ -132,16 +133,17 @@ export function useStateSync() {
   );
 
   // Watch preferences → push on change
-  watch(() => ui.theme, () => {
+  watch(isDark, () => {
     if (auth.isAuthenticated) syncPreferences();
   });
 
   // Watch history → push on change
   watch(
-    () => [history.searchHistory?.length, history.lookupHistory?.length],
+    () => [history.searchHistory, history.lookupHistory],
     () => {
       if (auth.isAuthenticated) syncHistory();
-    }
+    },
+    { deep: false }
   );
 
   return {

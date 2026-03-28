@@ -63,8 +63,8 @@ export async function synthesizeEntry(
         components?: string[];
         force?: boolean;
     }
-): Promise<any> {
-    const response = await api.post('/ai/synthesize', {
+): Promise<Record<string, unknown>> {
+    const response = await api.post<Record<string, unknown>>('/ai/synthesize', {
         word,
         components: options?.components || ['all'],
         force: options?.force || false,
@@ -94,7 +94,7 @@ export async function suggestWordsStream(
         stage: string,
         progress: number,
         message?: string,
-        details?: any
+        details?: Record<string, unknown>
     ) => void,
     onConfig?: (
         category: string,
@@ -131,9 +131,10 @@ export async function suggestWordsStream(
     };
 
     const handlers: SSEHandlers<WordSuggestionResponse> = {
-        onEvent: (event: string, data: any) => {
+        onEvent: (event: string, data: unknown) => {
             if (event === 'completion' || event === 'complete') {
-                return data.result || data;
+                const payload = data as Record<string, unknown>;
+                return (payload.result ?? data) as WordSuggestionResponse;
             }
             return null;
         },

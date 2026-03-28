@@ -1,50 +1,23 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { Themes, DEFAULT_THEME, type Theme } from '@/stores/types/constants'
+import { ref } from 'vue'
 
 /**
- * Streamlined UIStore focused on shared UI state
- * Handles theme and sidebar management only
- * Mode-specific functionality accessed directly from mode stores
+ * Streamlined UIStore focused on shared UI state.
+ * Theme / dark-mode is managed by glass-ui's useGlobalDark — see App.vue.
+ * This store handles sidebar state only.
  */
 export const useUIStore = defineStore('ui', () => {
   // ==========================================================================
   // SHARED UI STATE
   // ==========================================================================
 
-  // Theme and appearance
-  const theme = ref<Theme>(DEFAULT_THEME)
-
   // Sidebar visibility
   const sidebarOpen = ref(false)
   const sidebarCollapsed = ref(true)
 
   // ==========================================================================
-  // COMPUTED
-  // ==========================================================================
-
-  const resolvedTheme = computed((): 'light' | 'dark' => {
-    if (theme.value === Themes.SYSTEM) {
-      if (typeof window !== 'undefined' && window.matchMedia) {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-      }
-      return 'light'
-    }
-    return theme.value as 'light' | 'dark'
-  })
-
-  // ==========================================================================
   // SHARED ACTIONS
   // ==========================================================================
-
-  // Theme management
-  const toggleTheme = () => {
-    theme.value = resolvedTheme.value === 'dark' ? Themes.LIGHT : Themes.DARK
-  }
-
-  const setTheme = (newTheme: Theme) => {
-    theme.value = newTheme
-  }
 
   // Sidebar management
   const toggleSidebar = () => {
@@ -68,7 +41,6 @@ export const useUIStore = defineStore('ui', () => {
   // ==========================================================================
 
   const resetUI = () => {
-    theme.value = DEFAULT_THEME
     sidebarOpen.value = false
     sidebarCollapsed.value = true
   }
@@ -79,14 +51,10 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     // Shared State
-    theme,
-    resolvedTheme,
     sidebarOpen,
     sidebarCollapsed,
 
     // Shared Actions
-    toggleTheme,
-    setTheme,
     toggleSidebar,
     setSidebarOpen,
     setSidebarCollapsed,
@@ -94,12 +62,5 @@ export const useUIStore = defineStore('ui', () => {
 
     // Reset
     resetUI,
-  }
-}, {
-  persist: {
-    key: 'ui-state',
-    pick: [
-      'theme',
-    ]
   }
 })

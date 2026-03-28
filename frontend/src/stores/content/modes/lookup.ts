@@ -1,5 +1,4 @@
 import { ref, readonly, shallowRef } from 'vue'
-import { definitionsApi, examplesApi, entriesApi } from '@/api'
 import type { LookupContentState, ModeHandler } from '@/stores/types/mode-types'
 import type { SearchMode, SynthesizedDictionaryEntry, ThesaurusEntry, WordSuggestionResponse, Definition } from '@/types'
 
@@ -94,98 +93,74 @@ export function useLookupContentState() {
   }
   
   // ==========================================================================
-  // CONTENT OPERATIONS
+  // PURE STATE MUTATIONS (no API calls — network logic lives in composables)
   // ==========================================================================
-  
-  const updateDefinition = async (definitionId: string, updates: Partial<Definition>) => {
-    const response = await definitionsApi.updateDefinition(definitionId, updates)
-    
+
+  const setRegeneratingDefinitionIndex = (index: number | null) => {
+    regeneratingDefinitionIndex.value = index
+  }
+
+  /**
+   * Apply a definition update to the local entry state.
+   * Called by useContentMutations after a successful API call.
+   */
+  const applyDefinitionUpdate = (definitionId: string, updates: Partial<Definition>) => {
     if (currentEntry.value?.definitions?.some(def => def.id === definitionId)) {
       const updatedEntry = {
         ...currentEntry.value,
-        definitions: currentEntry.value.definitions.map(def => 
-          def.id === definitionId ? { ...def, ...response } : def
+        definitions: currentEntry.value.definitions.map(def =>
+          def.id === definitionId ? { ...def, ...updates } : def
         )
-      }
+      } as SynthesizedDictionaryEntry
       setCurrentEntry(updatedEntry)
     }
-    
-    return response
   }
 
-  const updateExample = async (_definitionId: string, exampleId: string, newText: string) => {
-    const response = await examplesApi.updateExample(exampleId, { text: newText })
-    
+  /**
+   * Trigger a shallow refresh of currentEntry so the UI picks up nested changes.
+   */
+  const touchCurrentEntry = () => {
     if (currentEntry.value) {
-      // For now, just trigger a refresh since nested updates are complex
-      const updatedEntry = { ...currentEntry.value }
-      setCurrentEntry(updatedEntry)
+      setCurrentEntry({ ...currentEntry.value })
     }
-    
-    return response
   }
 
-  const regenerateDefinitionComponent = async (definitionId: string, component: 'definition' | 'examples' | 'usage_notes') => {
-    const response = await definitionsApi.regenerateComponents(definitionId, component)
-    
+  /**
+   * Apply a regenerated component to the matching definition.
+   */
+  const applyDefinitionComponentRegeneration = (
+    definitionId: string,
+    component: string,
+    response: Record<string, unknown>
+  ) => {
     if (currentEntry.value) {
       const updatedEntry = {
         ...currentEntry.value,
-        definitions: currentEntry.value.definitions?.map(def => 
-          def.id === definitionId 
-            ? { ...def, [component]: (response as unknown as Record<string, unknown>)[component] }
+        definitions: currentEntry.value.definitions?.map(def =>
+          def.id === definitionId
+            ? { ...def, [component]: response[component] }
             : def
         )
+      } as SynthesizedDictionaryEntry
+      setCurrentEntry(updatedEntry)
+    }
+  }
+
+  /**
+   * Apply regenerated examples at a specific definition index.
+   */
+  const applyExamplesRegeneration = (definitionIndex: number, response: { examples?: unknown }) => {
+    if (!currentEntry.value?.definitions?.[definitionIndex]) return
+
+    const definition = currentEntry.value.definitions[definitionIndex]
+    const updatedEntry = { ...currentEntry.value }
+    if (updatedEntry.definitions) {
+      updatedEntry.definitions[definitionIndex] = {
+        ...definition,
+        examples: response.examples as any
       }
       setCurrentEntry(updatedEntry)
     }
-    
-    return response
-  }
-
-  const regenerateExamples = async (definitionIndex: number) => {
-    if (!currentEntry.value?.definitions?.[definitionIndex]) return
-    
-    // Prevent concurrent operations
-    if (regeneratingDefinitionIndex.value !== null) return
-    
-    const definition = currentEntry.value.definitions[definitionIndex]
-    regeneratingDefinitionIndex.value = definitionIndex
-    
-    try {
-      // For now, regenerate the entire definition component for examples
-      const definitionId = currentEntry.value.definitions[definitionIndex].id
-      const response = await definitionsApi.regenerateComponents(definitionId, 'examples')
-      
-      const updatedEntry = { ...currentEntry.value }
-      if (updatedEntry.definitions) {
-        updatedEntry.definitions[definitionIndex] = {
-          ...definition,
-          examples: response.examples as any
-        }
-        setCurrentEntry(updatedEntry)
-      }
-      
-      return response
-    } finally {
-      regeneratingDefinitionIndex.value = null
-    }
-  }
-
-  const refreshEntryImages = async () => {
-    if (!currentEntry.value) return
-    
-    // Assuming the entry has an ID field
-    const entryId = (currentEntry.value as any).id || currentEntry.value.word
-    const response = await entriesApi.refreshEntryImages(entryId)
-    
-    const updatedEntry: SynthesizedDictionaryEntry = {
-      ...currentEntry.value,
-      ...response
-    } as any // Type assertion needed due to complex merge
-    
-    setCurrentEntry(updatedEntry)
-    return response
   }
   
   // ==========================================================================
@@ -236,12 +211,12 @@ export function useLookupContentState() {
     clearCurrentEntry,
     clearWordSuggestions,
     
-    // Content operations
-    updateDefinition,
-    updateExample,
-    regenerateDefinitionComponent,
-    regenerateExamples,
-    refreshEntryImages,
+    // Pure state mutations (API calls live in useContentMutations composable)
+    setRegeneratingDefinitionIndex,
+    applyDefinitionUpdate,
+    touchCurrentEntry,
+    applyDefinitionComponentRegeneration,
+    applyExamplesRegeneration,
     
     // Sidebar actions
     setSidebarActiveCluster,

@@ -1,5 +1,5 @@
 import type { Example } from '@/types/api';
-import { api } from './core';
+import { api, transformError } from './core';
 import { logger } from '@/utils/logger';
 
 export const examplesApi = {
@@ -10,7 +10,7 @@ export const examplesApi = {
       return response.data;
     } catch (error) {
       logger.error('Example update failed:', error);
-      throw error;
+      throw transformError(error);
     }
   },
 };

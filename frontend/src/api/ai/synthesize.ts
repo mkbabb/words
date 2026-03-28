@@ -25,9 +25,10 @@ export const synthesize = {
                 throw new Error(`No data returned from lookup for "${word}"`);
             }
 
-            // Extract definitions, handling potential response shape variations
+            // Extract definitions — handle both direct response and wrapped { entry } envelope
+            const envelope = entryData as unknown as { entry?: DictionaryEntryResponse };
             const definitions =
-                entryData.definitions ?? (entryData as any).entry?.definitions;
+                entryData.definitions ?? envelope.entry?.definitions;
             if (
                 !definitions ||
                 !Array.isArray(definitions) ||

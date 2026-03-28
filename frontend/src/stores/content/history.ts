@@ -6,13 +6,12 @@ import type {
   LookupHistory,
   SearchResult,
   SynthesizedDictionaryEntry,
-  VocabularySuggestion
 } from '@/types'
 
 /**
  * HistoryStore - Search and lookup history management
- * Handles search history, lookup history, AI query history, and vocabulary suggestions
- * Uses modern Pinia persistence with intelligent caching and throttling
+ * Handles search history, lookup history, and AI query history.
+ * Vocabulary suggestions cache lives in useVocabularySuggestions composable.
  */
 export const useHistoryStore = defineStore('history', () => {
   // ==========================================================================
@@ -27,13 +26,6 @@ export const useHistoryStore = defineStore('history', () => {
   
   // AI Query history (for Recent AI Suggestions)
   const aiQueryHistory = ref<Array<{ query: string; timestamp: string }>>([])
-  
-  // Vocabulary suggestions cache with metadata
-  const suggestionsCache = ref({
-    suggestions: [] as VocabularySuggestion[],
-    lastWord: null as string | null,
-    timestamp: null as number | null,
-  })
 
   // ==========================================================================
   // COMPUTED PROPERTIES
@@ -95,23 +87,6 @@ export const useHistoryStore = defineStore('history', () => {
   const recentLookupWords = computed(() =>
     recentLookups.value.map((lookup) => lookup.word)
   )
-
-  // Vocabulary suggestions (cached with timestamp validation)
-  const vocabularySuggestions = computed(() => {
-    const ONE_HOUR = 60 * 60 * 1000
-    const cache = suggestionsCache.value
-    
-    // Return cached suggestions if they're valid and recent
-    if (
-      cache.suggestions.length > 0 &&
-      cache.timestamp &&
-      Date.now() - cache.timestamp < ONE_HOUR
-    ) {
-      return cache.suggestions
-    }
-    
-    return []
-  })
 
   // ==========================================================================
   // ACTIONS
@@ -175,9 +150,6 @@ export const useHistoryStore = defineStore('history', () => {
 
   const clearLookupHistory = () => {
     lookupHistory.value = []
-    suggestionsCache.value.suggestions = []
-    suggestionsCache.value.lastWord = null
-    suggestionsCache.value.timestamp = null
   }
 
   // AI query history management
@@ -205,32 +177,6 @@ export const useHistoryStore = defineStore('history', () => {
     aiQueryHistory.value = []
   }
 
-  // Suggestions cache setter — API calls live in useVocabularySuggestions composable
-  const setSuggestionsCache = (cache: {
-    suggestions: VocabularySuggestion[]
-    lastWord: string | null | undefined
-    timestamp: number | null
-  }) => {
-    suggestionsCache.value = {
-      suggestions: cache.suggestions,
-      lastWord: cache.lastWord ?? null,
-      timestamp: cache.timestamp,
-    }
-  }
-
-  // Cache management
-  const clearSuggestionsCache = () => {
-    suggestionsCache.value = {
-      suggestions: [],
-      lastWord: null,
-      timestamp: null,
-    }
-  }
-
-  const invalidateSuggestionsCache = () => {
-    suggestionsCache.value.timestamp = null
-  }
-
   // Utility functions
   const getSearchHistoryByQuery = (query: string) => {
     return searchHistory.value.filter(entry => 
@@ -251,8 +197,6 @@ export const useHistoryStore = defineStore('history', () => {
       totalLookups: lookupHistory.value.length,
       uniqueWordsLookedUp: new Set(lookupHistory.value.map(l => l.word.toLowerCase())).size,
       totalAIQueries: aiQueryHistory.value.length,
-      suggestionsCount: vocabularySuggestions.value.length,
-      cacheLastUpdated: suggestionsCache.value.timestamp
     }
   }
 
@@ -301,7 +245,6 @@ export const useHistoryStore = defineStore('history', () => {
     searchHistory.value = []
     lookupHistory.value = []
     aiQueryHistory.value = []
-    clearSuggestionsCache()
   }
 
   // ==========================================================================
@@ -313,8 +256,6 @@ export const useHistoryStore = defineStore('history', () => {
     searchHistory,
     lookupHistory,
     aiQueryHistory,
-    suggestionsCache,
-    vocabularySuggestions,
 
     // Computed
     recentSearches,
@@ -328,9 +269,6 @@ export const useHistoryStore = defineStore('history', () => {
     clearLookupHistory,
     addToAIQueryHistory,
     clearAIQueryHistory,
-    setSuggestionsCache,
-    clearSuggestionsCache,
-    invalidateSuggestionsCache,
     getSearchHistoryByQuery,
     getLookupHistoryByWord,
     getHistoryStats,
@@ -344,7 +282,6 @@ export const useHistoryStore = defineStore('history', () => {
       'searchHistory',
       'lookupHistory',
       'aiQueryHistory',
-      'suggestionsCache'
     ]
   }
 })

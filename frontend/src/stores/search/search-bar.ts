@@ -97,30 +97,31 @@ export const useSearchBarStore = defineStore(
             return modeStores[currentMode.value];
         });
         
-        // Unified results access
-        const currentResults = computed(() => {
+        // Unified results access — cast to any[] to unify lookup SearchResult[]
+        // and wordlist WordListItem[] under a single array type.
+        const currentResults = computed((): readonly any[] => {
             switch (searchMode.value) {
                 case 'lookup':
-                    return lookupMode.results;
+                    return lookupMode.results as any[];
                 case 'wordlist':
-                    return wordlistMode.results;
+                    return wordlistMode.results as any[];
                 default:
                     return [];
             }
         });
-        
+
         const hasResults = computed(() => currentResults.value.length > 0);
 
         const showDropdown = computed(() => {
             const mode = currentMode.value;
-            const results =
+            const modeResults: readonly any[] =
                 mode === 'lookup'
-                    ? lookupMode.results
+                    ? (lookupMode.results as any[])
                     : mode === 'wordlist'
-                      ? wordlistMode.results
+                      ? (wordlistMode.results as any[])
                       : [];
 
-            if (!results || (results as any[]).length === 0) {
+            if (!modeResults || modeResults.length === 0) {
                 return false;
             }
 
@@ -322,10 +323,10 @@ export const useSearchBarStore = defineStore(
             }
         };
         
-        const getResults = <T extends SearchMode>(mode?: T) => {
+        const getResults = (mode?: SearchMode): readonly any[] => {
             const targetMode = mode || searchMode.value;
             const store = modeStores[targetMode];
-            return store?.results || [];
+            return (store?.results as any[]) || [];
         };
 
         // ==========================================================================
@@ -551,7 +552,6 @@ export const useSearchBarStore = defineStore(
                 'previousMode',
                 'savedQueries',
                 'searchQuery',
-                'showSearchControls',
             ],
         },
     }

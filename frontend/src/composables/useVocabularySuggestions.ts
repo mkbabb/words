@@ -1,13 +1,48 @@
-import { ref, readonly } from 'vue'
+import { ref, readonly, computed } from 'vue'
 import { suggestionsApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useHistoryStore } from '@/stores/content/history'
 import { logger } from '@/utils/logger'
 import type { VocabularySuggestion } from '@/types'
 
+// ── Module-level singleton cache ──────────────────────────────────────────
+// Shared across all call-sites so there is exactly one TTL-guarded cache.
+
+interface SuggestionsCache {
+  suggestions: VocabularySuggestion[]
+  lastWord: string | null
+  timestamp: number | null
+}
+
+const suggestionsCache = ref<SuggestionsCache>({
+  suggestions: [],
+  lastWord: null,
+  timestamp: null,
+})
+
+const ONE_HOUR = 60 * 60 * 1000
+
+/**
+ * Computed list of valid (non-expired) vocabulary suggestions.
+ * Consumers can bind to this reactively.
+ */
+export const vocabularySuggestions = computed<VocabularySuggestion[]>(() => {
+  const cache = suggestionsCache.value
+  if (
+    cache.suggestions.length > 0 &&
+    cache.timestamp &&
+    Date.now() - cache.timestamp < ONE_HOUR
+  ) {
+    return cache.suggestions
+  }
+  return []
+})
+
+// ── Composable ────────────────────────────────────────────────────────────
+
 /**
  * Manages vocabulary suggestion fetching with throttling and caching.
- * Extracts API calls from the history store.
+ * The cache is a module-level singleton -- no store dependency needed.
  */
 export function useVocabularySuggestions() {
   const isLoading = ref(false)
@@ -17,9 +52,8 @@ export function useVocabularySuggestions() {
     if (!auth.isAuthenticated) return
 
     const historyStore = useHistoryStore()
-    const ONE_HOUR = 60 * 60 * 1000
     const currentWord = historyStore.recentLookupWords[0]
-    const cache = historyStore.suggestionsCache
+    const cache = suggestionsCache.value
 
     if (isLoading.value && !forceRefresh) return
 
@@ -46,11 +80,11 @@ export function useVocabularySuggestions() {
         })
       )
 
-      historyStore.setSuggestionsCache({
+      suggestionsCache.value = {
         suggestions: newSuggestions,
         lastWord: currentWord,
         timestamp: Date.now(),
-      })
+      }
     } catch (error) {
       logger.error('Failed to get vocabulary suggestions:', error)
     } finally {
@@ -73,9 +107,26 @@ export function useVocabularySuggestions() {
     }
   }
 
+  /** Clear the singleton cache (e.g. on logout). */
+  function clearSuggestionsCache() {
+    suggestionsCache.value = {
+      suggestions: [],
+      lastWord: null,
+      timestamp: null,
+    }
+  }
+
+  /** Invalidate cache so the next refresh fetches fresh data. */
+  function invalidateSuggestionsCache() {
+    suggestionsCache.value = { ...suggestionsCache.value, timestamp: null }
+  }
+
   return {
     isLoading: readonly(isLoading),
+    vocabularySuggestions,
     refreshSuggestions,
     getHistoryBasedSuggestions,
+    clearSuggestionsCache,
+    invalidateSuggestionsCache,
   }
 }

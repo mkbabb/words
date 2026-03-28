@@ -183,7 +183,6 @@ Fetch-based streaming (not `EventSource`—supports POST and custom headers). [`
 | `reka-ui` | shadcn/ui component primitives |
 | `@clerk/vue` | Authentication |
 | `tailwind-merge` + `clsx` | CSS class merging |
-| `gsap` | Animations |
 | `sonner` | Toast notifications |
 | `katex` | LaTeX rendering |
 | `axios` | HTTP client |

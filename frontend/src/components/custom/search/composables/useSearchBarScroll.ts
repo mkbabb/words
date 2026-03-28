@@ -77,7 +77,7 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
                 maxWidth,
                 transform: 'scale(1)',
                 opacity: '1',
-                transition: 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                transition: `transform var(--duration-normal, 0.3s) var(--ease-decelerate, cubic-bezier(0.25, 0.46, 0.45, 0.94)), opacity var(--duration-normal, 0.3s) var(--ease-decelerate, cubic-bezier(0.25, 0.46, 0.45, 0.94))`,
             };
         }
 
@@ -92,7 +92,7 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
             maxWidth,
             transform: `scale(${scale})`,
             opacity: opacity.toString(),
-            transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            transition: `transform var(--duration-fast, 0.2s) var(--ease-decelerate, cubic-bezier(0.25, 0.46, 0.45, 0.94)), opacity var(--duration-fast, 0.2s) var(--ease-decelerate, cubic-bezier(0.25, 0.46, 0.45, 0.94))`,
         };
     });
 

@@ -23,13 +23,13 @@ export interface APIError {
   message: string;
   code?: string;
   field?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 // Transform error responses to consistent format
 export function transformError(error: unknown): APIError {
   if (error instanceof Error && 'response' in error) {
-    const axiosError = error as { response?: { data?: { error?: string; details?: any } }; code?: string };
+    const axiosError = error as { response?: { data?: { error?: string; details?: Record<string, unknown> } }; code?: string };
     if (axiosError.response?.data?.error) {
       return {
         message: axiosError.response.data.error,

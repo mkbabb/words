@@ -17,7 +17,7 @@ import {
     type WordlistPanelFilters,
     type SortCriterion,
 } from '@/stores/types/constants';
-import { useWindowedStore } from '@/composables/virtual';
+import { useWindowedStore } from '@mkbabb/glass-ui';
 /**
  * Unified wordlist mode store — pure state management only.
  *
@@ -88,9 +88,11 @@ export const useWordlistMode = defineStore(
         // ==========================================================================
 
         const wordWindow = useWindowedStore<WordListItem>({ maxResident: 500 });
-        const results = wordWindow.items;
-        const windowStart = wordWindow.windowStart;
-        const storeGeneration = wordWindow.generation;
+        // Re-wrap glass-ui ShallowRefs as local computed properties so Pinia
+        // auto-unwrapping works correctly (avoids cross-package RefSymbol mismatch).
+        const results = computed(() => wordWindow.items.value);
+        const windowStart = computed(() => wordWindow.windowStart.value);
+        const storeGeneration = computed(() => wordWindow.generation.value);
         const resultsVersion = ref(0);
 
         const pagination = ref({
@@ -500,10 +502,10 @@ export const useWordlistMode = defineStore(
             itemsPerPage,
 
             // Results State
-            results: readonly(results),
+            results,
             resultsVersion: readonly(resultsVersion),
-            windowStart: readonly(windowStart),
-            storeGeneration: readonly(storeGeneration),
+            windowStart,
+            storeGeneration,
             pagination: readonly(pagination),
             currentWordlistId: readonly(currentWordlistId),
             currentQuery: readonly(currentQuery),
