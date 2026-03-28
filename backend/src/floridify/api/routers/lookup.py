@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from ...api.services.background_synthesis import get_background_synthesis_service
 from ...api.services.loaders import DictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
 from ...caching.core import get_global_cache
@@ -33,34 +34,6 @@ from ..core import AdminDep, OptionalUserDep, OptionalUserRoleDep
 
 logger = get_logger(__name__)
 router = APIRouter()
-
-# Deduplicates concurrent background synthesis requests
-_background_synthesis_in_flight: set[str] = set()
-_background_synthesis_lock: asyncio.Lock = asyncio.Lock()
-
-
-async def _background_synthesize(word: str, params: LookupParams) -> None:
-    """Fire-and-forget AI synthesis using existing provider data in the DB."""
-    async with _background_synthesis_lock:
-        if word in _background_synthesis_in_flight:
-            return
-        _background_synthesis_in_flight.add(word)
-
-    try:
-        await lookup_word_pipeline(
-            word=word,
-            providers=params.providers,
-            languages=params.languages,
-            no_ai=False,
-            skip_search=True,
-            state_tracker=None,
-        )
-        logger.info(f"Background synthesis complete for '{word}'")
-    except Exception as e:
-        logger.warning(f"Background synthesis failed for '{word}': {e}")
-    finally:
-        async with _background_synthesis_lock:
-            _background_synthesis_in_flight.discard(word)
 
 
 # ── Response sub-models ──────────────────────────────────────────────
@@ -155,7 +128,7 @@ class CollocationResponse(BaseModel):
     """Serialized collocation."""
 
     text: str
-    frequency: str | None = None
+    frequency: float | str | None = None
     type: str | None = None
 
 
@@ -337,7 +310,8 @@ async def lookup_word(
                 force_refresh=True,
                 no_ai=params.no_ai,
                 state_tracker=None,
-                user_id=user_id,
+                # user_id not passed here — router handles history tracking
+                # after the lookup completes (covers both cached and uncached paths)
             )
             if not entry:
                 raise HTTPException(
@@ -461,7 +435,9 @@ async def _lookup_with_tracking(
 
                 # Non-synthesis entry + AI allowed → background synthesis upgrade
                 if not is_synthesis and not params.no_ai:
-                    asyncio.ensure_future(_background_synthesize(word, params))
+                    asyncio.ensure_future(
+                        get_background_synthesis_service().synthesize(word, params)
+                    )
 
                 return result
 

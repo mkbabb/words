@@ -27,11 +27,11 @@ from ..models.dictionary import (
 from ..providers.factory import create_connector
 from ..storage.dictionary import save_entry_versioned
 from ..storage.mongodb import get_best_existing_entry, get_storage, get_synthesized_entry
+from ..utils.concurrency import gather_bounded
 from ..utils.language_precedence import (
     merge_language_precedence,
     to_language_codes,
 )
-from ..utils.concurrency import gather_bounded
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -45,6 +45,15 @@ from .state_tracker import Stages, StateTracker
 logger = get_logger(__name__)
 
 _PROVIDER_TIMEOUT_SECONDS = 30.0
+
+
+def _log_background_failure(task: asyncio.Task) -> None:  # type: ignore[type-arg]
+    """Done-callback for fire-and-forget tasks — logs exceptions instead of silently dropping them."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        logger.warning(f"Background task failed: {exc}")
 
 
 async def _ensure_primary_audio(entry: DictionaryEntry) -> None:
@@ -131,7 +140,7 @@ async def lookup_word_pipeline(
     """
     # Set defaults
     if providers is None:
-        providers = [DictionaryProvider.WIKTIONARY]
+        providers = [DictionaryProvider.WIKTIONARY, DictionaryProvider.WORDNET]
         # Add Apple Dictionary as default on macOS
         if platform.system() == "Darwin":
             providers.append(DictionaryProvider.APPLE_DICTIONARY)
@@ -202,7 +211,9 @@ async def lookup_word_pipeline(
                 if is_synthesis or no_ai:
                     source = "synthesis" if is_synthesis else str(existing.provider)
                     logger.info(f"📋 Using cached {source} entry for '{best_match}'")
-                    asyncio.ensure_future(_ensure_primary_audio(existing))
+                    asyncio.create_task(_ensure_primary_audio(existing)).add_done_callback(
+                        _log_background_failure
+                    )
                     # Track lookup server-side if user is authenticated
                     if user_id:
                         await _track_lookup(user_id, word)
@@ -233,9 +244,7 @@ async def lookup_word_pipeline(
             )
             for provider in providers
         ]
-        providers_results = await gather_bounded(
-            *provider_tasks, limit=4, return_exceptions=True
-        )
+        providers_results = await gather_bounded(*provider_tasks, limit=4, return_exceptions=True)
 
         # Filter out None results and exceptions
         providers_data = []
@@ -325,7 +334,9 @@ async def lookup_word_pipeline(
                     no_ai=no_ai,
                 )
                 if result:
-                    asyncio.ensure_future(_ensure_primary_audio(result))
+                    asyncio.create_task(_ensure_primary_audio(result)).add_done_callback(
+                        _log_background_failure
+                    )
                     # Track lookup server-side if user is authenticated
                     if user_id:
                         await _track_lookup(user_id, word)

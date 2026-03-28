@@ -171,7 +171,7 @@ async def generate_antonyms(
 
     return AntonymResponse(
         word=request.word,
-        antonyms=result.antonyms,
+        antonyms=[a.word for a in result.antonyms],
         confidence=result.confidence,
     )
 

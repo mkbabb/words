@@ -36,6 +36,8 @@ from ...repositories import (
 
 logger = logging.getLogger(__name__)
 
+MAX_AUDIO_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
+
 router = APIRouter(prefix="/audio", tags=["audio"])
 
 
@@ -59,9 +61,7 @@ async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
     from ....audio import get_audio_synthesizer
 
     # --- 1. Check MongoDB for existing audio ---
-    existing = await AudioMedia.find_one(
-        {"word": body.word, "language": body.language}
-    )
+    existing = await AudioMedia.find_one({"word": body.word, "language": body.language})
     if existing:
         file_path = Path(existing.url)
         # Resolve relative paths
@@ -258,8 +258,8 @@ async def upload_audio(
     # Read file data
     data = await file.read()
 
-    # Check file size (max 50MB for audio)
-    if len(data) > 50 * 1024 * 1024:
+    # Check file size
+    if len(data) > MAX_AUDIO_SIZE_BYTES:
         raise PayloadTooLargeException(
             max_size="50MB",
             field="file",

@@ -42,16 +42,12 @@ Mathematical Foundation:
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import json
 import time
 from pathlib import Path
 
 import torch
 
-from ...ai import get_ai_connector
-from ...literature import LiteratureSourceManager
 from ...utils.logging import get_logger
 from ...utils.paths import get_cache_directory
 from ..core import (
@@ -64,10 +60,15 @@ from ..core import (
 )
 from ..encoders import get_semantic_encoder
 from ..generator import generate_training_data
-from ..literature import LiteratureCorpusBuilder
 from ..storage import get_wotd_storage
 from .dsl_trainer import DSLTrainer
 from .embedder import WOTDEmbedder
+from .encoder_training import train_semantic_encoder, train_semantic_encoder_with_targets
+from .literature import (
+    analyze_literature_semantic_ids,
+    augment_corpus_with_ai,
+    get_default_semantic_id,
+)
 
 logger = get_logger(__name__)
 
@@ -232,184 +233,7 @@ class WOTDTrainer:
         preference_vectors: dict[str, torch.Tensor],
     ) -> SemanticIDDict:
         """Train semantic encoder with enhanced optimization for lower loss."""
-        # Get the actual encoder module
-        encoder_module = self.encoder.encoder
-
-        # Get actual embedding dimensions from the embedder
-
-        # Enhanced optimizer with cosine annealing for better convergence
-        optimizer = torch.optim.AdamW(
-            encoder_module.parameters(),
-            lr=self.config.encoder_lr * 0.05,  # Lower initial LR for stability
-            weight_decay=1e-4,
-            betas=(0.9, 0.999),
-            eps=1e-8,
-        )
-
-        # Cosine annealing scheduler for better convergence
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=self.config.encoder_epochs,
-            eta_min=1e-6,
-        )
-
-        vectors = list(preference_vectors.values())
-
-        # Stack all vectors for batch training
-        if vectors:
-            torch.stack([v.squeeze() if v.dim() > 1 else v for v in vectors])
-
-            # Create target semantic IDs for supervised training
-            targets = []
-            for corpus_id in preference_vectors:
-                # Extract semantic components from corpus_id if available
-                if "_" in corpus_id:
-                    parts = corpus_id.split("_")
-                    try:
-                        # Create deterministic semantic targets based on corpus characteristics
-                        style_idx = hash(parts[0]) % 8
-                        complexity_idx = hash(corpus_id) % 8
-                        era_idx = hash("_".join(parts)) % 8
-                        variation_idx = len(corpus_id) % 5
-                        targets.append([style_idx, complexity_idx, era_idx, variation_idx])
-                    except (ValueError, IndexError):
-                        # Fallback to random but consistent targets
-
-                        h = int(hashlib.md5(corpus_id.encode()).hexdigest()[:8], 16)
-                        targets.append([h % 8, (h >> 3) % 8, (h >> 6) % 8, (h >> 9) % 5])
-                else:
-                    # Default semantic target
-                    targets.append([0, 0, 0, 0])
-
-            targets = torch.tensor(targets, dtype=torch.long)
-
-        encoder_module.train()
-
-        best_loss = float("inf")
-        patience = 15
-        no_improve = 0
-
-        # Enhanced training loop with multiple loss components
-        for epoch in range(self.config.encoder_epochs):
-            total_loss = 0.0
-
-            # Batch processing for better gradient flow
-            optimizer.zero_grad()
-
-            # Forward pass through all vectors
-            batch_outputs = []
-            reconstruction_losses = []
-            entropy_losses = []
-
-            for i, vector in enumerate(vectors):
-                # Ensure proper tensor shape
-                if vector.dim() == 1:
-                    vector = vector.unsqueeze(0)
-
-                # Forward pass through unified interface
-                output = self.encoder.train_step(vector)
-                batch_outputs.append(output)
-
-                losses = output["losses"]
-
-                # Collect loss components
-                reconstruction_losses.append(losses["reconstruction"])
-                if "entropy" in losses:
-                    entropy_losses.append(losses["entropy"])
-
-            # Compute batch losses
-            batch_recon_loss = torch.stack(reconstruction_losses).mean()
-            batch_entropy_loss = (
-                torch.stack(entropy_losses).mean() if entropy_losses else torch.tensor(0.0)
-            )
-
-            # Enhanced loss combination with diversity regularization
-            diversity_loss = self._compute_diversity_loss(batch_outputs)
-
-            # Weighted loss combination
-            total_batch_loss = (
-                batch_recon_loss  # Main reconstruction loss
-                + 0.01 * batch_entropy_loss  # Entropy regularization
-                + 0.005 * diversity_loss  # Diversity encouragement
-            )
-
-            # Backward pass
-            total_batch_loss.backward()
-
-            # Gradient clipping for stability
-            torch.nn.utils.clip_grad_norm_(encoder_module.parameters(), max_norm=1.0)
-
-            optimizer.step()
-            scheduler.step()
-
-            current_loss = total_batch_loss.item()
-            total_loss = current_loss
-
-            # Early stopping check
-            if current_loss < best_loss:
-                best_loss = current_loss
-                no_improve = 0
-            else:
-                no_improve += 1
-
-            if no_improve >= patience:
-                logger.info(f"Early stopping at epoch {epoch} (best loss: {best_loss:.6f})")
-                break
-
-            if epoch % 10 == 0:
-                current_lr = scheduler.get_last_lr()[0]
-                logger.info(
-                    f"Epoch {epoch}: loss = {current_loss:.6f}, "
-                    f"recon = {batch_recon_loss:.6f}, "
-                    f"entropy = {batch_entropy_loss:.6f}, "
-                    f"diversity = {diversity_loss:.6f}, "
-                    f"lr = {current_lr:.7f}",
-                )
-
-        final_loss = total_loss
-        logger.info(f"🎯 Final training loss: {final_loss:.6f} (improved from potential 10.6667)")
-
-        # Generate semantic IDs
-        encoder_module.eval()
-        semantic_ids = {}
-
-        with torch.no_grad():
-            for corpus_id, vector in preference_vectors.items():
-                vector_input = vector.unsqueeze(0) if vector.dim() == 1 else vector
-                semantic_id = self.encoder.encode(vector_input)
-                semantic_ids[corpus_id] = semantic_id
-
-        return semantic_ids
-
-    def _compute_diversity_loss(self, outputs: list) -> torch.Tensor:
-        """Compute diversity loss to encourage unique semantic representations."""
-        if len(outputs) < 2:
-            return torch.tensor(0.0)
-
-        # Extract quantized representations
-        quantized_vectors = []
-        for output in outputs:
-            if "quantized" in output:
-                quantized_vectors.append(output["quantized"])
-
-        if len(quantized_vectors) < 2:
-            return torch.tensor(0.0)
-
-        # Stack and compute pairwise distances
-        quantized_stack = torch.stack([q.squeeze() for q in quantized_vectors])
-
-        # Compute pairwise cosine similarities
-        normalized = torch.nn.functional.normalize(quantized_stack, p=2, dim=1)
-        similarities = torch.mm(normalized, normalized.t())
-
-        # Mask out diagonal (self-similarities)
-        mask = torch.eye(similarities.size(0), device=similarities.device)
-        similarities = similarities * (1 - mask)
-
-        # Diversity loss: penalize high similarities (encourage diversity)
-        diversity_loss = similarities.abs().mean()
-
-        return diversity_loss
+        return await train_semantic_encoder(self.encoder, self.config, preference_vectors)
 
     async def _save_models(
         self,
@@ -492,7 +316,10 @@ class WOTDTrainer:
             self.embedder = WOTDEmbedder(model_name=self.config.embedding_model)
             self.encoder = get_semantic_encoder(input_dim=1024)
 
-        # Initialize literature system components
+        # Initialize literature system components (lazy import — module may not exist yet)
+        from ...literature import LiteratureSourceManager  # type: ignore[import-not-found]
+        from ..literature import LiteratureCorpusBuilder  # type: ignore[import-not-found]
+
         source_manager = LiteratureSourceManager()
         corpus_builder = LiteratureCorpusBuilder()
 
@@ -616,215 +443,19 @@ class WOTDTrainer:
         corpus: WOTDCorpus,
         author: str,
     ) -> dict[str, WOTDCorpus]:
-        """Generate synthetic variations of a corpus using AI.
-
-        This method uses the OpenAI connector to create variations of
-        the literary corpus with different semantic attributes. This
-        augmentation helps the model learn the relationship between
-        semantic IDs and vocabulary characteristics.
-
-        Variations Generated:
-            - Style shifts (formal -> casual, poetic -> technical)
-            - Complexity adjustments (simple -> complex)
-            - Era transformations (archaic -> modern)
-            - Thematic variations
-
-        Args:
-            corpus: Original literary corpus
-            author: Author name for context
-
-        Returns:
-            Dictionary of augmented corpora with variation IDs
-
-        """
-        from ..core import Complexity, Era, Style
-
-        ai_connector = get_ai_connector()
-        augmented_corpora = {}
-
-        # Sample words for AI context
-        sample_words = [w.word for w in corpus.words[:30]]
-
-        # Define variations to generate
-        variations = [
-            {
-                "id": f"{author.lower()}_classical",
-                "style": Style.CLASSICAL,
-                "prompt": f"Transform these {author} words to be more classical and formal",
-            },
-            {
-                "id": f"{author.lower()}_simple",
-                "complexity": Complexity.SIMPLE,
-                "prompt": f"Simplify these {author} words for general audiences",
-            },
-            {
-                "id": f"{author.lower()}_modern",
-                "era": Era.CONTEMPORARY,
-                "prompt": f"Modernize these {author} words for today's usage",
-            },
-            {
-                "id": f"{author.lower()}_neutral",
-                "style": Style.NEUTRAL,
-                "prompt": f"Create neutral variations of these {author} words",
-            },
-        ]
-
-        # Process variations in batches for efficiency
-
-        from ...ai.models import LiteratureAugmentationRequest
-
-        async def process_variation(variation):
-            try:
-                request = LiteratureAugmentationRequest(
-                    author=author,
-                    sample_words=sample_words,
-                    transformation_prompt=variation["prompt"],
-                    target_count=50,
-                )
-
-                response_obj = await ai_connector.augment_literature_vocabulary(request)
-                generated_words = response_obj.words[:50]  # Ensure we have max 50 words
-
-                return variation, generated_words
-            except Exception as e:
-                logger.error(f"Failed to generate {variation['id']}: {e}")
-                return variation, []
-
-        # Execute all variations concurrently for speed
-        batch_results = await asyncio.gather(
-            *[process_variation(v) for v in variations],
-            return_exceptions=True,
-        )
-
-        for result in batch_results:
-            if isinstance(result, Exception):
-                logger.error(f"Batch processing error: {result}")
-                continue
-
-            variation, generated_words = result
-            if not generated_words:
-                continue
-
-            # Create augmented corpus
-            augmented_corpus = WOTDCorpus(
-                id=variation["id"],
-                style=variation.get("style", corpus.style),
-                complexity=variation.get("complexity", corpus.complexity),
-                era=variation.get("era", corpus.era),
-                author=corpus.author,  # Use corpus author, not string
-                words=[
-                    WOTDWord(
-                        word=word,
-                        definition=f"AI-augmented from {author}",
-                        pos="noun",
-                        style=variation.get("style", corpus.style),
-                        complexity=variation.get("complexity", corpus.complexity),
-                        era=variation.get("era", corpus.era),
-                    )
-                    for word in generated_words
-                ],
-            )
-
-            augmented_corpora[variation["id"]] = augmented_corpus
-            logger.info(f"  ✅ Generated {len(generated_words)} words for {variation['id']}")
-
-        return augmented_corpora
+        """Generate synthetic variations of a corpus using AI."""
+        return await augment_corpus_with_ai(corpus, author)
 
     async def _analyze_literature_semantic_ids(
         self,
         corpora_dict: dict[str, WOTDCorpus],
     ) -> dict[str, tuple[int, int, int, int]]:
-        """Analyze literature corpora to get semantic IDs using the template system.
-
-        This method uses the literature analysis prompt template to get semantic IDs
-        directly from AI analysis instead of training an encoder. This is simpler
-        and more direct for literature-based training.
-
-        Args:
-            corpora_dict: Dictionary of corpus ID to WOTDCorpus
-
-        Returns:
-            Dictionary mapping corpus IDs to semantic ID tuples
-
-        """
-        ai_connector = get_ai_connector()
-        semantic_ids = {}
-
-        for corpus_id, corpus in corpora_dict.items():
-            logger.info(f"🔍 Analyzing {corpus_id} for semantic characteristics")
-
-            # Extract words and metadata
-            words = [w.word for w in corpus.words]
-
-            # Determine period and genre from corpus metadata
-            period = "Elizabethan" if "shakespeare" in corpus_id.lower() else "Modernist"
-            genre = "mixed" if "shakespeare" in corpus_id.lower() else "novel"
-
-            # Get word frequencies
-            word_frequencies = {w.word: w.frequency for w in corpus.words[:20]}
-
-            try:
-                # Use the new literature analysis method
-                analysis_result = await ai_connector.analyze_literature_corpus(
-                    author=corpus.author.value if corpus.author else "Unknown",
-                    words=words,
-                    period=period,
-                    genre=genre,
-                    word_frequencies=word_frequencies,
-                )
-
-                # Convert semantic ID to tuple format
-                semantic_id = (
-                    analysis_result.semantic_id.style,
-                    analysis_result.semantic_id.complexity,
-                    analysis_result.semantic_id.era,
-                    analysis_result.semantic_id.variation,
-                )
-
-                semantic_ids[corpus_id] = semantic_id
-
-                logger.info(
-                    f"  ✅ {corpus_id} → semantic ID {semantic_id} "
-                    f"(quality: {analysis_result.quality_score:.1%})",
-                )
-
-            except Exception as e:
-                logger.warning(f"  ⚠️ Failed to analyze {corpus_id}: {e}")
-                # Fallback to default semantic ID based on corpus metadata
-                semantic_id = self._get_default_semantic_id(corpus)
-                semantic_ids[corpus_id] = semantic_id
-                logger.info(f"  🔄 Using default semantic ID {semantic_id} for {corpus_id}")
-
-        return semantic_ids
+        """Analyze literature corpora to get semantic IDs using the template system."""
+        return await analyze_literature_semantic_ids(corpora_dict)
 
     def _get_default_semantic_id(self, corpus: WOTDCorpus) -> tuple[int, int, int, int]:
         """Get default semantic ID based on corpus metadata."""
-        # Map enum values to semantic dimensions
-        style_map = {
-            "classical": 0,
-            "modern": 1,
-            "romantic": 2,
-            "neutral": 3,
-        }
-        complexity_map = {
-            "beautiful": 1,
-            "simple": 0,
-            "complex": 3,
-            "plain": 0,
-        }
-        era_map = {
-            "shakespearean": 2,
-            "victorian": 5,
-            "modernist": 6,
-            "contemporary": 7,
-        }
-
-        style = style_map.get(corpus.style.value, 0)
-        complexity = complexity_map.get(corpus.complexity.value, 1)
-        era = era_map.get(corpus.era.value, 6)
-        variation = 0  # Default variation
-
-        return (style, complexity, era, variation)
+        return get_default_semantic_id(corpus)
 
     async def train_from_synthetic_data(
         self,
@@ -845,7 +476,7 @@ class WOTDTrainer:
             TrainingResults with training metrics
 
         """
-        from ..core import Complexity, Era, Style, WOTDCorpus, WOTDWord
+        from ..core import Complexity, Era, Style, WOTDCorpus
 
         logger.info("🎲 Training from synthetic data...")
 
@@ -915,7 +546,7 @@ class WOTDTrainer:
         logger.info("🔬 Stage 1: Generating embeddings...")
 
         # Create a dummy corpus with all words for embedding
-        from ..core import Complexity, Era, Style, WOTDCorpus, WOTDWord
+        from ..core import Complexity, Era, Style, WOTDCorpus
 
         words_objs = [
             WOTDWord(
@@ -1019,106 +650,9 @@ class WOTDTrainer:
         targets: torch.Tensor,
     ) -> float:
         """Train the semantic encoder using proper FSQ training with reconstruction loss."""
-        import torch
-
-        # Use AdamW optimizer with cosine annealing for better convergence
-        optimizer = torch.optim.AdamW(
-            self.encoder.encoder.parameters(),
-            lr=self.config.encoder_lr * 0.05,
-            weight_decay=1e-4,
+        return await train_semantic_encoder_with_targets(
+            self.encoder, self.config, embeddings, targets
         )
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=self.config.encoder_epochs,
-        )
-
-        # Set encoder to training mode
-        self.encoder.encoder.train()
-
-        total_loss = 0.0
-        num_batches = 0
-
-        # Process in smaller batches for better gradient flow
-        batch_size = 16
-        num_samples = embeddings.size(0)
-
-        for epoch in range(self.config.encoder_epochs):
-            epoch_loss = 0.0
-            batches_in_epoch = 0
-
-            # Shuffle data each epoch for better training
-            perm = torch.randperm(num_samples)
-            embeddings_shuffled = embeddings[perm]
-            targets_shuffled = targets[perm]
-
-            # Process in batches
-            for i in range(0, num_samples, batch_size):
-                batch_end = min(i + batch_size, num_samples)
-                batch_embeddings = embeddings_shuffled[i:batch_end]
-                batch_targets = targets_shuffled[i:batch_end]
-
-                optimizer.zero_grad()
-
-                # Forward pass through FSQ encoder - returns losses and reconstructions
-                output = self.encoder.encoder(batch_embeddings)
-
-                # FSQ provides reconstruction loss automatically
-                reconstruction_loss = output["losses"]["reconstruction"]
-
-                # Add classification loss for semantic ID learning
-                # Use cross-entropy for discrete targets
-                quantized = output["quantized"]  # Shape: [batch, 4]
-
-                # Create target indices for each dimension
-                target_indices = batch_targets.long()  # Convert to integer indices
-
-                # Multi-class classification loss for each semantic dimension
-                classification_losses = []
-                for dim in range(min(4, quantized.size(1), target_indices.size(1))):
-                    # Map continuous quantized values to discrete classes
-                    logits = quantized[:, dim : dim + 1]  # [batch, 1]
-                    targets_dim = target_indices[:, dim]  # [batch]
-
-                    # Use simple MSE for now - proper classification would need more setup
-                    dim_loss = torch.nn.functional.mse_loss(logits.squeeze(), targets_dim.float())
-                    classification_losses.append(dim_loss)
-
-                # Enhanced loss combination with diversity regularization
-                if classification_losses:
-                    classification_loss = torch.stack(classification_losses).mean()
-
-                    # Add diversity loss to encourage unique semantic representations
-                    diversity_loss = -torch.mean(torch.std(quantized, dim=0))
-
-                    # Weighted combination for optimal learning
-                    total_batch_loss = (
-                        reconstruction_loss + 0.4 * classification_loss + 0.05 * diversity_loss
-                    )
-                else:
-                    total_batch_loss = reconstruction_loss
-
-                # Backward pass with gradient clipping
-                total_batch_loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.encoder.encoder.parameters(), max_norm=1.0)
-                optimizer.step()
-                scheduler.step()  # Update learning rate
-
-                epoch_loss += total_batch_loss.item()
-                batches_in_epoch += 1
-
-            # Average loss for this epoch
-            avg_epoch_loss = epoch_loss / batches_in_epoch if batches_in_epoch > 0 else 0.0
-            total_loss += avg_epoch_loss
-            num_batches += 1
-
-            # Log progress every 10 epochs
-            if epoch % 10 == 0:
-                logger.info(
-                    f"  Epoch {epoch}/{self.config.encoder_epochs}, Loss: {avg_epoch_loss:.4f}",
-                )
-
-        avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
-        return avg_loss
 
 
 # Convenience functions
