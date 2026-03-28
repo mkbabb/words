@@ -23,9 +23,16 @@ from ..models import DictionaryProviderEntry
 from .wikitext_cleaner import WikitextCleaner
 from .wiktionary_parser import (
     extract_definitions,
+    extract_derived_terms,
     extract_etymology,
+    extract_hypernyms,
+    extract_hyponyms,
     extract_pronunciation,
+    extract_related_terms,
+    extract_section_antonyms,
     extract_section_synonyms,
+    extract_section_usage_notes,
+    find_all_language_sections,
     find_language_section,
 )
 
@@ -37,6 +44,11 @@ WIKTIONARY_SECTION_TITLES: dict[str, str] = {
     Language.SPANISH.value: "Spanish",
     Language.GERMAN.value: "German",
     Language.ITALIAN.value: "Italian",
+}
+
+# Reverse: Wiktionary section name → Language code
+_SECTION_TO_LANGUAGE: dict[str, Language] = {
+    name.lower(): Language(code) for code, name in WIKTIONARY_SECTION_TITLES.items()
 }
 
 
@@ -181,75 +193,145 @@ class WiktionaryConnector(DictionaryConnector):
         word_obj: Word,
         primary_language: Language,
     ) -> DictionaryProviderEntry | None:
-        """Extract all available data from wikitext using systematic parsing."""
+        """Extract all available data from wikitext across all language sections.
+
+        English Wiktionary is a multilingual dictionary — a single page may
+        have ==English==, ==French==, ==Latin== sections. We parse ALL
+        recognized language sections (primary first), merge the definitions,
+        and tag the word with every language found.
+
+        E.g., "en coulisse" has a ==French== section on en.wiktionary.org.
+        A word like "resume" might have both ==English== and ==French==.
+        """
         try:
             parsed = wtp.parse(wikitext)
 
-            section_title = WIKTIONARY_SECTION_TITLES[primary_language.value]
-            language_section = find_language_section(parsed, section_title)
-            if language_section is None:
+            # Discover all language sections on this page
+            available = find_all_language_sections(parsed)
+            if not available:
+                return None
+
+            # Resolve to known Language enums, primary language first
+            sections_to_parse: list[tuple[Language, wtp.Section]] = []
+            seen_languages: set[str] = set()
+
+            # Primary language gets priority
+            for section_name, section in available:
+                resolved = _SECTION_TO_LANGUAGE.get(section_name.lower())
+                if resolved is not None and resolved == primary_language:
+                    sections_to_parse.insert(0, (resolved, section))
+                    seen_languages.add(resolved.value)
+
+            # Then all other recognized languages
+            for section_name, section in available:
+                resolved = _SECTION_TO_LANGUAGE.get(section_name.lower())
+                if resolved is not None and resolved.value not in seen_languages:
+                    sections_to_parse.append((resolved, section))
+                    seen_languages.add(resolved.value)
+
+            if not sections_to_parse:
                 logger.info(
-                    "Wiktionary section '%s' not found for '%s'",
-                    section_title,
+                    "Wiktionary: no recognized language section for '%s' (found: %s)",
                     word_obj.text,
+                    [name for name, _ in available],
                 )
                 return None
 
-            # Extract all components
-            # After save(), word_obj.id is guaranteed to be not None
+            # Update word's language tags to reflect all languages found
+            for lang, _ in sections_to_parse:
+                if lang.value not in word_obj.languages:
+                    word_obj.languages.append(lang.value)
+            await word_obj.save()
+
             assert word_obj.id is not None
 
-            # Extract section synonyms FIRST so they can be merged into definitions
-            # before the initial save (avoids a consistency window with missing synonyms).
-            section_syns = extract_section_synonyms(language_section)
+            # Parse all language sections, merging definitions
+            all_definitions_dicts: list[dict[str, Any]] = []
+            first_etymology: str | None = None
+            first_pronunciation = None
+            all_derived: list[str] = []
+            all_related: list[str] = []
+            all_hypernyms: list[str] = []
+            all_hyponyms: list[str] = []
+            all_usage_notes: list[dict[str, str]] = []
+            entry_language = sections_to_parse[0][0]  # Primary or first found
 
-            definitions = await extract_definitions(
-                language_section,
-                word_obj.id,
-                section_synonyms=section_syns,
-            )
-            etymology = extract_etymology(language_section)
-            pronunciation = extract_pronunciation(language_section, word_obj.id)
+            for lang, language_section in sections_to_parse:
+                section_syns = extract_section_synonyms(language_section)
+                section_ants = extract_section_antonyms(language_section)
 
-            return DictionaryProviderEntry(
-                word=word_obj.text,
-                provider=self.provider.value,
-                language=primary_language,
-                definitions=[
-                    {
+                definitions = await extract_definitions(
+                    language_section,
+                    word_obj.id,
+                    section_synonyms=section_syns,
+                    section_antonyms=section_ants,
+                )
+
+                for definition in definitions:
+                    all_definitions_dicts.append({
                         "id": str(definition.id),
                         "part_of_speech": definition.part_of_speech,
                         "text": definition.text,
                         "sense_number": definition.sense_number,
                         "synonyms": definition.synonyms,
+                        "antonyms": definition.antonyms,
                         "frequency_band": definition.frequency_band,
                         "collocations": [
-                            {
-                                "text": c.text,
-                                "type": c.type,
-                                "frequency": c.frequency,
-                            }
+                            {"text": c.text, "type": c.type, "frequency": c.frequency}
                             for c in definition.collocations
                         ],
                         "usage_notes": [
-                            {
-                                "type": n.type,
-                                "text": n.text,
-                            }
+                            {"type": n.type, "text": n.text}
                             for n in definition.usage_notes
                         ],
                         "example_ids": [str(eid) for eid in definition.example_ids],
-                    }
-                    for definition in definitions
-                ],
-                pronunciation=pronunciation.phonetic if pronunciation else None,
-                etymology=etymology,
+                        "language": lang.value,  # Tag which language this def came from
+                    })
+
+                # First section with etymology/pronunciation wins
+                if first_etymology is None:
+                    first_etymology = extract_etymology(language_section)
+                if first_pronunciation is None:
+                    first_pronunciation = extract_pronunciation(language_section, word_obj.id)
+
+                all_derived.extend(extract_derived_terms(language_section))
+                all_related.extend(extract_related_terms(language_section))
+                all_hypernyms.extend(extract_hypernyms(language_section))
+                all_hyponyms.extend(extract_hyponyms(language_section))
+                all_usage_notes.extend(
+                    {"type": n.type, "text": n.text}
+                    for n in extract_section_usage_notes(language_section)
+                )
+
+            if not all_definitions_dicts:
+                return None
+
+            languages_found = [lang.value for lang, _ in sections_to_parse]
+            if len(languages_found) > 1:
+                logger.info(
+                    "Wiktionary: '%s' parsed from %d language sections: %s",
+                    word_obj.text, len(languages_found), languages_found,
+                )
+
+            return DictionaryProviderEntry(
+                word=word_obj.text,
+                provider=self.provider.value,
+                language=entry_language,
+                definitions=all_definitions_dicts,
+                pronunciation=first_pronunciation.phonetic if first_pronunciation else None,
+                etymology=first_etymology,
                 examples=[],
                 raw_data={"wikitext": wikitext},
                 provider_metadata={
-                    "pronunciation": pronunciation.model_dump(mode="json")
-                    if pronunciation
+                    "pronunciation": first_pronunciation.model_dump(mode="json")
+                    if first_pronunciation
                     else None,
+                    "languages_found": languages_found,
+                    "derived_terms": all_derived,
+                    "related_terms": all_related,
+                    "hypernyms": all_hypernyms,
+                    "hyponyms": all_hyponyms,
+                    "section_usage_notes": all_usage_notes,
                 },
             )
 

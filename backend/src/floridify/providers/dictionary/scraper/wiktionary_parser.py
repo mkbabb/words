@@ -1,7 +1,8 @@
 """Wiktionary wikitext parsing functions.
 
 Free functions for extracting definitions, examples, etymology, pronunciation,
-synonyms, collocations, and usage notes from parsed wikitext sections.
+synonyms, antonyms, derived terms, related terms, hypernyms, hyponyms,
+collocations, and usage notes from parsed wikitext sections.
 """
 
 from __future__ import annotations
@@ -33,16 +34,35 @@ _cleaner = WikitextCleaner()
 
 # Word type mappings
 POS_MAPPINGS = {
+    # Core POS
     "noun": "noun",
+    "proper noun": "noun",
     "verb": "verb",
+    "participle": "verb",
     "adjective": "adjective",
     "adverb": "adverb",
     "pronoun": "pronoun",
     "preposition": "preposition",
     "conjunction": "conjunction",
     "interjection": "interjection",
-    "determiner": "adjective",  # Map to adjective
-    "article": "adjective",  # Map to adjective
+    # Mapped POS
+    "determiner": "adjective",
+    "article": "adjective",
+    "numeral": "adjective",
+    # Phrase-level POS (common in multi-language entries)
+    "prepositional phrase": "preposition",
+    "phrase": "noun",
+    "proverb": "noun",
+    "idiom": "noun",
+    # Morphological POS
+    "suffix": "noun",
+    "prefix": "noun",
+    "affix": "noun",
+    "contraction": "pronoun",
+    # Abbreviation POS
+    "initialism": "noun",
+    "abbreviation": "noun",
+    "acronym": "noun",
 }
 
 
@@ -58,10 +78,25 @@ def find_language_section(parsed: wtp.WikiList, language: str) -> wtp.Section | 
     return None
 
 
+def find_all_language_sections(parsed: wtp.WikiList) -> list[tuple[str, wtp.Section]]:
+    """Discover all language sections in a Wiktionary entry.
+
+    Returns:
+        List of (language_name, section) tuples. E.g., [("French", <Section>)]
+        for an entry like 'en coulisse' that only has a ==French== section.
+    """
+    results: list[tuple[str, wtp.Section]] = []
+    for section in parsed.sections:
+        if section.title and section.level == 2:
+            results.append((section.title.strip(), section))
+    return results
+
+
 async def extract_definitions(
     section: wtp.Section,
     word_id: PydanticObjectId,
     section_synonyms: list[str] | None = None,
+    section_antonyms: list[str] | None = None,
 ) -> list[Definition]:
     """Extract definitions using new model structure."""
     definitions = []
@@ -103,6 +138,11 @@ async def extract_definitions(
             if section_synonyms:
                 synonyms = list(set(synonyms) | set(section_synonyms))
 
+            # Extract inline antonyms and merge with section-level antonyms
+            antonyms = extract_inline_antonyms(def_text)
+            if section_antonyms:
+                antonyms = list(set(antonyms) | set(section_antonyms))
+
             # Extract collocations from the definition context
             collocations = extract_collocations_from_definition(def_text)
 
@@ -116,6 +156,7 @@ async def extract_definitions(
                 text=clean_def,
                 sense_number=f"{idx + 1}",
                 synonyms=synonyms,
+                antonyms=antonyms,
                 frequency_band=None,
                 collocations=collocations,
                 usage_notes=usage_notes,
@@ -307,12 +348,15 @@ def extract_inline_synonyms(definition_text: str) -> list[str]:
 
             if template_name in ["syn", "synonym", "synonyms", "l", "link"]:
                 for arg in template.arguments:
-                    if not arg.name:  # Positional arguments
-                        arg_value = str(arg.value).strip()
-                        if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
-                            clean_syn = clean_synonym(arg_value)
-                            if clean_syn:
-                                synonyms.append(clean_syn)
+                    if arg.name == "1":
+                        continue
+                    if arg.name and not arg.name.isdigit():
+                        continue
+                    arg_value = str(arg.value).strip()
+                    if arg_value and len(arg_value) > 1 and arg_value not in ["en", "eng", "lang"]:
+                        clean_syn = clean_synonym(arg_value)
+                        if clean_syn and is_valid_synonym(clean_syn):
+                            synonyms.append(clean_syn)
 
     except Exception as e:
         logger.debug(f"Error extracting inline synonyms: {e}")
@@ -320,62 +364,264 @@ def extract_inline_synonyms(definition_text: str) -> list[str]:
     return synonyms[:10]  # Limit to 10 synonyms
 
 
+def extract_inline_antonyms(definition_text: str) -> list[str]:
+    """Extract antonyms from inline templates in definitions."""
+    antonyms = []
+
+    try:
+        parsed = wtp.parse(definition_text)
+
+        for template in parsed.templates:
+            template_name = template.name.strip().lower()
+
+            if template_name in ["ant", "antonym", "antonyms"]:
+                for arg in template.arguments:
+                    if arg.name == "1":
+                        continue
+                    if arg.name and not arg.name.isdigit():
+                        continue
+                    arg_value = str(arg.value).strip()
+                    if arg_value and len(arg_value) > 1 and arg_value not in ["en", "eng", "lang"]:
+                        clean_ant = clean_synonym(arg_value)
+                        if clean_ant and is_valid_synonym(clean_ant):
+                            antonyms.append(clean_ant)
+
+    except Exception as e:
+        logger.debug(f"Error extracting inline antonyms: {e}")
+
+    return antonyms[:10]
+
+
+def _extract_words_from_templates(parsed: wtp.WikiText) -> list[str]:
+    """Extract word lists from wtp templates.
+
+    Handles all common Wiktionary word-list template patterns:
+    - {{l|en|word}}, {{link|en|word}} — single-word links
+    - {{m|en|word}}, {{mention|en|word}} — mentions
+    - {{syn|en|w1|w2|w3}}, {{ant|en|w1|w2}} — inline syn/ant lists
+    - {{col2|en|w1|w2|...}} through {{col5|...}} — multi-column layouts
+
+    All share the same structure: arg 1 = language code, remaining = words.
+    """
+    # Template names that contain word lists (arg 1 = lang, rest = words)
+    WORD_LIST_TEMPLATES = {
+        "l", "link", "m", "mention",
+        "syn", "synonym", "synonyms",
+        "ant", "antonym", "antonyms",
+        "col", "col1", "col2", "col3", "col4", "col5",
+        "col-auto", "der2", "der3", "der4", "der5",
+        "rel2", "rel3", "rel4", "rel5",
+        "hyp2", "hyp3", "hyp4", "hyp5",
+    }
+
+    words: list[str] = []
+    for template in parsed.templates:
+        template_name = template.name.strip().lower()
+        if template_name not in WORD_LIST_TEMPLATES:
+            continue
+        for arg in template.arguments:
+            if arg.name == "1":
+                continue  # Skip language code
+            value = str(arg.value).strip()
+            if not value or len(value) < 2:
+                continue
+            if value in ("en", "eng", "English", "lang"):
+                continue
+            # Skip named parameters like sort=, title=, etc.
+            if arg.name and not arg.name.isdigit():
+                continue
+            cleaned = clean_synonym(value)
+            if cleaned and is_valid_synonym(cleaned):
+                words.append(cleaned)
+    return words
+
+
+def _dedupe(items: list[str], limit: int = 20) -> list[str]:
+    """Deduplicate while preserving order, with a cap."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result[:limit]
+
+
 def extract_section_synonyms(section: wtp.Section) -> list[str]:
     """Extract synonyms from dedicated Synonyms and See also sections."""
-    all_synonyms = []
+    all_synonyms: list[str] = []
 
-    # Look for Synonyms and See also subsections
     for subsection in section.sections:
-        if subsection.title and any(
-            keyword in subsection.title.lower() for keyword in ["synonym", "see also"]
-        ):
-            # Extract all wikilist items and plain text
-            items = extract_wikilist_items(str(subsection))
+        if not subsection.title:
+            continue
+        if not any(kw in subsection.title.lower() for kw in ("synonym", "see also")):
+            continue
 
-            # Also parse templates in the section
-            parsed = wtp.parse(str(subsection))
+        parsed = wtp.parse(str(subsection))
+        all_synonyms.extend(_extract_words_from_templates(parsed))
 
-            # Extract from templates
-            for template in parsed.templates:
-                template_name = template.name.strip().lower()
-                if template_name in ["l", "link", "syn", "synonym"]:
-                    for arg in template.arguments:
-                        if not arg.name or arg.name == "2":  # Second arg is usually the word
-                            value = str(arg.value).strip()
-                            if value and value not in ["en", "English"]:
-                                clean_syn = clean_synonym(value)
-                                if clean_syn and is_valid_synonym(clean_syn):
-                                    all_synonyms.append(clean_syn)
+        # Also extract from wikilinks in list items
+        for item in extract_wikilist_items(str(subsection)):
+            clean_item = _cleaner.clean_text(item)
+            if clean_item and len(clean_item) > 1:
+                if "thesaurus:" in clean_item.lower():
+                    continue
+                for part in clean_item.split(","):
+                    syn = part.strip()
+                    if syn and len(syn) > 1 and is_valid_synonym(syn):
+                        all_synonyms.append(syn)
 
-            # Extract from list items
-            for item in items:
-                # Clean the item
-                clean_item = _cleaner.clean_text(item)
-                if clean_item and len(clean_item) > 1:
-                    # Filter out Thesaurus references
-                    if "thesaurus:" in clean_item.lower():
-                        continue
+    return _dedupe(all_synonyms, 30)
 
-                    # Split by commas if multiple synonyms in one line
-                    parts = clean_item.split(",")
-                    for part in parts:
-                        syn = part.strip()
-                        if syn and len(syn) > 1 and is_valid_synonym(syn):
-                            all_synonyms.append(syn)
 
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_synonyms = []
-    for syn in all_synonyms:
-        if syn.lower() not in seen:
-            seen.add(syn.lower())
-            unique_synonyms.append(syn)
+def extract_section_antonyms(section: wtp.Section) -> list[str]:
+    """Extract antonyms from dedicated Antonyms sections."""
+    all_antonyms: list[str] = []
 
-    return unique_synonyms[:20]  # Limit to 20 synonyms
+    for subsection in section.sections:
+        if not subsection.title or "antonym" not in subsection.title.lower():
+            continue
+
+        parsed = wtp.parse(str(subsection))
+        all_antonyms.extend(_extract_words_from_templates(parsed))
+
+        for item in extract_wikilist_items(str(subsection)):
+            clean_item = _cleaner.clean_text(item)
+            if clean_item and len(clean_item) > 1:
+                if "thesaurus:" in clean_item.lower():
+                    continue
+                for part in clean_item.split(","):
+                    ant = part.strip()
+                    if ant and len(ant) > 1 and is_valid_synonym(ant):
+                        all_antonyms.append(ant)
+
+    return _dedupe(all_antonyms, 30)
+
+
+def extract_derived_terms(section: wtp.Section) -> list[str]:
+    """Extract derived terms from ====Derived terms==== sections."""
+    return _extract_term_section(section, ["derived term", "derived forms"])
+
+
+def extract_related_terms(section: wtp.Section) -> list[str]:
+    """Extract related terms from ====Related terms==== sections."""
+    return _extract_term_section(section, ["related term"])
+
+
+def extract_hypernyms(section: wtp.Section) -> list[str]:
+    """Extract hypernyms from ====Hypernyms==== sections."""
+    return _extract_term_section(section, ["hypernym"])
+
+
+def extract_hyponyms(section: wtp.Section) -> list[str]:
+    """Extract hyponyms from ====Hyponyms==== sections."""
+    return _extract_term_section(section, ["hyponym"])
+
+
+def extract_coordinate_terms(section: wtp.Section) -> list[str]:
+    """Extract coordinate terms from ====Coordinate terms==== sections."""
+    return _extract_term_section(section, ["coordinate term"])
+
+
+def extract_alternative_forms(section: wtp.Section) -> list[str]:
+    """Extract alternative forms from ===Alternative forms=== sections."""
+    return _extract_term_section(section, ["alternative form"])
+
+
+def _extract_term_section(section: wtp.Section, keywords: list[str]) -> list[str]:
+    """Generic extraction for term-list sections (derived, related, hypernyms, etc.)."""
+    all_terms: list[str] = []
+
+    for subsection in section.sections:
+        if not subsection.title or not any(kw in subsection.title.lower() for kw in keywords):
+            continue
+
+        parsed = wtp.parse(str(subsection))
+        all_terms.extend(_extract_words_from_templates(parsed))
+
+        # Also extract from bare wikilinks (not inside templates)
+        for wikilink in parsed.wikilinks:
+            target = (wikilink.text or wikilink.target or "").strip()
+            if target and len(target) > 1 and is_valid_synonym(target):
+                all_terms.append(target)
+
+    return _dedupe(all_terms, 30)
+
+
+def extract_section_usage_notes(section: wtp.Section) -> list[UsageNote]:
+    """Extract usage notes from dedicated ====Usage notes==== sections.
+
+    Unlike extract_usage_notes_from_definition() which detects inline indicators,
+    this extracts prose from dedicated Usage notes subsections.
+    """
+    notes: list[UsageNote] = []
+
+    for subsection in section.sections:
+        if subsection.title and "usage note" in subsection.title.lower():
+            # Get the prose content (stop at next subsection)
+            text_parts = []
+            for line in subsection.contents.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("===") or stripped.startswith("===="):
+                    break
+                if stripped.startswith("*") or stripped.startswith("#"):
+                    # List items — extract the text after the marker
+                    item_text = re.sub(r"^[*#]+\s*", "", stripped)
+                    if item_text:
+                        text_parts.append(item_text)
+                elif stripped:
+                    text_parts.append(stripped)
+
+            for part in text_parts:
+                clean_text = _cleaner.clean_text(part)
+                if clean_text and len(clean_text) > 10:
+                    # Classify the usage note type
+                    note_type = _classify_usage_note(clean_text)
+                    notes.append(UsageNote(type=note_type, text=clean_text))
+
+    return notes[:5]
+
+
+def _classify_usage_note(text: str) -> Literal[
+    "grammar",
+    "confusion",
+    "regional",
+    "register",
+    "error",
+]:
+    """Classify a usage note into one of the valid types based on content."""
+    lower = text.lower()
+
+    # Grammar patterns
+    if any(kw in lower for kw in ["plural", "singular", "countable", "uncountable",
+                                    "transitive", "intransitive", "conjugat",
+                                    "inflect", "participle", "tense"]):
+        return "grammar"
+
+    # Confusion patterns
+    if any(kw in lower for kw in ["confused with", "not to be confused",
+                                    "distinguish", "compare", "versus",
+                                    "as opposed to", "different from"]):
+        return "confusion"
+
+    # Regional patterns
+    if any(kw in lower for kw in ["british", "american", "australian",
+                                    "canadian", "irish", "scottish",
+                                    "regional", "dialect"]):
+        return "regional"
+
+    # Error patterns
+    if any(kw in lower for kw in ["incorrect", "error", "wrong", "avoid",
+                                    "nonstandard", "proscribed"]):
+        return "error"
+
+    # Default to register
+    return "register"
 
 
 def is_valid_synonym(synonym: str) -> bool:
-    """Check if a synonym is valid (not a meta-reference)."""
+    """Check if a synonym/term is valid (not a meta-reference)."""
     lower_syn = synonym.lower()
     # Filter out meta-references
     invalid_patterns = [
@@ -411,127 +657,147 @@ def extract_etymology(section: wtp.Section) -> str | None:
 
 
 def clean_etymology_text(text: str) -> str:
-    """Clean etymology text with a simple, focused approach."""
+    """Clean etymology wikitext into readable prose.
+
+    Uses a collect-then-replace strategy to avoid mutating the wtp parse tree
+    (modifying template.string invalidates sibling Section objects, causing
+    "object has died" errors in the caller).
+    """
     if not text:
         return ""
 
-    # Language code mapping
     lang_map = {
-        "enm": "Middle English",
-        "ang": "Old English",
-        "fro": "Old French",
-        "fr": "French",
-        "la": "Latin",
-        "grc": "Ancient Greek",
-        "de": "German",
-        "es": "Spanish",
-        "it": "Italian",
-        "ar": "Arabic",
-        "sa": "Sanskrit",
-        "zh": "Chinese",
-        "ja": "Japanese",
-        "pt": "Portuguese",
-        "nl": "Dutch",
+        "enm": "Middle English", "ang": "Old English", "fro": "Old French",
+        "frm": "Middle French", "fr": "French", "la": "Latin",
+        "la-lat": "Late Latin", "la-med": "Medieval Latin",
+        "grc": "Ancient Greek", "el": "Greek",
+        "de": "German", "gmh": "Middle High German", "goh": "Old High German",
+        "es": "Spanish", "it": "Italian", "pt": "Portuguese",
+        "nl": "Dutch", "dum": "Middle Dutch",
+        "non": "Old Norse", "da": "Danish", "sv": "Swedish", "no": "Norwegian",
+        "ar": "Arabic", "fa": "Persian", "sa": "Sanskrit", "hi": "Hindi",
+        "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+        "ru": "Russian", "pl": "Polish", "cy": "Welsh", "ga": "Irish",
+        "sga": "Old Irish", "cel-pro": "Proto-Celtic",
+        "gem-pro": "Proto-Germanic", "ine-pro": "Proto-Indo-European",
     }
+
+    # Etymology templates: arg structure is {{name|source_lang|target_lang|word|t=gloss}}
+    ETYM_TEMPLATES = {"der", "inh", "bor", "cog", "m", "mention", "l", "lang",
+                      "inherited", "derived", "borrowed", "cognate", "noncog",
+                      "uder", "ubor", "lbor", "slbor", "psm", "calque", "cal",
+                      "semi-calque", "learned borrowing", "orthographic borrowing"}
+
+    # Collect (span, replacement) pairs from wtp, then apply to raw text
+    replacements: list[tuple[tuple[int, int], str]] = []
 
     try:
         parsed = wtp.parse(text)
 
-        # Process templates more carefully
         for template in parsed.templates:
-            template_name = template.name.strip().lower()
+            tname = template.name.strip().lower()
+            span = template.span
 
-            # Handle specific etymology templates
-            if template_name in [
-                "der",
-                "inh",
-                "bor",
-                "cog",
-                "m",
-                "mention",
-                "l",
-                "lang",
-            ]:
-                args = [str(arg.value).strip() for arg in template.arguments]
+            if tname in ETYM_TEMPLATES:
+                args = [str(a.value).strip() for a in template.arguments]
+                # Find the word and language code
+                # Patterns: {{m|la|word}}, {{der|en|la|word}}, {{inh|en|enm|word|t=gloss}}
+                word = None
+                lang_code = None
+                gloss = None
+                for a in template.arguments:
+                    aname = str(a.name).strip() if a.name else ""
+                    aval = str(a.value).strip()
+                    if aname in ("t", "gloss", "tr"):
+                        gloss = aval
+                # Find lang + word from positional args
+                positional = [str(a.value).strip() for a in template.arguments
+                              if not a.name or a.name.isdigit()]
+                if len(positional) >= 3:
+                    lang_code = positional[1]
+                    word = positional[2]
+                elif len(positional) >= 2:
+                    lang_code = positional[0]
+                    word = positional[1]
 
-                # Common pattern: {{template|en|lang_code|word|...}}
-                if len(args) >= 3:
-                    # args[1] is usually the language code
-                    # args[2] is usually the word
-                    lang_code = args[1] if len(args[1]) <= 3 else None
-                    word = args[2] if len(args[2]) > 1 else None
-
-                    if word:
-                        if lang_code in lang_map:
-                            template.string = f"{lang_map[lang_code]} {word}"
-                        else:
-                            template.string = word
-                    else:
-                        template.string = ""
+                if word:
+                    lang_name = lang_map.get(lang_code, "")
+                    parts = [lang_name, word] if lang_name else [word]
+                    if gloss:
+                        parts.append(f'("{gloss}")')
+                    replacements.append((span, " ".join(parts)))
                 else:
-                    template.string = ""
+                    replacements.append((span, ""))
 
-            # Handle quotation templates (preserve the quoted text)
-            elif template_name in ["quote", "gloss"]:
-                # Look for the gloss/translation argument
-                gloss_text = ""
-                for arg in template.arguments:
-                    if arg.name and str(arg.name).strip() in [
-                        "t",
-                        "gloss",
-                        "translation",
-                        "3",
-                    ]:
-                        gloss_text = str(arg.value).strip()
-                        break
-                    if not arg.name and len(str(arg.value).strip()) > 3:
-                        # Sometimes the gloss is a positional argument
-                        gloss_text = str(arg.value).strip()
+            elif tname in ("gloss", "gl"):
+                args = [str(a.value).strip() for a in template.arguments]
+                gloss = args[0] if args else ""
+                replacements.append((span, f'("{gloss}")' if gloss else ""))
 
-                if gloss_text:
-                    template.string = f'("{gloss_text}")'
-                else:
-                    template.string = ""
+            elif tname in ("doublet", "see"):
+                args = [str(a.value).strip() for a in template.arguments]
+                word = args[-1] if args and len(args[-1]) > 1 else ""
+                replacements.append((span, word))
 
-            # Remove other templates but preserve doublet/see also references
-            elif template_name in ["doublet", "see"]:
-                # Extract the word reference
-                if template.arguments:
-                    word_ref = str(template.arguments[-1].value).strip()
-                    if word_ref and len(word_ref) > 1:
-                        template.string = word_ref
-                    else:
-                        template.string = ""
-                else:
-                    template.string = ""
+            elif tname in ("suffix", "prefix", "af", "affix", "confix"):
+                # {{suffix|en|perspicac|ious}} → "perspicac- + -ious"
+                parts = [str(a.value).strip() for a in template.arguments
+                         if not a.name or a.name.isdigit()]
+                parts = [p for p in parts if p and p not in ("en", "eng") and len(p) > 0]
+                replacements.append((span, " + ".join(parts) if parts else ""))
+
+            elif tname in ("w", "wikipedia", "wp", "pedialite", "root",
+                          "senseid", "anchor", "rfe", "etystub"):
+                replacements.append((span, ""))
+
+            elif tname == "circa" or tname == "c." or tname == "circa2":
+                args = [str(a.value).strip() for a in template.arguments]
+                replacements.append((span, f"c. {args[0]}" if args else ""))
+
+            elif tname in ("quote", "quote-book", "quote-journal", "quote-web"):
+                replacements.append((span, ""))
+
             else:
-                # Remove unhandled templates
-                template.string = ""
+                # Unknown template — remove
+                replacements.append((span, ""))
 
-        # Convert wikilinks to their display text
-        for wikilink in parsed.wikilinks:
-            display_text = wikilink.text or wikilink.target
-            wikilink.string = display_text or ""
+        # Apply replacements in reverse order to preserve spans
+        cleaned = text
+        for (start, end), replacement in sorted(replacements, key=lambda r: r[0][0], reverse=True):
+            cleaned = cleaned[:start] + replacement + cleaned[end:]
 
-        # Get the cleaned text
-        cleaned = str(parsed)
+        # Convert wikilinks: [[target|display]] → display, [[word]] → word
+        cleaned = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", cleaned)
 
     except Exception as e:
         logger.debug(f"Etymology parsing error: {e}")
-        # Fallback to regex cleaning
         cleaned = text
-
-        # Simple template removal
-        cleaned = re.sub(r"\{\{[^}]+\}\}", "", cleaned)
-
-        # Convert wikilinks
-        cleaned = re.sub(
-            r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]",
-            lambda m: m.group(2) or m.group(1),
-            cleaned,
-        )
+        # Regex fallback for etymology templates
+        def _etym_template_replace(m: re.Match[str]) -> str:
+            inner = m.group(1)
+            parts = inner.split("|")
+            tname = parts[0].strip().lower()
+            if tname in ETYM_TEMPLATES and len(parts) >= 4:
+                lang_code = parts[2].strip()
+                word = parts[3].strip()
+                lang_name = lang_map.get(lang_code, "")
+                return f"{lang_name} {word}" if lang_name else word
+            return ""
+        cleaned = re.sub(r"\{\{([^}]+)\}\}", _etym_template_replace, cleaned)
+        cleaned = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", cleaned)
 
     # Final cleanup
+    cleaned = re.sub(r"\[\[(Image|File):[^\]]*\]\]", "", cleaned)  # Remove image/file links
+    cleaned = re.sub(r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL)  # Remove references
+    cleaned = re.sub(r"<ref[^/]*/?>", "", cleaned)  # Self-closing refs
+    cleaned = re.sub(r"<[^>]+>", "", cleaned)  # Any remaining HTML tags
+    cleaned = re.sub(r"'''+", "", cleaned)  # Bold/italic markers
+    cleaned = re.sub(r"''+", "", cleaned)
+    # Strip any remaining templates/wikilinks that survived parsing
+    for _ in range(3):
+        cleaned = re.sub(r"\{\{[^{}]*\}\}", "", cleaned)
+    cleaned = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", cleaned)
+    cleaned = re.sub(r"[{}|\[\]]", "", cleaned)  # Stray brackets
     cleaned = html.unescape(cleaned)
 
     # Clean up punctuation and whitespace
