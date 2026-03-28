@@ -74,31 +74,40 @@ services:
         max-file: "3"
         labels: "service=notification"
 
-  # Nginx with SSL (optional - only if not using external load balancer)
+  mongo:
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   nginx:
-    image: jonasal/nginx-certbot:5
+    image: nginx:alpine
     container_name: floridify-nginx
-    restart: unless-stopped
-    environment:
-      CERTBOT_EMAIL: ${CERTBOT_EMAIL}
-      DOMAIN: ${DOMAIN}
-      # STAGING: 1  # Uncomment for Let's Encrypt staging
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:${HTTP_PORT:-8110}:80"
     volumes:
-      - nginx_secrets:/etc/letsencrypt
-      - ./nginx/user_conf.d:/etc/nginx/user_conf.d:ro
+      - ./nginx/floridify.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - frontend
       - backend
     networks:
       - app-network
-    profiles:
-      - ssl
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  nginx_secrets:
-    driver: local
   notification_logs:
     driver: local

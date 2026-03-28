@@ -8,6 +8,9 @@ services:
       target: ${BUILD_TARGET:-development}
     container_name: floridify-backend
     restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8003}:8000"
     environment:
@@ -110,6 +113,26 @@ services:
     profiles:
       - dev
 
+  mongo:
+    image: mongo:8.0
+    container_name: floridify-mongodb
+    volumes:
+      - floridify_mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "admin", "-p", "${MONGO_PASSWORD}",
+             "--authenticationDatabase", "admin",
+             "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
 networks:
   app-network:
     driver: bridge
@@ -117,3 +140,6 @@ networks:
 volumes:
   notification_logs:
     driver: local
+  floridify_mongo_data:
+    external: true
+    name: floridify_mongo_data
