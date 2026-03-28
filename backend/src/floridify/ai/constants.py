@@ -35,11 +35,21 @@ class SynthesisComponent(Enum):
 
     @classmethod
     def default_definition_components(cls) -> set["SynthesisComponent"]:
-        """Return default components for definition enhancement."""
+        """Return default components for definition enhancement.
+
+        Includes CEFR, frequency, register, domain, and regional — these are
+        now handled locally (no AI cost) via wordfreq, WordNet taxonomy, and
+        keyword classifiers, so they're free to include by default.
+        """
         return {
             cls.SYNONYMS,
             cls.EXAMPLES,
             cls.ANTONYMS,
+            cls.CEFR_LEVEL,
+            cls.FREQUENCY_BAND,
+            cls.REGISTER,
+            cls.REGIONAL_VARIANTS,
+            cls.DOMAIN,  # Uses embedding-based synset matching for accurate sense disambiguation
         }
 
     @classmethod

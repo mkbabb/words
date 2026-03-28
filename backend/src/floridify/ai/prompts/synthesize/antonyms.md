@@ -1,6 +1,7 @@
 # Antonyms: {{ word }} ({{ part_of_speech }})
 
 **Definition**: {{ definition }}
+**Language**: {{ language | default('English') }}
 {% if existing_antonyms %}**Existing**: {{ existing_antonyms | join(', ') }}{% endif %}
 
 ## Task
@@ -8,10 +9,8 @@
 Generate up to {{ count }}{% if existing_antonyms %} NEW (not in Existing list){% endif %} antonyms for the specific sense defined above. Not all words have antonyms. If no genuine antonym exists, return an empty list. Return fewer rather than padding with weak alternatives.
 
 ### Distribution
-- ~40% common: everyday, widely understood opposites
-- ~30% literary: sophisticated or elevated register
-- ~20% foreign: non-English terms where they capture an opposing nuance English lacks
-- ~10% technical: domain-specific vocabulary
+- ~80% {{ language | default('English') }}: everyday, literary, and technical antonyms in the word's primary language
+- ~20% cross-language: non-{{ language | default('English') }} terms that capture an opposing nuance the primary language lacks
 
 ### Quality Rules
 - **NEVER include "{{ word }}" itself as an antonym.** A word cannot be its own antonym.

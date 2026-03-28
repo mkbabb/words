@@ -17,12 +17,23 @@ from ...models.relationships import (
     UsageNote,
 )
 from ...utils.logging import get_logger
+from ..assessment.cefr import assess_cefr_local
+from ..assessment.domain import classify_domain_local
+from ..assessment.frequency import (
+    adjust_band_for_sense,
+    assess_frequency_local,
+    assess_frequency_score_local,
+    assess_sense_frequency,
+)
+from ..assessment.regional import detect_regional_local
+from ..assessment.register import classify_register_local
 from ..connector import AIConnector
 from ..constants import (
     DEFAULT_ANTONYM_COUNT,
     DEFAULT_EXAMPLE_COUNT,
     DEFAULT_SYNONYM_COUNT,
 )
+from .hybrid import compute_antonym_delta, compute_synonym_delta
 
 logger = get_logger(__name__)
 
@@ -34,50 +45,81 @@ async def synthesize_synonyms(
     count: int = 10,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
+    language: str = "en",
 ) -> list[str]:
-    """Synthesize synonyms: enhance existing or generate new to reach target count."""
+    """Synthesize synonyms: Wiktionary + WordNet first, AI for the delta.
+
+    Filters AI response by language — primary-language synonyms go to the
+    return list, cross-language cognates are stored on definition.cognates.
+    """
+    from .language_filter import is_primary_language
+
     count = count or DEFAULT_SYNONYM_COUNT
 
-    # Get existing synonyms (empty if force_refresh)
-    existing_synonyms = [] if force_refresh else (definition.synonyms or [])
+    if force_refresh:
+        definition.synonyms = []
 
-    # If we already have enough synonyms, return them
-    if len(existing_synonyms) >= count:
-        return existing_synonyms[:count]
+    # Merge Wiktionary (already on definition) + WordNet synonyms
+    merged, ai_needed = await compute_synonym_delta(definition, word, target_count=count)
 
-    # Calculate how many new synonyms we need
-    needed_count = count - len(existing_synonyms)
+    # If local sources satisfy the target, skip AI entirely
+    if ai_needed <= 0:
+        return merged[:count]
 
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS,
-                message=f"Synthesizing {needed_count} new synonyms for {word} (total: {count})",
+                message=f"Synthesizing {ai_needed} new synonyms for {word} (have {len(merged)} local)",
             )
+
+        # Map ISO code to display name for prompt
+        from ...models.base import Language as LangEnum
+        lang_display = {v.value: v.name.title() for v in LangEnum}.get(language, "English")
 
         response = await ai.synthesize_synonyms(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
-            existing_synonyms=existing_synonyms,
-            count=needed_count,
+            existing_synonyms=merged,
+            count=ai_needed,
+            language=lang_display,
         )
 
-        # Union existing and new synonyms, removing duplicates and self-references
+        # Filter by language: primary → synonyms, foreign → cognates
         word_lower = word.lower()
-        all_synonyms = existing_synonyms.copy()
-        for candidate in response.synonyms:
-            if candidate.word.lower() != word_lower and candidate.word not in all_synonyms:
-                all_synonyms.append(candidate.word)
+        all_synonyms = merged.copy()
+        cognates: list[str] = list(definition.cognates or [])
 
-        logger.info(f"Synthesized {len(all_synonyms)} total synonyms for '{word}'")
+        for candidate in response.synonyms:
+            if candidate.word.lower() == word_lower:
+                continue
+            if candidate.word in all_synonyms:
+                continue
+
+            if is_primary_language(candidate.language, language):
+                all_synonyms.append(candidate.word)
+            else:
+                cognates.append(candidate.word)
+
+        # Store cognates on the definition
+        seen_cog: set[str] = set()
+        definition.cognates = [
+            c for c in cognates
+            if c.lower() not in seen_cog and not seen_cog.add(c.lower())  # type: ignore[func-returns-value]
+        ][:20]
+
+        logger.info(
+            f"Synthesized {len(all_synonyms)} synonyms + {len(definition.cognates)} cognates "
+            f"for '{word}' (hybrid)"
+        )
         return all_synonyms[:count]
 
     except Exception as e:
         logger.error(f"Failed to synthesize synonyms: {e}")
         if state_tracker:
             await state_tracker.update_error(f"Synonym synthesis failed: {e!s}")
-        return existing_synonyms
+        return merged
 
 
 async def synthesize_antonyms(
@@ -87,47 +129,62 @@ async def synthesize_antonyms(
     count: int = 5,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
+    language: str = "en",
 ) -> list[str]:
-    """Synthesize antonyms: enhance existing or generate new to reach target count."""
+    """Synthesize antonyms: Wiktionary + WordNet first, AI for the delta.
+
+    Filters AI response by language — foreign antonyms are discarded
+    (antonyms are less useful cross-linguistically than synonym cognates).
+    """
+    from .language_filter import is_primary_language
+
     count = count or DEFAULT_ANTONYM_COUNT
 
-    # Get existing antonyms (empty if force_refresh)
-    existing_antonyms = [] if force_refresh else (definition.antonyms or [])
+    if force_refresh:
+        definition.antonyms = []
 
-    # If we already have enough antonyms, return them
-    if len(existing_antonyms) >= count:
-        return existing_antonyms[:count]
+    # Merge Wiktionary (already on definition) + WordNet antonyms
+    merged, ai_needed = await compute_antonym_delta(definition, word, target_count=count)
 
-    # Calculate how many new antonyms we need
-    needed_count = count - len(existing_antonyms)
+    # If local sources satisfy the target, skip AI entirely
+    if ai_needed <= 0:
+        return merged[:count]
 
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS,
-                message=f"Synthesizing {needed_count} new antonyms for {word} (total: {count})",
+                message=f"Synthesizing {ai_needed} new antonyms for {word} (have {len(merged)} local)",
             )
+
+        from ...models.base import Language as LangEnum
+        lang_display = {v.value: v.name.title() for v in LangEnum}.get(language, "English")
 
         response = await ai.synthesize_antonyms(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
-            existing_antonyms=existing_antonyms,
-            count=needed_count,
+            existing_antonyms=merged,
+            count=ai_needed,
+            language=lang_display,
         )
 
-        # Union existing and new antonyms, removing duplicates and self-references
+        # Filter: keep only primary-language antonyms (discard foreign ones)
         word_lower = word.lower()
-        all_antonyms = existing_antonyms.copy()
+        all_antonyms = merged.copy()
         for candidate in response.antonyms:
-            if candidate.word.lower() != word_lower and candidate.word not in all_antonyms:
+            if candidate.word.lower() == word_lower:
+                continue
+            if candidate.word in all_antonyms:
+                continue
+            if is_primary_language(candidate.language, language):
                 all_antonyms.append(candidate.word)
 
         return all_antonyms[:count]
 
     except Exception as e:
         logger.error(f"Failed to synthesize antonyms: {e}")
-        return existing_antonyms
+        return merged  # Return local results even if AI fails
 
 
 async def generate_examples(
@@ -171,7 +228,21 @@ async def assess_definition_cefr(
     ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
-    """Assess CEFR level for a definition."""
+    """Assess CEFR level for a definition. Local-first with AI fallback.
+
+    Uses sense-level frequency when definition context is available,
+    so rare senses of common words get higher CEFR levels.
+    """
+    local_result = await assess_cefr_local(
+        word,
+        definition_text=definition.text,
+        part_of_speech=definition.part_of_speech,
+    )
+    if local_result is not None:
+        logger.debug(f"CEFR for '{word}' ({definition.part_of_speech}): {local_result} (local, sense-adjusted)")
+        return local_result
+
+    # Fall back to AI
     try:
         if state_tracker:
             await state_tracker.update(
@@ -191,7 +262,34 @@ async def assess_definition_frequency(
     ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> int | None:
-    """Assess frequency band for a definition."""
+    """Assess frequency band for a definition. Local-first with AI fallback.
+
+    Also sets definition.frequency_score as a side effect when using local assessment.
+    """
+    # Try local assessment first (corpus-derived, deterministic, free)
+    local_band = assess_frequency_local(word)
+    if local_band is not None:
+        # Adjust for sense-level prominence
+        sense_freq = await assess_sense_frequency(word, definition.part_of_speech, definition.text)
+        adjusted_band = adjust_band_for_sense(local_band, sense_freq)
+
+        # Also set the continuous frequency score for temperature visualization
+        local_score = assess_frequency_score_local(word)
+        if local_score is not None:
+            # Adjust score proportionally to sense frequency
+            if sense_freq is not None:
+                local_score = local_score * (0.5 + 0.5 * sense_freq)
+            definition.frequency_score = local_score
+
+        sense_str = f"{sense_freq:.2f}" if sense_freq is not None else "N/A"
+        logger.debug(
+            f"Frequency for '{word}' ({definition.part_of_speech}): "
+            f"word_band={local_band}, sense_freq={sense_str}, "
+            f"adjusted_band={adjusted_band} (local)"
+        )
+        return adjusted_band
+
+    # Fall back to AI
     try:
         if state_tracker:
             await state_tracker.update(
@@ -210,7 +308,12 @@ async def classify_definition_register(
     ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
-    """Classify register for a definition."""
+    """Classify register for a definition. Local-first with AI fallback."""
+    local_result = classify_register_local(definition.text)
+    if local_result is not None:
+        logger.debug(f"Register: {local_result} (local)")
+        return local_result
+
     try:
         if state_tracker:
             await state_tracker.update(
@@ -228,8 +331,14 @@ async def assess_definition_domain(
     definition: Definition,
     ai: AIConnector,
     state_tracker: StateTracker | None = None,
+    word: str = "",
 ) -> str | None:
-    """Identify domain for a definition."""
+    """Identify domain for a definition. Local-first via WordNet taxonomy, AI fallback."""
+    local_result = await classify_domain_local(definition.text, word=word, part_of_speech=definition.part_of_speech)
+    if local_result is not None:
+        logger.debug(f"Domain: {local_result} (local)")
+        return local_result
+
     try:
         if state_tracker:
             await state_tracker.update(
@@ -338,7 +447,12 @@ async def assess_regional_variants(
     ai: AIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
-    """Detect regional variants for a definition."""
+    """Detect regional variants for a definition. Local-first with AI fallback."""
+    local_result = detect_regional_local(definition.text)
+    if local_result is not None:
+        logger.debug(f"Regional: {local_result} (local)")
+        return [local_result]
+
     try:
         if state_tracker:
             await state_tracker.update(

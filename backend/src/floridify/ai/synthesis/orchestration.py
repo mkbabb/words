@@ -253,6 +253,7 @@ async def enhance_definitions_parallel(
                     count=counts.synonyms,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
+                    language=primary_language,
                 ),
             )
             task_info.append((definition, SynthesisComponent.SYNONYMS, len(tasks) - 1))
@@ -282,6 +283,7 @@ async def enhance_definitions_parallel(
                     count=counts.antonyms,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
+                    language=primary_language,
                 ),
             )
             task_info.append((definition, SynthesisComponent.ANTONYMS, len(tasks) - 1))
@@ -317,7 +319,7 @@ async def enhance_definitions_parallel(
 
         # Domain
         if SynthesisComponent.DOMAIN in components and (not definition.domain or force_refresh):
-            tasks.append(assess_definition_domain(definition, ai, state_tracker))
+            tasks.append(assess_definition_domain(definition, ai, state_tracker, word=word.text))
             task_info.append((definition, SynthesisComponent.DOMAIN, len(tasks) - 1))
 
         # Grammar Patterns

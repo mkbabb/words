@@ -107,9 +107,10 @@ class SynthesisMixin:
         part_of_speech: str,
         existing_synonyms: list[str],
         count: int = 10,
+        language: str = "English",
     ) -> SynonymGenerationResponse:
         """Generate synonyms with efflorescence ranking."""
-        logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({part_of_speech})")
+        logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({part_of_speech}, {language})")
 
         prompt = self.prompt_manager.render(
             "synthesize/synonyms",
@@ -118,6 +119,7 @@ class SynthesisMixin:
             part_of_speech=part_of_speech,
             existing_synonyms=existing_synonyms,
             count=count,
+            language=language,
         )
 
         result = await self._make_structured_request(
@@ -139,18 +141,9 @@ class SynthesisMixin:
         part_of_speech: str,
         existing_antonyms: list[str],
         count: int = 5,
+        language: str = "English",
     ) -> AntonymResponse:
-        """Generate antonyms for a definition.
-
-        Args:
-            word: The word
-            definition: The definition text
-            part_of_speech: Part of speech
-
-        Returns:
-            AntonymResponse with list of antonyms
-
-        """
+        """Generate antonyms for a definition."""
         prompt = self.prompt_manager.render(
             "synthesize/antonyms",
             word=word,
@@ -158,6 +151,7 @@ class SynthesisMixin:
             part_of_speech=part_of_speech,
             existing_antonyms=existing_antonyms,
             count=count,
+            language=language,
         )
 
         result = await self._make_structured_request(

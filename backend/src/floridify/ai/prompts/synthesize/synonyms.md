@@ -1,6 +1,7 @@
 # Synonyms: {{ word }} ({{ part_of_speech }})
 
 **Definition**: {{ definition }}
+**Language**: {{ language | default('English') }}
 {% if existing_synonyms %}**Existing**: {{ existing_synonyms | join(', ') }}{% endif %}
 
 ## Task
@@ -8,9 +9,8 @@
 Generate up to {{ count }}{% if existing_synonyms %} NEW (not in Existing list){% endif %} synonyms for the specific sense defined above. If fewer than {{ count }} high-quality synonyms exist, return fewer rather than padding with weak alternatives.
 
 ### Distribution
-- ~50% common: everyday, widely understood alternatives
-- ~30% literary: sophisticated or elevated register
-- ~20% foreign/technical: non-English or domain-specific terms where they capture a nuance English lacks
+- ~80% {{ language | default('English') }}: everyday, literary, and technical synonyms in the word's primary language
+- ~20% cross-language cognates: non-{{ language | default('English') }} terms that capture a nuance the primary language lacks
 
 ### Quality Rules
 - **NEVER include "{{ word }}" itself as a synonym.** The word cannot be its own synonym.

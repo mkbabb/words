@@ -19,6 +19,7 @@ from ..models.dictionary import (
 )
 from ..storage.dictionary import _provider_str, save_definition_versioned, save_entry_versioned
 from ..storage.mongodb import get_storage
+from ..utils.concurrency import gather_bounded
 from ..utils.language_precedence import (
     to_language_codes,
 )
@@ -26,6 +27,7 @@ from ..utils.logging import get_logger
 from .adaptive_counts import compute_counts
 from .connector import AIConnector, get_ai_connector
 from .constants import SynthesisComponent
+from .dedup import local_deduplicate_definitions
 from .synthesis import (
     cluster_definitions,
     enhance_definitions_parallel,
@@ -46,11 +48,13 @@ class DefinitionSynthesizer:
         openai_connector: AIConnector,
         examples_count: int = 2,
         facts_count: int = 3,
+        use_local_dedup: bool = True,
     ) -> None:
         # Wrap connector for batch logging
         self.ai = openai_connector  # wrap_connector_for_logging(openai_connector)
         self.examples_count = examples_count
         self.facts_count = facts_count
+        self.use_local_dedup = use_local_dedup
 
     async def synthesize_entry(
         self,
@@ -121,13 +125,19 @@ class DefinitionSynthesizer:
                 )
             )
 
-        # DEDUPLICATION: Use AI to identify and merge near-duplicates before clustering
+        # DEDUPLICATION: Local 3-tier pipeline or AI fallback
         logger.info(f"Deduplicating {len(all_definitions)} definitions before clustering")
 
-        dedup_response = await self.ai.deduplicate_definitions(
-            word=word,
-            definitions=all_definitions,
-        )
+        if self.use_local_dedup:
+            dedup_response = await local_deduplicate_definitions(
+                word=word,
+                definitions=all_definitions,
+            )
+        else:
+            dedup_response = await self.ai.deduplicate_definitions(
+                word=word,
+                definitions=all_definitions,
+            )
 
         # Create unique definitions list from deduplication results
         unique_definitions: list[Definition] = []
@@ -360,8 +370,8 @@ class DefinitionSynthesizer:
             task = synthesize_cluster(cluster_slug, cluster_defs)
             synthesis_tasks.append(task)
 
-        # Parallel cluster synthesis: log failures explicitly, filter to successful results
-        results = await asyncio.gather(*synthesis_tasks, return_exceptions=True)
+        # Parallel cluster synthesis with bounded concurrency (max 4 concurrent AI calls)
+        results = await gather_bounded(*synthesis_tasks, limit=4, return_exceptions=True)
 
         synthesized_definitions = []
         for i, result in enumerate(results):
