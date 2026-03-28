@@ -1,4 +1,4 @@
-import { toast } from '@/components/ui/toast'
+import { toast } from '@mkbabb/glass-ui'
 
 export const showError = (message: string) => {
   toast({

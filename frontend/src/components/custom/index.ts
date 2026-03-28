@@ -7,10 +7,6 @@ export * from './loading'
 export * from './search'
 export * from './texture'
 
-// Re-export existing organized components
-export * from './dark-mode-toggle'
-export * from './latex'
-
 // Single file exports
 export { default as Modal } from './Modal.vue'
 export { default as Sidebar } from './Sidebar.vue'

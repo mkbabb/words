@@ -1,17 +1,5 @@
-export {
-    useVirtualSectionWindow,
-    type VirtualSectionWindowOptions,
-} from './useVirtualSectionWindow';
-
+// Project-specific virtual scrolling (not in glass-ui)
 export {
     useVirtualGrid,
     type UseVirtualGridOptions,
 } from './useVirtualGrid';
-
-export {
-    useWindowedStore,
-    type WindowedStore,
-    type UseWindowedStoreOptions,
-} from './useWindowedStore';
-
-export * from './virtualSectionLayout';

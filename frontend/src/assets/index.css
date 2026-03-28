@@ -1,14 +1,112 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@mkbabb/glass-ui/styles';
+@import 'katex/dist/katex.min.css';
+@import '@mkbabb/latex-paper/theme';
+@variant dark (&:where(.dark, .dark *));
+
+/* ─── Project-specific Tailwind v4 theme tokens ─── */
+@theme {
+  /* Spacing */
+  --spacing-sidebar-collapsed: 4rem;
+  --spacing-sidebar-expanded: 20rem;
+
+  /* Z-index: provided by glass-ui theme.css (--z-index-* → --z-*) */
+  /* Project-specific alias */
+  --z-index-float: var(--z-content);
+
+}
+
+/* Project-specific keyframes (outside @theme — raw CSS) */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes sparkle-slide {
+  0% { transform: translateX(-100%) rotate(45deg); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(300%) rotate(45deg); opacity: 0; }
+}
+@keyframes bounce-in {
+  0% { transform: scale(0.9); opacity: 0; }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes bounce-out {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(0.9); opacity: 0; }
+}
+@keyframes shrink-bounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.95); }
+  60% { transform: scale(1.02); }
+  80% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+@keyframes icon-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes elastic-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.05); }
+  50% { transform: scale(0.95); }
+  70% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  25% { transform: rotate(3deg) scale(1.02); }
+  75% { transform: rotate(-3deg) scale(0.98); }
+}
+@keyframes wiggle-bounce {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  25% { transform: rotate(2deg) translateY(-2px); }
+  75% { transform: rotate(-2deg) translateY(2px); }
+}
+@keyframes tab-content-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hovercard-in {
+  from { opacity: 0; transform: scale(0.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes hovercard-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.9) translateY(8px); }
+}
+
+/* Animation token bindings for Tailwind v4 animate-* utilities */
+@theme inline {
+  --animate-shimmer: shimmer 3s ease-in-out infinite;
+  --animate-sparkle-slide: sparkle-slide 4s ease-in-out infinite;
+  --animate-bounce-in: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --animate-bounce-out: bounce-out 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --animate-shrink-bounce: shrink-bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --animate-icon-fade: icon-fade 0.3s var(--ease-standard);
+  --animate-elastic-bounce: elastic-bounce 0.6s var(--ease-apple-default);
+  --animate-spin-slow: spin-slow 3s linear infinite;
+  --animate-wiggle: wiggle 2.5s ease-in-out infinite;
+  --animate-wiggle-bounce: wiggle-bounce 2.5s ease-in-out infinite;
+  --animate-tab-content-in: tab-content-in 0.25s ease both;
+  --animate-hovercard-in: hovercard-in 0.3s var(--ease-standard) forwards;
+  --animate-hovercard-out: hovercard-out 0.2s var(--ease-standard) forwards;
+}
+
+/* Project-specific extensions (layered AFTER glass-ui) */
 @import './theme.css';
-@import './utilities.css';
 @import './transitions.css';
 @import './themed-cards/index.css';
 
-@custom-variant dark (&:is(.dark *));
-
 @layer base {
   body {
-    font-family: 'Fraunces', Georgia, Cambria, 'Times New Roman', serif;
+    font-family: var(--font-serif);
   }
 }
 
@@ -19,6 +117,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* KaTeX: inherit font-size from parent context */
+  .katex { font-size: inherit; }
+  .katex-display { margin: 0; }
 }
 
 /* Theme toggle is instant — no CSS transitions.
@@ -63,13 +164,25 @@ html.no-transition *::after {
     background-size: 60px 60px;
   }
 
-  .interactive-item {
-    @apply rounded-xl outline-hidden select-none
-      transition-[background-color,color,border-color,box-shadow,transform] duration-200 ease-apple-default
-      hover:bg-accent/50
-      focus-visible:bg-accent focus-visible:text-accent-foreground
-      active:scale-[0.98]
-      disabled:pointer-events-none disabled:opacity-50
-      data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
+  /* Paper texture + blend-mode shorthand for surfaces that need the paper
+     overlay without a full dialog-surface / popover-surface treatment. */
+  .paper-texture-overlay {
+    background-image: var(--paper-clean-texture);
+    background-blend-mode: multiply;
+  }
+
+  /* Migrated from utilities.css — project-specific gradient utilities */
+  .review-progress-gradient {
+    background: linear-gradient(90deg, var(--mastery-bronze), var(--mastery-gold));
+  }
+
+  .mastery-bar-gold {
+    background: linear-gradient(90deg, var(--color-chart-4), var(--color-chart-5));
+  }
+  .mastery-bar-silver {
+    background: linear-gradient(90deg, var(--color-chart-2), var(--color-chart-3));
+  }
+  .mastery-bar-bronze {
+    background: linear-gradient(90deg, var(--color-chart-1), var(--color-chart-2));
   }
 }

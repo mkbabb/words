@@ -1,26 +1,11 @@
-/* Theme: Light/dark color variables, paper textures, body base styles */
+/* Theme: Project-specific color tokens layered on top of glass-ui */
 
 @theme {
-  /* Paper-like background tones */
-  --color-background: hsl(48 15% 98%);
-  --color-foreground: hsl(0 0% 3.9%);
-  --color-card: hsl(48 12% 99%);
-  --color-card-foreground: hsl(0 0% 3.9%);
-  --color-popover: hsl(48 10% 98.5%);
-  --color-popover-foreground: hsl(0 0% 3.9%);
-  --color-primary: hsl(0 0% 9%);
-  --color-primary-foreground: hsl(0 0% 98%);
-  --color-secondary: hsl(48 8% 96.1%);
-  --color-secondary-foreground: hsl(0 0% 9%);
-  --color-muted: hsl(48 8% 96.1%);
-  --color-muted-foreground: hsl(0 0% 45.1%);
-  --color-accent: hsl(48 8% 96.1%);
-  --color-accent-foreground: hsl(0 0% 9%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(48 5% 89.8%);
-  --color-input: hsl(48 5% 89.8%);
-  --color-ring: hsl(0 0% 3.9%);
+  /* Typography — warm serif stack (was in glass-ui presets/words.css) */
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-mono: "Fira Code", Consolas, monospace;
 
   /* Accent colors for AI and error states */
   --ai-accent: #fbbf24;
@@ -57,22 +42,38 @@
   --color-foreground-12: hsl(0 0% 3.9% / 0.12);
   --color-foreground-18: hsl(0 0% 3.9% / 0.18);
 
-  /* Design system radius token (consumed by tailwind.config.ts border-radius scale) */
+  /* Chart colors for mastery bar gradients */
+  --color-chart-1: hsl(25 85% 55%);   /* bronze start */
+  --color-chart-2: hsl(25 70% 60%);   /* bronze-silver bridge */
+  --color-chart-3: hsl(210 15% 65%);  /* silver */
+  --color-chart-4: hsl(43 70% 55%);   /* silver-gold bridge */
+  --color-chart-5: hsl(43 90% 55%);   /* gold */
+}
+
+/* Warm paper color palette (was in glass-ui presets/words.css) */
+:root {
+  --background: 48 15% 98%;
+  --foreground: 0 0% 3.9%;
+  --muted: 48 8% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --card: 48 12% 99%;
+  --card-foreground: 0 0% 3.9%;
+  --popover: 48 12% 99%;
+  --popover-foreground: 0 0% 3.9%;
+  --border: 48 5% 89.8%;
+  --input: 48 5% 89.8%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 48 4.8% 95.9%;
+  --secondary-foreground: 0 0% 9%;
+  --accent: 48 4.8% 95.9%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 0 0% 3.9%;
+  --shadow: 0 0% 0%;
+  --shadow-color: 0 0% 0%;
   --radius: 8px;
-
-  /* Named easings as CSS custom properties (mirrors tailwind.config.ts) */
-  --ease-apple-default: cubic-bezier(0.25, 0.1, 0.25, 1);
-  --ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --ease-apple-ease-in: cubic-bezier(0.42, 0, 1, 1);
-  --ease-apple-ease-out: cubic-bezier(0, 0, 0.58, 1);
-
-  /* Paper texture variables */
-  --paper-clean-texture: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.18'/%3E%3C/svg%3E");
-  --paper-aged-texture: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.25'/%3E%3C/svg%3E");
-  --paper-handmade-texture: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.5' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.22'/%3E%3C/svg%3E");
-  --paper-kraft-texture: url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.28'/%3E%3C/svg%3E");
-
 }
 
 /* Cartoon shadow color system — CSS custom properties for dark mode theming */
@@ -83,32 +84,36 @@
   --shadow-cartoon-color-hover-soft: rgb(0 0 0 / 0.10);
 }
 
-/* Dark theme colors - dark paper tones */
+/* Dark theme — color palette (was in glass-ui presets/words.css) */
+.dark {
+  --background: 24 8% 6%;
+  --foreground: 48 10% 92%;
+  --muted: 24 5% 15%;
+  --muted-foreground: 48 5% 64%;
+  --card: 24 6% 7%;
+  --card-foreground: 48 10% 92%;
+  --popover: 24 7% 6.5%;
+  --popover-foreground: 48 10% 92%;
+  --border: 24 4% 16%;
+  --input: 24 4% 16%;
+  --primary: 48 10% 92%;
+  --primary-foreground: 0 0% 9%;
+  --secondary: 24 5% 15%;
+  --secondary-foreground: 48 10% 92%;
+  --accent: 24 5% 15%;
+  --accent-foreground: 48 10% 92%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 48 10% 92%;
+  --ring: 48 8% 83%;
+  --shadow: 0 0% 100%;
+}
+
+/* Dark theme — project-specific token overrides */
 .dark {
   --shadow-cartoon-color: rgb(255 255 255 / 0.07);
   --shadow-cartoon-color-soft: rgb(255 255 255 / 0.04);
   --shadow-cartoon-color-hover: rgb(255 255 255 / 0.09);
   --shadow-cartoon-color-hover-soft: rgb(255 255 255 / 0.06);
-
-  --color-background: hsl(24 8% 6%);
-  --color-foreground: hsl(48 10% 92%);
-  --color-card: hsl(24 6% 7%);
-  --color-card-foreground: hsl(48 10% 92%);
-  --color-popover: hsl(24 7% 6.5%);
-  --color-popover-foreground: hsl(48 10% 92%);
-  --color-primary: hsl(48 10% 92%);
-  --color-primary-foreground: hsl(0 0% 9%);
-  --color-secondary: hsl(24 5% 15%);
-  --color-secondary-foreground: hsl(48 10% 92%);
-  --color-muted: hsl(24 5% 15%);
-  --color-muted-foreground: hsl(48 5% 64%);
-  --color-accent: hsl(24 5% 15%);
-  --color-accent-foreground: hsl(48 10% 92%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(48 10% 92%);
-  --color-border: hsl(24 4% 16%);
-  --color-input: hsl(24 4% 16%);
-  --color-ring: hsl(48 8% 83%);
 
   /* Accent colors for AI and error states (dark variants) */
   --ai-accent: #d97706;
@@ -142,30 +147,9 @@
   --color-foreground-12: hsl(48 10% 92% / 0.12);
   --color-foreground-18: hsl(48 10% 92% / 0.18);
 
-  /* Dark mode texture variants */
+  /* Dark mode texture variants (different opacity from glass-ui defaults) */
   --paper-clean-texture: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.10'/%3E%3C/svg%3E");
   --paper-aged-texture: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.14'/%3E%3C/svg%3E");
   --paper-handmade-texture: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.5' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.12'/%3E%3C/svg%3E");
   --paper-kraft-texture: url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.16'/%3E%3C/svg%3E");
-}
-
-@theme inline {
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
-  @keyframes accordion-down {
-  from {
-    height: 0;
-    }
-  to {
-    height: var(--reka-accordion-content-height);
-    }
-  }
-  @keyframes accordion-up {
-  from {
-    height: var(--reka-accordion-content-height);
-    }
-  to {
-    height: 0;
-    }
-  }
 }

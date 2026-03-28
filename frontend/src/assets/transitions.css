@@ -1,4 +1,4 @@
-/* Transitions & Keyframes: shared animation definitions */
+/* Transitions & Keyframes: project-specific animation definitions */
 
 @layer utilities {
   .result-list-enter-active,
@@ -85,16 +85,7 @@
     }
 }
 
-/* ─── Standardized Vue Transition Classes ─── */
-
-/* Dropdown/popover appear — shared by search results, theme selector, etc. */
-.dropdown-enter-active { transition: opacity 120ms ease, transform 200ms var(--ease-apple-spring); }
-.dropdown-leave-active { transition: opacity 100ms ease, transform 150ms ease; }
-.dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: scale(0.96) translateY(4px); }
-
-/* Fade — generic crossfade for content switches */
-.fade-enter-active, .fade-leave-active { transition: opacity 150ms ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+/* ─── Project-specific Vue Transition Classes ─── */
 
 /* Slide up — for docks, toasts, bottom sheets */
 .slide-up-enter-active { transition: opacity 200ms ease, transform 250ms var(--ease-apple-spring); }
@@ -120,8 +111,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dropdown-enter-active, .dropdown-leave-active,
-    .fade-enter-active, .fade-leave-active,
     .slide-up-enter-active, .slide-up-leave-active,
     .dock-fade-enter-active, .dock-fade-leave-active {
         transition-duration: 0.01ms !important;

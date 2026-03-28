@@ -21,6 +21,7 @@
         right: 0;
         bottom: 0;
         pointer-events: none;
+        /* Local stacking context: 0 = overlay behind content (not glass-ui z-index scale) */
         z-index: 0;
         background:
             var(--paper-clean-texture),
@@ -55,7 +56,8 @@
         border-radius: inherit;
     }
 
-    /* Ensure card content appears above the gradient overlay */
+    /* Ensure card content appears above the gradient overlay.
+       z-index: 1 is a local stacking context value (not glass-ui scale). */
     .themed-card[data-theme]:not([data-theme='default'])
         > *:not([class*='absolute']) {
         position: relative;

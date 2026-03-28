@@ -1,5 +1,3 @@
 export { default as AnimatedText } from './AnimatedText.vue'
-export { default as BouncyToggle } from './BouncyToggle.vue'
 export { default as ShimmerText } from './ShimmerText.vue'
 export { default as BorderShimmer } from './BorderShimmer.vue'
-export { default as GlassDock } from './GlassDock.vue'

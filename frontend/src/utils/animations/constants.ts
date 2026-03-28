@@ -3,6 +3,11 @@
  * Apple-like animation system for consistent motion design
  */
 
+// Stagger intervals (in ms) — mirrors --duration-stagger-* in glass-ui tokens.css
+export const STAGGER_FAST = 40;   // matches --duration-stagger-fast
+export const STAGGER = 60;        // matches --duration-stagger
+export const STAGGER_SLOW = 150;  // matches --duration-stagger-slow
+
 // Standard durations (in ms)
 export const DURATION = {
   instant: 150,   // Micro-interactions
