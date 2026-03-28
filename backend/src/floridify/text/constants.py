@@ -131,3 +131,11 @@ DIACRITIC_MAPPINGS = {
     "æ": "ae",
     "œ": "oe",
 }
+
+
+# ── Stopwords ─────────────────────────────────────────────────────────
+# NLTK's curated stopword corpus (198 English words).
+
+from nltk.corpus import stopwords as _nltk_stopwords
+
+ENGLISH_STOPWORDS: frozenset[str] = frozenset(_nltk_stopwords.words("english"))

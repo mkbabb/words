@@ -27,8 +27,11 @@ class DictionaryProvider(Enum):
     APPLE_DICTIONARY = "apple_dictionary"
     MERRIAM_WEBSTER = "merriam_webster"
     FREE_DICTIONARY = "free_dictionary"
-    # DICTIONARY_COM removed - JavaScript-heavy site
     WORDHIPPO = "wordhippo"
+    WORDNET = "wordnet"
+    GCIDE = "gcide"
+    WIKIPEDIA = "wikipedia"
+    MOBY_THESAURUS = "moby_thesaurus"
     AI_FALLBACK = "ai_fallback"
     SYNTHESIS = "synthesis"
 
@@ -41,12 +44,34 @@ class DictionaryProvider(Enum):
             DictionaryProvider.APPLE_DICTIONARY: "Apple Dictionary",
             DictionaryProvider.MERRIAM_WEBSTER: "Merriam-Webster",
             DictionaryProvider.FREE_DICTIONARY: "Free Dictionary",
-            # DictionaryProvider.DICTIONARY_COM removed
             DictionaryProvider.WORDHIPPO: "WordHippo",
+            DictionaryProvider.WORDNET: "WordNet",
+            DictionaryProvider.GCIDE: "GCIDE",
+            DictionaryProvider.WIKIPEDIA: "Wikipedia",
+            DictionaryProvider.MOBY_THESAURUS: "Moby Thesaurus",
             DictionaryProvider.AI_FALLBACK: "AI Fallback",
             DictionaryProvider.SYNTHESIS: "Synthesis",
         }
         return display_names.get(self, self.value.title())
+
+    @property
+    def license(self) -> str:
+        """Get the license identifier for this provider's content."""
+        licenses: dict[DictionaryProvider, str] = {
+            DictionaryProvider.WIKTIONARY: "cc-by-sa-3.0",
+            DictionaryProvider.OXFORD: "proprietary",
+            DictionaryProvider.APPLE_DICTIONARY: "proprietary-system",
+            DictionaryProvider.MERRIAM_WEBSTER: "proprietary",
+            DictionaryProvider.FREE_DICTIONARY: "mit",
+            DictionaryProvider.WORDHIPPO: "unknown",
+            DictionaryProvider.WORDNET: "princeton-wordnet",
+            DictionaryProvider.GCIDE: "gpl-public-domain",
+            DictionaryProvider.WIKIPEDIA: "cc-by-sa-3.0",
+            DictionaryProvider.MOBY_THESAURUS: "public-domain",
+            DictionaryProvider.AI_FALLBACK: "generated",
+            DictionaryProvider.SYNTHESIS: "derived",
+        }
+        return licenses.get(self, "unknown")
 
 
 class SourceReference(BaseModel):
@@ -56,6 +81,7 @@ class SourceReference(BaseModel):
     entry_id: PydanticObjectId  # Provider DictionaryEntry._id
     entry_version: str = ""  # e.g. "1.0.3" — version at time of synthesis
     definition_ids: list[PydanticObjectId] = Field(default_factory=list)
+    license: str | None = None  # e.g. "cc-by-sa-3.0", "proprietary", "public-domain"
 
 
 class Word(Document, BaseMetadata):
@@ -202,6 +228,7 @@ class Definition(Document, BaseMetadata):
     )  # FK to Example documents
     synonyms: list[str] = Field(default_factory=list, max_length=50)
     antonyms: list[str] = Field(default_factory=list, max_length=50)
+    cognates: list[str] = Field(default_factory=list, max_length=20)  # Cross-language enrichment terms
 
     # Usage and context
     language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
@@ -270,6 +297,36 @@ class DictionaryEntry(Document, BaseMetadata):
 
     # Synthesis metadata (populated for synthesized entries)
     model_info: ModelInfo | None = None  # AI model info for synthesized entries
+
+    @property
+    def attribution_text(self) -> str | None:
+        """Compute attribution text based on source providers requiring attribution.
+
+        Returns attribution string for CC BY-SA and other attribution-required
+        sources, or None if no attribution is needed.
+        """
+        attribution_sources: dict[str, str] = {
+            "cc-by-sa-3.0": "CC BY-SA 3.0",
+            "princeton-wordnet": "Princeton WordNet License",
+            "gpl-public-domain": "GPL / Public Domain",
+        }
+
+        required_attributions: list[str] = []
+        seen_providers: set[str] = set()
+
+        for ref in self.source_entries:
+            provider = DictionaryProvider(ref.provider) if isinstance(ref.provider, str) else ref.provider
+            license_id = ref.license or provider.license
+            if license_id in attribution_sources and provider.value not in seen_providers:
+                seen_providers.add(provider.value)
+                required_attributions.append(
+                    f"{provider.display_name} ({attribution_sources[license_id]})"
+                )
+
+        if not required_attributions:
+            return None
+
+        return "Includes content from " + ", ".join(required_attributions)
 
     class Settings:
         name = "dictionary_entries"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -128,6 +129,21 @@ class DatabaseConfig(BaseModel):
         if env_url and target == "runtime":
             return env_url
 
+        if env_url and target == "test":
+            # Inside Docker, MONGODB_URL points to the tunnel.
+            # Derive the test URL by swapping the database name.
+            from urllib.parse import urlsplit, urlunsplit
+
+            parts = urlsplit(env_url)
+            test_db = self.test_url and urlsplit(self.test_url).path
+            if test_db:
+                test_parts = parts._replace(path=test_db)
+                # Preserve authSource and other query params from test_url
+                test_query = urlsplit(self.test_url).query if self.test_url else parts.query
+                if test_query:
+                    test_parts = test_parts._replace(query=test_query)
+                return urlunsplit(test_parts)
+
         if target == "runtime":
             if self.tunnel_url and not self._in_docker():
                 return self._resolve_tunnel_port(self.tunnel_url)
@@ -161,7 +177,9 @@ class DatabaseConfig(BaseModel):
             try:
                 result = subprocess.run(
                     ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-Fn"],
-                    capture_output=True, text=True, timeout=3,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
                 )
                 # Find SSH processes listening on ports in the tunnel range
                 ssh_pids: set[str] = set()
@@ -174,7 +192,9 @@ class DatabaseConfig(BaseModel):
                         try:
                             ps_result = subprocess.run(
                                 ["ps", "-p", current_pid, "-o", "command="],
-                                capture_output=True, text=True, timeout=2,
+                                capture_output=True,
+                                text=True,
+                                timeout=2,
                             )
                             if "ssh" in ps_result.stdout and "27017" in ps_result.stdout:
                                 # Extract the local port from the -L flag
@@ -299,21 +319,39 @@ class Config(BaseModel):
 
     @classmethod
     def from_file(cls, config_path: str | Path | None = None) -> Config:
-        """Load configuration from TOML file."""
+        """Load configuration from TOML file.
+
+        Results are cached by resolved path — repeated calls with the same
+        path (or None → default) return the same frozen Config instance
+        without re-reading disk.
+        """
+        resolved = cls._resolve_config_path(config_path)
+        return cls._load_cached(str(resolved))
+
+    @staticmethod
+    def _resolve_config_path(config_path: str | Path | None) -> Path:
+        """Resolve config_path to an absolute Path, applying defaults."""
         if config_path is None:
             env_path = os.getenv("FLORIDIFY_CONFIG_PATH")
             if env_path:
-                config_path = Path(env_path)
-            else:
-                project_root = get_project_root()
-                config_path = project_root / "auth" / "config.toml"
+                return Path(env_path)
 
-                if os.path.exists("/.dockerenv") and not config_path.exists():
-                    docker_config = Path("/app/auth/config.toml")
-                    if docker_config.exists():
-                        config_path = docker_config
-        else:
-            config_path = Path(config_path)
+            project_root = get_project_root()
+            candidate = project_root / "auth" / "config.toml"
+
+            if os.path.exists("/.dockerenv") and not candidate.exists():
+                docker_config = Path("/app/auth/config.toml")
+                if docker_config.exists():
+                    return docker_config
+            return candidate
+
+        return Path(config_path)
+
+    @classmethod
+    @functools.lru_cache(maxsize=4)
+    def _load_cached(cls, config_path_str: str) -> Config:
+        """Load and cache Config from a resolved path string."""
+        config_path = Path(config_path_str)
 
         if not config_path.exists():
             raise FileNotFoundError(

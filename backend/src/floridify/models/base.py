@@ -121,6 +121,16 @@ class FieldChange(BaseModel):
     new_value: str | None = None  # String summary of new value (truncated for large values)
 
 
+class DedupMergeRecord(BaseModel):
+    """Record of a deduplication merge decision for audit trail."""
+
+    kept_index: int  # Index of the definition kept as primary
+    merged_indices: list[int] = Field(default_factory=list)  # Indices merged into it
+    reasoning: str = ""  # Why these were considered duplicates
+    similarity_score: float | None = None  # Similarity metric (0-1) from local dedup tiers
+    tier: str | None = None  # Which dedup tier caught this: "exact", "fuzzy", "semantic", "ai"
+
+
 class SynthesisAuditEntry(BaseModel):
     """Audit trail for AI synthesis operations."""
 
@@ -134,6 +144,7 @@ class SynthesisAuditEntry(BaseModel):
     definitions_output: int = 0  # Definitions after synthesis
     dedup_removed: int = 0  # Duplicates removed
     clusters_created: int = 0
+    dedup_merge_history: list[DedupMergeRecord] = Field(default_factory=list)
 
 
 class EditMetadata(BaseModel):
@@ -187,6 +198,7 @@ __all__ = [
     "AIResponseBase",
     "AudioMedia",
     "BaseMetadata",
+    "DedupMergeRecord",
     "EditMetadata",
     "FieldChange",
     "ImageMedia",

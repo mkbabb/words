@@ -7,10 +7,12 @@ import json
 import math
 import statistics
 import time
-from dataclasses import asdict, dataclass, field
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
@@ -37,8 +39,7 @@ def _percentile(samples: list[float], pct: float) -> float:
     return lower_value + (upper_value - lower_value) * (rank - lower)
 
 
-@dataclass(slots=True)
-class BenchmarkStats:
+class BenchmarkStats(BaseModel):
     """Summary statistics for a timed benchmark case."""
 
     iterations: int
@@ -53,32 +54,16 @@ class BenchmarkStats:
     throughput_per_second: float
     error_count: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
-
-@dataclass(slots=True)
-class BenchmarkCase:
+class BenchmarkCase(BaseModel):
     """A benchmark case plus metadata and optional notes."""
 
     name: str
     category: str
     status: str
     stats: BenchmarkStats | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    notes: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        payload = {
-            "name": self.name,
-            "category": self.category,
-            "status": self.status,
-            "metadata": self.metadata,
-            "notes": self.notes,
-        }
-        if self.stats is not None:
-            payload["stats"] = self.stats.to_dict()
-        return payload
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
 
 
 def summarize_samples(
@@ -243,22 +228,34 @@ def format_table(cases: list[BenchmarkCase] | None = None) -> str:
         s = c.stats
         if s is None:
             continue
-        rows.append((
-            c.category,
-            c.name,
-            s.iterations,
-            f"{s.min_ms:.3f}",
-            f"{s.mean_ms:.3f}",
-            f"{s.median_ms:.3f}",
-            f"{s.p95_ms:.3f}",
-            f"{s.max_ms:.3f}",
-            f"{s.throughput_per_second:.1f}",
-        ))
+        rows.append(
+            (
+                c.category,
+                c.name,
+                s.iterations,
+                f"{s.min_ms:.3f}",
+                f"{s.mean_ms:.3f}",
+                f"{s.median_ms:.3f}",
+                f"{s.p95_ms:.3f}",
+                f"{s.max_ms:.3f}",
+                f"{s.throughput_per_second:.1f}",
+            )
+        )
 
     if not rows:
         return "(no benchmarks with stats)"
 
-    headers = ("Category", "Name", "Rounds", "Min (ms)", "Mean (ms)", "Median (ms)", "P95 (ms)", "Max (ms)", "OPS")
+    headers = (
+        "Category",
+        "Name",
+        "Rounds",
+        "Min (ms)",
+        "Mean (ms)",
+        "Median (ms)",
+        "P95 (ms)",
+        "Max (ms)",
+        "OPS",
+    )
     # Compute column widths
     widths = [len(h) for h in headers]
     for row in rows:

@@ -6,12 +6,11 @@ import asyncio
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import asdict
 from datetime import timedelta
 from typing import Any, Generic, TypeVar
 
-from ..utils.logging import get_logger
 from ..search.config import INLINE_CONTENT_THRESHOLD_BYTES
+from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
 from .config import DEFAULT_CONFIGS
 from .filesystem import FilesystemBackend
@@ -28,6 +27,8 @@ from .models import (
 from .serialize import CacheStats, estimate_binary_size, serialize_content
 
 logger = get_logger(__name__)
+
+DEFAULT_CLEANUP_INTERVAL_SECONDS = 300.0
 
 # Type variable for backend
 T = TypeVar("T", bound=FilesystemBackend)
@@ -355,7 +356,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                 return {
                     "namespace": namespace.value,
                     "memory_count": len(ns.memory_cache),
-                    "stats": asdict(ns.stats),
+                    "stats": ns.stats.model_dump(),
                 }
 
         # Aggregate stats using functional approach
@@ -406,7 +407,9 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
 
         return total_evicted
 
-    async def _run_periodic_cleanup(self, interval_seconds: float = 300.0) -> None:
+    async def _run_periodic_cleanup(
+        self, interval_seconds: float = DEFAULT_CLEANUP_INTERVAL_SECONDS
+    ) -> None:
         """Run cleanup_expired_entries periodically.
 
         Args:
@@ -423,7 +426,9 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         except asyncio.CancelledError:
             logger.info("Background TTL cleanup task cancelled")
 
-    def start_ttl_cleanup_task(self, interval_seconds: float = 300.0) -> asyncio.Task[None]:
+    def start_ttl_cleanup_task(
+        self, interval_seconds: float = DEFAULT_CLEANUP_INTERVAL_SECONDS
+    ) -> asyncio.Task[None]:
         """Start the periodic TTL cleanup background task.
 
         Args:

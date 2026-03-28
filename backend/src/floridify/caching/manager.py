@@ -50,9 +50,12 @@ class VersionedDataManager:
         self.cache: GlobalCacheManager[FilesystemBackend] | None = (
             None  # Will be initialized lazily (GlobalCacheManager)
         )
-        # Per-resource locks for 3-5x concurrent throughput
-        self._locks: defaultdict[tuple[ResourceType, str], asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._locks_loop_id: int | None = None  # Track which event loop owns locks
+        # Per-resource locks keyed by (loop_id, resource_type, resource_id).
+        # Loop ID ensures each event loop gets its own locks without clearing
+        # locks held by tasks in a previous loop (which would break exclusion).
+        self._locks: defaultdict[tuple[int, ResourceType, str], asyncio.Lock] = defaultdict(
+            asyncio.Lock
+        )
 
     def _get_lock(self, resource_type: ResourceType, resource_id: str) -> asyncio.Lock:
         """Get or create lock for a specific resource.
@@ -75,21 +78,11 @@ class VersionedDataManager:
             ...     await save_dictionary("dog", ...)
         """
         try:
-            loop = asyncio.get_running_loop()
-            loop_id = id(loop)
+            loop_id = id(asyncio.get_running_loop())
         except RuntimeError:
-            logger.debug("No running event loop — using default lock")
-            # No event loop running - just return lock from dict
-            return self._locks[(resource_type, resource_id)]
+            loop_id = 0  # No event loop — deterministic fallback
 
-        # Check if we need to recreate locks for new event loop
-        if self._locks_loop_id != loop_id:
-            # New event loop - clear old locks and set new loop ID
-            self._locks.clear()
-            self._locks_loop_id = loop_id
-            logger.debug(f"Created new lock dict for event loop {loop_id}")
-
-        return self._locks[(resource_type, resource_id)]
+        return self._locks[(loop_id, resource_type, resource_id)]
 
     async def _save_with_transaction(
         self,

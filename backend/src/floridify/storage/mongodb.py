@@ -12,10 +12,6 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
-
-from ..corpus.core import Corpus
-from ..corpus.language.core import LanguageCorpus
-from ..corpus.literature.core import LiteratureCorpus
 from ..models.base import AudioMedia, ImageMedia
 from ..models.dictionary import (
     Definition,
@@ -28,16 +24,8 @@ from ..models.dictionary import (
 )
 from ..models.relationships import WordRelationship
 from ..models.user import User, UserHistory
-from ..providers.batch import BatchOperation
-from ..providers.dictionary.models import DictionaryProviderEntry
-from ..providers.language.models import LanguageEntry
-from ..providers.literature.models import LiteratureEntry
-from ..search.index import SearchIndex
-from ..search.semantic.index import SemanticIndex
-from ..search.trie.index import TrieIndex
 from ..utils.config import Config
 from ..utils.logging import get_logger
-from ..wordlist.models import WordList, WordListItemDoc
 from .dictionary import _resolve_word_text, save_entry_versioned
 
 logger = get_logger(__name__)
@@ -130,46 +118,69 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
-        # Initialize Beanie with all document models
+        # Initialize Beanie with all document models.
+        # Heavy modules (corpus, search, providers, wordlist) are imported here
+        # rather than at module level, so that `from ..storage.mongodb import get_storage`
+        # doesn't force-load the entire dependency tree at import time.
         await init_beanie(
             database=database,
-            document_models=[
-                # New models
-                Word,
-                Definition,
-                Example,
-                Fact,
-                Pronunciation,
-                AudioMedia,
-                ImageMedia,
-                WordRelationship,
-                WordList,
-                WordListItemDoc,
-                # Versioning models - Base class provides collection, subclasses inherit
-                BaseVersionedData,
-                # CRITICAL: All Metadata subclasses must be registered for polymorphic deserialization
-                # BaseVersionedData owns the "versioned_data" collection with is_root=True
-                # All subclasses share this collection and need proper _class_id handling
-                Corpus.Metadata,
-                LanguageCorpus.Metadata,  # DISCRIMINATOR FIX: Register LanguageCorpus.Metadata
-                LiteratureCorpus.Metadata,  # DISCRIMINATOR FIX: Register LiteratureCorpus.Metadata
-                DictionaryProviderEntry.Metadata,
-                LanguageEntry.Metadata,
-                LiteratureEntry.Metadata,
-                SearchIndex.Metadata,
-                TrieIndex.Metadata,
-                SemanticIndex.Metadata,
-                # User models
-                User,
-                UserHistory,
-                # Backward-compatible query models
-                DictionaryEntry,
-                BatchOperation,
-            ],
+            document_models=self._get_document_models(),
         )
 
         self._initialized = True
         logger.info("MongoDB connection established with optimized pool settings")
+
+    def _get_document_models(self) -> list[type]:
+        """Return all Beanie document models for init_beanie registration.
+
+        Imports are deferred to avoid loading the entire dependency tree
+        (corpus, search, providers, wordlist) at module import time.
+        """
+        from ..corpus.core import Corpus
+        from ..corpus.language.core import LanguageCorpus
+        from ..corpus.literature.core import LiteratureCorpus
+        from ..providers.batch import BatchOperation
+        from ..providers.dictionary.models import DictionaryProviderEntry
+        from ..providers.language.models import LanguageEntry
+        from ..providers.literature.models import LiteratureEntry
+        from ..search.index import SearchIndex
+        from ..search.semantic.index import SemanticIndex
+        from ..search.trie.index import TrieIndex
+        from ..wordlist.models import WordList, WordListItemDoc
+
+        return [
+            # Core models
+            Word,
+            Definition,
+            Example,
+            Fact,
+            Pronunciation,
+            AudioMedia,
+            ImageMedia,
+            WordRelationship,
+            WordList,
+            WordListItemDoc,
+            # Versioning models - Base class provides collection, subclasses inherit
+            BaseVersionedData,
+            # CRITICAL: All Metadata subclasses must be registered for polymorphic deserialization
+            # BaseVersionedData owns the "versioned_data" collection with is_root=True
+            # All subclasses share this collection and need proper _class_id handling
+            Corpus.Metadata,
+            LanguageCorpus.Metadata,
+            LiteratureCorpus.Metadata,
+            DictionaryProviderEntry.Metadata,
+            LanguageEntry.Metadata,
+            LiteratureEntry.Metadata,
+            SearchIndex.Metadata,
+            TrieIndex.Metadata,
+            SemanticIndex.Metadata,
+            # User models
+            User,
+            UserHistory,
+            # Backward-compatible query models
+            DictionaryEntry,
+            BatchOperation,
+        ]
 
     async def ensure_healthy_connection(self, max_retries: int = 3) -> bool:
         """Ensure MongoDB connection is healthy and reconnect if needed.

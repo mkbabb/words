@@ -14,14 +14,11 @@ Design Principles:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from .base import Language
-
-if TYPE_CHECKING:
-    pass
 
 T = TypeVar("T")
 
