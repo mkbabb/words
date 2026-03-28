@@ -1,11 +1,9 @@
 """Wholesale download connectors for bulk data."""
 
-from .wiktionary_wholesale import (
-    WiktionaryTitleListDownloader,
-    WiktionaryWholesaleConnector,
-)
+from .batch import ImportMode
+from .connector import WiktionaryWholesaleConnector
 
 __all__ = [
-    "WiktionaryTitleListDownloader",
+    "ImportMode",
     "WiktionaryWholesaleConnector",
 ]

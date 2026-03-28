@@ -507,49 +507,59 @@ def scrape_apple_dictionary(
     help="Language to download",
 )
 @click.option(
-    "--download-all",
-    is_flag=True,
-    help="Download complete Wiktionary dump instead of vocabulary-based scraping",
+    "--data-dir",
+    type=click.Path(),
+    default="/tmp/floridify/wiktionary_wholesale",
+    help="Directory for dump files",
 )
-def scrape_wiktionary_wholesale(language: str, download_all: bool):
-    """Download and process complete Wiktionary dumps."""
+@click.option(
+    "--download/--no-download",
+    default=True,
+    help="Download dump before importing",
+)
+@click.option(
+    "--limit",
+    type=int,
+    default=0,
+    help="Max entries to import (0 = unlimited)",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["insert", "update", "hydrate"]),
+    default="insert",
+    help="insert=skip existing, update=replace all (versioned), hydrate=fill gaps only",
+)
+def scrape_wiktionary_wholesale(
+    language: str,
+    data_dir: str,
+    download: bool,
+    limit: int,
+    mode: str,
+):
+    """Download and import complete Wiktionary dumps."""
+    from ...providers.dictionary.wholesale import ImportMode, WiktionaryWholesaleConnector
 
     async def _run():
         language_enum = Language(language)
+        import_mode = ImportMode(mode)
+        connector = WiktionaryWholesaleConnector(language=language_enum)
 
-        if download_all:
+        if download:
             console.print(
-                f"\\n[bold green]Starting Wiktionary wholesale download for {language_enum.value.title()}[/bold green]",
+                f"\n[bold green]Downloading Wiktionary dump for {language_enum.value.title()}[/bold green]",
             )
-            console.print(
-                "[yellow]This will download the complete Wiktionary dump (several GB)[/yellow]",
-            )
-
-            if not click.confirm("Continue with wholesale download?"):
+            success = await connector.download_bulk_data(data_dir)
+            if not success:
+                console.print("[red]Download failed[/red]")
                 return
 
-            progress = await scrape_wiktionary_wholesale(
-                language=language_enum,
-                download_all=True,
-            )
-
-            console.print("\\n[bold green]✅ Wiktionary wholesale download completed![/bold green]")
-            console.print(f"[green]Processed: {progress.processed_words:,} entries[/green]")
-        else:
-            console.print(
-                f"\\n[bold green]Starting Wiktionary vocabulary-based scraping for {language_enum.value.title()}[/bold green]",
-            )
-
-            await run_scraping_session(
-                DictionaryProvider.WIKTIONARY,
-                language,
-                50,
-                3,
-                None,
-                None,
-                False,
-                True,
-            )
+        console.print(f"\n[bold green]Importing from {data_dir} (mode={mode})...[/bold green]")
+        count = await connector.import_bulk_data(
+            data_path=data_dir,
+            limit=limit,
+            mode=import_mode,
+        )
+        console.print(f"\n[bold green]✅ Import complete: {count:,} entries[/bold green]")
 
     asyncio.run(_run())
 
