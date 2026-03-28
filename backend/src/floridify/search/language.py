@@ -8,11 +8,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from floridify.storage.mongodb import get_storage
-
 from ..caching.models import VersionConfig
 from ..corpus.language.core import LanguageCorpus
 from ..models.base import Language
+from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .constants import SearchMode
 from .engine import Search

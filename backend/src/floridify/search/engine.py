@@ -14,6 +14,7 @@ from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
 from ..utils.logging import get_logger
+from .cache import get_cached_search, put_cached_search
 from .config import (
     HIGH_QUALITY_FUZZY_SCORE,
     LEXICAL_GATE_SCORE_MARGIN,
@@ -32,10 +33,14 @@ from .fuzzy.search import FuzzySearch  # Multi-strategy fuzzy pipeline
 from .fuzzy.suffix_array import SuffixArray
 from .index import SearchIndex
 from .phonetic.index import PhoneticIndex
-from .result import MatchDetail, SearchResult
+from .result import SearchResult
+from .scoring import (
+    deduplicate_results,
+    deduplicate_results_multi,
+    sort_key,
+)
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .semantic.search import SemanticSearch
-from .cache import get_cached_search, put_cached_search
 from .trie.search import TrieSearch
 
 logger = get_logger(__name__)
@@ -46,25 +51,6 @@ class Search:
 
     Optimized for 100k-1M word searches with minimal overhead.
     """
-
-    # Method priority for deduplication (higher = preferred when same word appears)
-    METHOD_PRIORITY = {
-        SearchMethod.EXACT: 5,
-        SearchMethod.PREFIX: 4,
-        SearchMethod.SUBSTRING: 3,
-        SearchMethod.SEMANTIC: 2,
-        SearchMethod.FUZZY: 1,
-    }
-
-    # Small bonus added to score for sorting — tiebreaker only, never overrides score.
-    # A fuzzy match at 0.95 still beats a semantic match at 0.80.
-    METHOD_SORT_BONUS = {
-        SearchMethod.EXACT: 0.03,
-        SearchMethod.PREFIX: 0.02,
-        SearchMethod.SUBSTRING: 0.015,
-        SearchMethod.SEMANTIC: 0.01,
-        SearchMethod.FUZZY: 0.0,
-    }
 
     def __init__(
         self,
@@ -615,7 +601,9 @@ class Search:
             elif method == SearchMethod.SUBSTRING:
                 return self.search_substring(normalized_query, max_results)
             elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
-                results = self.fuzzy_search.search(normalized_query, self.corpus, suffix_array=self.suffix_array)
+                results = self.fuzzy_search.search(
+                    normalized_query, self.corpus, suffix_array=self.suffix_array
+                )
                 if min_score is not None:
                     results = [r for r in results if r.score >= min_score]
                 # Restore diacritics
@@ -929,7 +917,12 @@ class Search:
             # unrelated words can score 0.80+ simply because there aren't enough
             # neighbours to push them down.  Raise the floor to compensate.
             if self.corpus and len(self.corpus.vocabulary) < SEMANTIC_SMALL_CORPUS_SIZE:
-                strict_floor = max(strict_floor, SEMANTIC_SMALL_CORPUS_WORD_FLOOR if " " not in normalized_query else SEMANTIC_SMALL_CORPUS_PHRASE_FLOOR)
+                strict_floor = max(
+                    strict_floor,
+                    SEMANTIC_SMALL_CORPUS_WORD_FLOOR
+                    if " " not in normalized_query
+                    else SEMANTIC_SMALL_CORPUS_PHRASE_FLOOR,
+                )
             effective_min_score = max(min_score, strict_floor)
             results = await self.semantic_search.search(
                 normalized_query,
@@ -951,7 +944,10 @@ class Search:
 
                 lexical_similarity = SequenceMatcher(None, normalized_query, candidate).ratio()
                 # For small corpora, require higher lexical overlap
-                if lexical_similarity < LEXICAL_SANITY_THRESHOLD and result.score < effective_min_score + LEXICAL_GATE_SCORE_MARGIN:
+                if (
+                    lexical_similarity < LEXICAL_SANITY_THRESHOLD
+                    and result.score < effective_min_score + LEXICAL_GATE_SCORE_MARGIN
+                ):
                     continue
                 filtered_results.append(result)
 
@@ -1056,11 +1052,11 @@ class Search:
                 f"Early exit: {len(exact_results)} exact + {len(prefix_results)} prefix matches"
             )
             all_results = list(itertools.chain(exact_results, prefix_results))
-            dedup = self._deduplicate_results_multi if collect_all_matches else self._deduplicate_results
+            dedup = deduplicate_results_multi if collect_all_matches else deduplicate_results
             unique_results = dedup(all_results)
             return sorted(
                 unique_results,
-                key=lambda r: r.score + self.METHOD_SORT_BONUS.get(r.method, 0.0),
+                key=sort_key,
                 reverse=True,
             )[:max_results]
 
@@ -1077,7 +1073,9 @@ class Search:
         # When there are NO text-based results, require a much higher semantic
         # score to avoid garbage (e.g., "exampl" → "table" at 73%).
         semantic_results = []
-        has_text_results = bool(exact_results or prefix_results or substring_results or fuzzy_results)
+        has_text_results = bool(
+            exact_results or prefix_results or substring_results or fuzzy_results
+        )
         if semantic and self._semantic_ready and self.semantic_search:
             high_quality = [r for r in fuzzy_results if r.score >= HIGH_QUALITY_FUZZY_SCORE]
             semantic_limit = max(
@@ -1092,17 +1090,19 @@ class Search:
         semantic_gen = (r for r in semantic_results if r.score >= min_score)
 
         # Chain all results without creating intermediate lists
-        all_results = list(itertools.chain(
-            exact_results, prefix_results, substring_results, fuzzy_gen, semantic_gen
-        ))
+        all_results = list(
+            itertools.chain(
+                exact_results, prefix_results, substring_results, fuzzy_gen, semantic_gen
+            )
+        )
 
         # Deduplicate and sort
-        dedup = self._deduplicate_results_multi if collect_all_matches else self._deduplicate_results
+        dedup = deduplicate_results_multi if collect_all_matches else deduplicate_results
         unique_results = dedup(all_results)
 
         return sorted(
             unique_results,
-            key=lambda r: r.score + self.METHOD_SORT_BONUS.get(r.method, 0.0),
+            key=sort_key,
             reverse=True,
         )[:max_results]
 
@@ -1132,68 +1132,6 @@ class Search:
                 return original
 
         return normalized_word
-
-    def _deduplicate_results(self, results: list[SearchResult]) -> list[SearchResult]:
-        """Remove duplicates, preferring exact matches. Case-insensitive dedup keys."""
-        word_to_result: dict[str, SearchResult] = {}
-
-        for result in results:
-            key = result.word.lower()
-            if key not in word_to_result:
-                word_to_result[key] = result
-            else:
-                existing = word_to_result[key]
-                # Prefer higher priority methods, then higher scores
-                result_priority = self.METHOD_PRIORITY.get(result.method, 0)
-                existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
-
-                if (result_priority > existing_priority) or (
-                    result_priority == existing_priority and result.score > existing.score
-                ):
-                    word_to_result[key] = result
-
-        return list(word_to_result.values())
-
-    def _deduplicate_results_multi(self, results: list[SearchResult]) -> list[SearchResult]:
-        """Deduplicate results, collecting all (method, score) pairs per word.
-
-        Keeps the highest-priority method as primary but stores all matches.
-        """
-        word_to_result: dict[str, SearchResult] = {}
-        word_to_matches: dict[str, dict[SearchMethod, float]] = {}
-
-        for result in results:
-            key = result.word.lower()
-
-            # Collect match detail (keep best score per method)
-            if key not in word_to_matches:
-                word_to_matches[key] = {}
-            method_scores = word_to_matches[key]
-            if result.method not in method_scores or result.score > method_scores[result.method]:
-                method_scores[result.method] = result.score
-
-            # Track best primary result (same logic as _deduplicate_results)
-            if key not in word_to_result:
-                word_to_result[key] = result
-            else:
-                existing = word_to_result[key]
-                result_priority = self.METHOD_PRIORITY.get(result.method, 0)
-                existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
-                if (result_priority > existing_priority) or (
-                    result_priority == existing_priority and result.score > existing.score
-                ):
-                    word_to_result[key] = result
-
-        # Attach collected matches to each result
-        for key, result in word_to_result.items():
-            method_scores = word_to_matches[key]
-            result.matches = sorted(
-                [MatchDetail(method=m, score=s) for m, s in method_scores.items()],
-                key=lambda md: (self.METHOD_PRIORITY.get(md.method, 0), md.score),
-                reverse=True,
-            )
-
-        return list(word_to_result.values())
 
     def get_stats(self) -> dict[str, Any]:
         """Get search engine statistics."""

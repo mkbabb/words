@@ -54,10 +54,10 @@ PHONETIC_BUDGET_CAP = 200
 
 # ─── BK-Tree Configuration ───────────────────────────────────────
 
-BKTREE_MAX_CORPUS_SIZE = 100_000  # Skip BK-tree above this (too slow)
-BKTREE_TIME_BUDGET_SMALL = 20.0  # ms, corpora < 10K words
-BKTREE_TIME_BUDGET_MEDIUM = 10.0  # ms, corpora 10K-50K
-BKTREE_TIME_BUDGET_LARGE = 5.0  # ms, corpora > 50K
+BKTREE_MAX_CORPUS_SIZE = 500_000  # Skip BK-tree above this (time-budgeted)
+BKTREE_TIME_BUDGET_SMALL = 20.0  # ms, corpora < 5K words
+BKTREE_TIME_BUDGET_MEDIUM = 15.0  # ms, corpora 5K-50K
+BKTREE_TIME_BUDGET_LARGE = 10.0  # ms, corpora > 50K
 BKTREE_CASCADE_MIN_CANDIDATES = 10
 BKTREE_MAX_RESULTS_CAP = 2000
 
