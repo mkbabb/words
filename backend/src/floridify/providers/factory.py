@@ -7,8 +7,10 @@ from ..utils.config import Config
 from .dictionary.api.free_dictionary import FreeDictionaryConnector
 from .dictionary.api.merriam_webster import MerriamWebsterConnector
 from .dictionary.api.oxford import OxfordConnector
+from .dictionary.api.wikipedia_provider import WikipediaConnector
 from .dictionary.core import DictionaryConnector
 from .dictionary.local.apple_dictionary import AppleDictionaryConnector
+from .dictionary.local.wordnet_provider import WordNetConnector
 from .dictionary.scraper.wiktionary import WiktionaryConnector
 from .dictionary.scraper.wordhippo import WordHippoConnector
 
@@ -60,6 +62,12 @@ def create_connector(
 
     elif provider == DictionaryProvider.FREE_DICTIONARY:
         return FreeDictionaryConnector()
+
+    elif provider == DictionaryProvider.WORDNET:
+        return WordNetConnector()
+
+    elif provider == DictionaryProvider.WIKIPEDIA:
+        return WikipediaConnector()
 
     else:
         raise ValueError(f"Unsupported provider: {provider.value}")
