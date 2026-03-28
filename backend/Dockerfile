@@ -100,8 +100,9 @@ RUN mkdir -p /app/logs /app/cache /app/data && chown -R appuser:appuser /app/log
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 
-# Download NLTK data required by text.constants (must be before USER appuser)
-RUN python -c "import nltk; nltk.download('stopwords', quiet=True)"
+# Download NLTK data to a shared location accessible by appuser
+ENV NLTK_DATA=/usr/share/nltk_data
+RUN python -c "import nltk; nltk.download('stopwords', quiet=True, download_dir='/usr/share/nltk_data')"
 
 # Switch to non-root user
 USER appuser
