@@ -77,6 +77,9 @@ ENV PYTHONPATH="/app/src"
 RUN --mount=type=cache,target=/opt/uv-cache \
     uv sync --frozen
 
+# Download NLTK data required by text.constants
+RUN python -c "import nltk; nltk.download('stopwords', quiet=True)"
+
 CMD ["uvicorn", "floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # Production stage

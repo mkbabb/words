@@ -20,6 +20,8 @@ dependencies = [
     "rich>=13.0.0",
     # Modern optimized string matching (Rust-backed)
     "rapidfuzz>=3.0.0",
+    # Corpus-derived word frequency data (40+ languages)
+    "wordfreq>=3.0.0",
     # Modern NLP libraries
     "contractions>=0.1.73",
     # Optimized data structures

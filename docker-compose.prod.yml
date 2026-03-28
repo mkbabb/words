@@ -17,10 +17,24 @@ services:
           memory: 8G
         reservations:
           memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   frontend:
     build:
       target: production
     image: floridify-frontend:latest
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   notification-server:
     build:

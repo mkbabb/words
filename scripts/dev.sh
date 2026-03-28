@@ -134,6 +134,17 @@ prepare_env() {
     export API_URL="${API_URL:-http://backend:8000}"
 }
 
+# ─── Sync glass-ui into frontend build context ───────────────────
+# Temporary: until @mkbabb/glass-ui is published to npm, copy it
+# into frontend/ so Docker can access it during build.
+GLASS_UI_SRC="$ROOT_DIR/../glass-ui"
+GLASS_UI_DST="$ROOT_DIR/frontend/glass-ui"
+if [ -d "$GLASS_UI_SRC" ]; then
+    rsync -a --delete \
+        --exclude node_modules --exclude dist --exclude .git \
+        "$GLASS_UI_SRC/" "$GLASS_UI_DST/"
+fi
+
 # ─── Commands ────────────────────────────────────────────────────────
 
 case "${1:-}" in

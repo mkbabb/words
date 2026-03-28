@@ -35,7 +35,7 @@ DOMAIN="${DOMAIN:-mbabb.friday.institute}"
 REMOTE_DIR="${REMOTE_DIR:-~/floridify}"
 REPO_URL="${REPO_URL:-https://github.com/mkbabb/words.git}"
 
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+SSH_OPTS="-o ConnectTimeout=10"
 SSH_CMD="ssh $SSH_OPTS -p $DEPLOY_PORT"
 SCP_CMD="scp $SSH_OPTS -P $DEPLOY_PORT"
 
