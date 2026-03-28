@@ -12,7 +12,7 @@
             lineHeight: 'var(--search-line-height, 1.4)',
         }"
         :class="[
-            'search-input-field relative z-10 block w-full bg-transparent text-lg outline-none transition-[height,color,transform] duration-300 ease-out',
+            'search-input-field relative z-content block w-full bg-transparent text-lg outline-none transition-[height,color,transform] duration-300 ease-out',
             'resize-none whitespace-pre-wrap break-words overflow-hidden align-top placeholder:truncate placeholder:text-muted-foreground',
             'focus:ring-0',
             {

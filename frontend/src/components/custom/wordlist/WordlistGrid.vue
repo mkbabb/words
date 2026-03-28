@@ -14,7 +14,7 @@
       :border-shimmer="false"
     >
       <!-- Three-dot menu (lazy) -->
-      <div class="absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      <div class="absolute right-3 top-3 z-content opacity-0 transition-opacity duration-200 group-hover:opacity-100"
            @mouseenter="activeMenu = wl.id">
         <DropdownMenu v-if="activeMenu === wl.id">
           <DropdownMenuTrigger as-child>
@@ -63,16 +63,16 @@
 
       <!-- Content -->
       <div class="relative">
-        <h3 class="font-serif font-semibold leading-snug truncate">{{ wl.name }}</h3>
+        <h3 class="text-heading font-serif font-semibold leading-snug truncate">{{ wl.name }}</h3>
 
         <p
           v-if="wl.description"
-          class="mt-1 line-clamp-2 text-xs text-muted-foreground/80 leading-relaxed"
+          class="mt-1 line-clamp-2 text-small text-muted-foreground/80 leading-relaxed"
         >
           {{ wl.description }}
         </p>
 
-        <div class="mt-3 flex items-center gap-2.5 text-micro text-muted-foreground/60">
+        <div class="mt-3 flex items-center gap-2.5 text-caption text-muted-foreground/60">
           <span class="flex items-center gap-1">
             <span class="tabular-nums font-medium text-foreground/70">{{ formatCount(wl.unique_words ?? wl.total_words ?? 0) }}</span>
             words
@@ -104,8 +104,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { ChevronRight, MoreVertical, Pencil, Tag, Trash2 } from 'lucide-vue-next';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Button } from '@mkbabb/glass-ui';
 import { ThemedCard } from '@/components/custom/card';
 import MasteryBar from './MasteryBar.vue';
 import type { WordList } from '@/types';

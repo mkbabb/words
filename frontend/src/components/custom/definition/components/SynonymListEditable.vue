@@ -5,7 +5,7 @@
     >
         <span
             v-for="(synonym, index) in synonyms"
-            :key="index"
+            :key="`${index}-${synonym}`"
             class="group relative cursor-pointer rounded-md border border-border/50 bg-muted/50 px-2 py-1 text-sm text-foreground/80 transition-fast hover:border-border hover:bg-muted hover:text-foreground"
             @click="!editMode && $emit('synonym-click', synonym)"
             @dblclick="editMode && editSynonym(index)"
@@ -58,7 +58,7 @@
     <!-- Edit dialog -->
     <div
         v-if="editingIndex !== null"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        class="fixed inset-0 z-overlay flex items-center justify-center bg-black/50 p-4"
     >
         <div
             class="w-full max-w-sm rounded-lg border border-border bg-background p-4 shadow-lg"

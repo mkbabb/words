@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TypewriterText } from '@/components/custom/typewriter';
+import { TypewriterText } from '@mkbabb/glass-ui';
 
 interface AnimatedTitleProps {
     text: string;

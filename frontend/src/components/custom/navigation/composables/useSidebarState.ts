@@ -3,9 +3,9 @@ import { useStores } from '@/stores';
 import { useDefinitionGroups } from '@/components/custom/definition/composables';
 import { PART_OF_SPEECH_ORDER } from '@/components/custom/definition/constants';
 import { normalizeEtymology } from '@/utils/guards';
-import { useTreeIndex } from './useTreeIndex';
+import { useTreeIndex } from '@mkbabb/glass-ui';
 import type { SidebarCluster } from '../types';
-import type { TreeNode } from './types';
+import type { TreeNode } from '@mkbabb/glass-ui';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
 export function useSidebarState() {

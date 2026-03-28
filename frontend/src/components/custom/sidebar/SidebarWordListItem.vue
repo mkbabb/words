@@ -97,10 +97,8 @@
   <ConfirmDialog
     v-model:open="showDeleteDialog"
     title="Delete Wordlist"
-    :description="`Are you sure you want to delete &quot;${wordlist.name}&quot;?`"
-    message="This action cannot be undone. All words and progress will be permanently deleted."
-    confirm-text="Delete"
-    cancel-text="Cancel"
+    :description="`Are you sure you want to delete &quot;${wordlist.name}&quot;? This action cannot be undone.`"
+    confirm-label="Delete"
     :destructive="true"
     @confirm="handleConfirmDelete"
   />
@@ -115,15 +113,7 @@ import {
   MoreVertical,
   Trash2,
 } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import ConfirmDialog from '../ConfirmDialog.vue';
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator, ConfirmDialog } from '@mkbabb/glass-ui';
 import type { WordList } from '@/types';
 import { formatRelativeTime } from '@/utils';
 import { formatCount } from '@/components/custom/wordlist/utils/formatting';

@@ -20,7 +20,7 @@
                         :key="item.cluster.clusterId"
                         :ref="(el: any) => measureSection(item.id, el?.$el)"
                         :class="clusterAnimReady ? 'animate-cluster-in' : ''"
-                        :style="clusterAnimReady ? { animationDelay: `${visIdx * 60}ms` } : undefined"
+                        :style="clusterAnimReady ? { animationDelay: `${visIdx * STAGGER}ms` } : undefined"
                         :cluster="item.cluster"
                         :clusterIndex="item.index"
                         :totalClusters="totalClusters"
@@ -143,7 +143,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, provide } from 'vue';
-import { CardContent } from '@/components/ui/card';
+import { EnsureTargetWindowKey } from '../../constants';
+import { CardContent } from '@mkbabb/glass-ui';
 import {
     DefinitionCluster,
     DefinitionItem,
@@ -155,10 +156,12 @@ import SynonymChooserComponent from '../editing/SynonymChooser.vue';
 import PhrasesSection from '../PhrasesSection.vue';
 import {
     useDefinitionGroups,
-    useVirtualSectionWindow,
     flattenDefinitionClusters,
+    type FlatDefinitionCluster,
 } from '../../composables';
+import { useVirtualSectionWindow } from '@mkbabb/glass-ui';
 import { normalizeEtymology } from '@/utils/guards';
+import { STAGGER } from '@/utils/animations';
 import type { CardVariant } from '@/types';
 
 const props = defineProps<{
@@ -215,6 +218,8 @@ const totalClusters = computed(() => groupedDefinitions.value.length);
 // Virtual windowing for definition clusters
 const clusterContainerRef = ref<HTMLElement | null>(null);
 const flatClusters = computed(() => flattenDefinitionClusters(groupedDefinitions.value));
+// Cast to `any` to work around cross-package RefSymbol mismatch between
+// the words frontend's Vue and glass-ui's Vue reactivity packages.
 const {
     visibleItems,
     topSpacerPx,
@@ -222,15 +227,21 @@ const {
     measureSection,
     ensureTargetWindow,
 } = useVirtualSectionWindow({
-    items: flatClusters,
-    scrollContainer: ref(null), // null = use window/document scroll
-    contentEl: clusterContainerRef,
+    items: flatClusters as any,
+    scrollContainer: ref(null) as any,
+    contentEl: clusterContainerRef as any,
     overscanBeforePx: 400,
     overscanAfterPx: 800,
-});
+}) as unknown as {
+    visibleItems: import('vue').ComputedRef<FlatDefinitionCluster[]>;
+    topSpacerPx: import('vue').ComputedRef<number>;
+    bottomSpacerPx: import('vue').ComputedRef<number>;
+    measureSection: (id: string, el: HTMLElement | undefined) => void;
+    ensureTargetWindow: (id: string) => void;
+};
 
 // Provide ensureTargetWindow for sidebar navigation (via provide/inject)
-provide('ensureTargetWindow', ensureTargetWindow);
+provide(EnsureTargetWindowKey, ensureTargetWindow);
 
 // --- Staggered cluster entrance animation (CSS class toggle) ---
 const clusterAnimReady = ref(false);

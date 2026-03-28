@@ -17,7 +17,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Button, type ButtonVariants } from '@/components/ui/button';
+import { Button, type ButtonVariants } from '@mkbabb/glass-ui';
 
 type Variant = 'default' | 'primary' | 'danger' | 'secondary';
 
@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<ActionButtonProps>(), {
 const variantMap = computed<Record<Variant, ButtonVariants['variant']>>(() => {
     return {
         default: 'glass-subtle',
-        primary: 'glass',
+        primary: 'glass-subtle',
         danger: 'danger-subtle',
         secondary: 'outline',
     };

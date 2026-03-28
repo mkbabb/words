@@ -119,12 +119,8 @@
 </template>
 
 <script setup lang="ts">
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
-import { cn } from '@/utils';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { cn } from '@mkbabb/glass-ui';
 import type { GroupedDefinition } from '../../types';
 import type { CardVariant } from '@/types';
 import EditableField from '../editing/EditableField.vue';

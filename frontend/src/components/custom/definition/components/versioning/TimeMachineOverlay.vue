@@ -19,14 +19,14 @@
 
                 <!-- Close button -->
                 <button
-                    class="absolute top-4 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-full glass-light text-foreground/70 transition-colors hover:bg-background/90 hover:text-foreground"
+                    class="absolute top-4 right-4 z-controls flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-foreground/70 transition-colors hover:bg-background/90 hover:text-foreground"
                     @click.stop="emit('close')"
                 >
                     <X :size="16" />
                 </button>
 
                 <!-- Title -->
-                <div class="relative z-10 pt-6 text-center">
+                <div class="relative z-content pt-6 text-center">
                     <p class="text-micro font-medium tracking-widest text-muted-foreground/50 uppercase">
                         Version History
                     </p>
@@ -41,7 +41,7 @@
                 <!-- Main content area -->
                 <div
                     ref="contentRef"
-                    class="relative z-10 flex flex-1 items-center justify-center gap-4 overflow-hidden px-4"
+                    class="relative z-content flex flex-1 items-center justify-center gap-4 overflow-hidden px-4"
                     @click.stop
                 >
                     <Transition name="view-switch" mode="out-in">
@@ -73,7 +73,7 @@
                         >
                             <!-- Left arrow (older) -->
                             <button
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-light text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-subtle text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                 :disabled="isOldest"
                                 @click="$emit('navigatePrev')"
                             >
@@ -97,7 +97,7 @@
 
                             <!-- Right arrow (newer) -->
                             <button
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-light text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-subtle text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                 :disabled="isNewest"
                                 @click="$emit('navigateNext')"
                             >
@@ -112,7 +112,7 @@
                     <div
                         v-if="!expandedView"
                         ref="timelineRef"
-                        class="relative z-10"
+                        class="relative z-content"
                         @click.stop
                     >
                         <!-- Loading state -->

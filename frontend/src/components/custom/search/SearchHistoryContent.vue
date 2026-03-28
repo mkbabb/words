@@ -101,7 +101,8 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
-import { formatDate, cn } from '@/utils';
+import { formatDate } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import { History } from 'lucide-vue-next';
 import SearchHistoryItem from './SearchHistoryItem.vue';
 

@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { Shield, Sparkles } from 'lucide-vue-next';
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import type { UserRole } from '@/types/api';
 
 interface Props {

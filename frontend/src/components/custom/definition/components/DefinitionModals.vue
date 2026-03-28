@@ -1,24 +1,24 @@
 <template>
     <!-- Time Machine Version History Overlay -->
     <TimeMachineOverlay
-        :is-open="timeMachineState.isOpen"
+        :is-open="tmIsOpen"
         :word="word"
         :current-version="currentVersion"
-        :versions="timeMachineState.versions"
-        :selected-index="timeMachineState.selectedIndex"
-        :selected-version="timeMachineState.selectedVersion"
-        :version-detail="timeMachineState.versionDetail"
-        :version-diff="timeMachineState.versionDiff"
-        :diff-fields="timeMachineState.diffFields"
-        :text-changes="timeMachineState.textChanges"
-        :hydrated-entry="timeMachineState.hydratedEntry"
-        :navigation-direction="timeMachineState.navigationDirection"
-        :loading="timeMachineState.loading"
-        :detail-loading="timeMachineState.detailLoading"
-        :rolling-back="timeMachineState.rollingBack"
-        :is-newest="timeMachineState.isNewest"
-        :is-oldest="timeMachineState.isOldest"
-        :expanded-view="timeMachineState.expandedView"
+        :versions="tmVersions"
+        :selected-index="tmSelectedIndex"
+        :selected-version="tmSelectedVersion"
+        :version-detail="tmVersionDetail"
+        :version-diff="tmVersionDiff"
+        :diff-fields="tmDiffFields"
+        :text-changes="tmTextChanges"
+        :hydrated-entry="tmHydratedEntry"
+        :navigation-direction="tmNavigationDirection"
+        :loading="tmLoading"
+        :detail-loading="tmDetailLoading"
+        :rolling-back="tmRollingBack"
+        :is-newest="tmIsNewest"
+        :is-oldest="tmIsOldest"
+        :expanded-view="tmExpandedView"
         @close="$emit('time-machine-close')"
         @select-version="$emit('time-machine-select-version', $event)"
         @navigate-next="$emit('time-machine-navigate-next')"
@@ -29,10 +29,10 @@
 
     <!-- Inline Word Lookup Popover -->
     <WordLookupPopover
-        :selected-word="inlineLookupState.selectedWord"
-        :is-pill-visible="inlineLookupState.isPillVisible"
-        :is-popover-visible="inlineLookupState.isPopoverVisible"
-        :position="inlineLookupState.position"
+        :selected-word="ilSelectedWord"
+        :is-pill-visible="ilIsPillVisible"
+        :is-popover-visible="ilIsPopoverVisible"
+        :position="ilPosition"
         @show-popover="$emit('inline-show-popover')"
         @dismiss="$emit('inline-dismiss')"
         @lookup="$emit('inline-lookup', $event)"
@@ -51,34 +51,36 @@
 import TimeMachineOverlay from './versioning/TimeMachineOverlay.vue';
 import WordLookupPopover from './WordLookupPopover.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
+import type { VersionSummary, VersionDetailResponse } from '@/types/api';
+import type { SynthesizedDictionaryEntry } from '@/types';
+import type { VersionDiff, TextChange } from '../composables/useTimeMachine';
 
 defineProps<{
     word?: string;
     currentVersion?: string;
-    timeMachineState: {
-        isOpen: boolean;
-        versions: any;
-        selectedIndex: number;
-        selectedVersion: any;
-        versionDetail: any;
-        versionDiff: any;
-        diffFields: any;
-        textChanges: any;
-        hydratedEntry: any;
-        navigationDirection: any;
-        loading: boolean;
-        detailLoading: boolean;
-        rollingBack: boolean;
-        isNewest: boolean;
-        isOldest: boolean;
-        expandedView: boolean;
-    };
-    inlineLookupState: {
-        selectedWord: string;
-        isPillVisible: boolean;
-        isPopoverVisible: boolean;
-        position: any;
-    };
+    // Time Machine props (individual, not bundled)
+    tmIsOpen: boolean;
+    tmVersions: VersionSummary[];
+    tmSelectedIndex: number;
+    tmSelectedVersion: VersionSummary | null;
+    tmVersionDetail: VersionDetailResponse | null;
+    tmVersionDiff: VersionDiff | null;
+    tmDiffFields: Set<string>;
+    tmTextChanges: Map<string, TextChange[]>;
+    tmHydratedEntry: SynthesizedDictionaryEntry | null;
+    tmNavigationDirection: 'forward' | 'backward';
+    tmLoading: boolean;
+    tmDetailLoading: boolean;
+    tmRollingBack: boolean;
+    tmIsNewest: boolean;
+    tmIsOldest: boolean;
+    tmExpandedView: boolean;
+    // Inline lookup props (individual, not bundled)
+    ilSelectedWord: string;
+    ilIsPillVisible: boolean;
+    ilIsPopoverVisible: boolean;
+    ilPosition: { x: number; y: number };
+    // Wordlist
     wordToAdd: string;
 }>();
 

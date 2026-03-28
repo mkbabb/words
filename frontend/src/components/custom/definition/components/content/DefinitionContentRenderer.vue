@@ -120,7 +120,7 @@
 
 <script setup lang="ts">
 import { computed, h, type FunctionalComponent } from 'vue';
-import { CardContent } from '@/components/ui/card';
+import { CardContent } from '@mkbabb/glass-ui';
 import {
     WordHeader,
     DefinitionCluster,

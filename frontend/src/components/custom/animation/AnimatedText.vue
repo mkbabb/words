@@ -1,7 +1,7 @@
 <template>
     <div class="relative text-center" :class="{ 'flex justify-center': forceSingleLine }">
         <h1
-            class="depth-text relative z-10 select-none"
+            class="depth-text relative z-content select-none"
             :class="[
                 'font-fraunces', 
                 textClass, 
@@ -12,7 +12,7 @@
                 }
             ]"
         >
-            <template v-for="(char, index) in currentText" :key="index">
+            <template v-for="(char, index) in currentText" :key="`${index}-${char}`">
                 <span
                     v-if="char !== '\n'"
                     :class="[
@@ -154,7 +154,7 @@ const duration = computed(
 }
 
 .font-fraunces {
-    font-family: theme('fontFamily.serif');
+    font-family: var(--font-serif);
     font-variation-settings: 'wght' 900;
 }
 </style>

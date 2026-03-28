@@ -122,7 +122,7 @@
 <script setup lang="ts">
 import { Info } from 'lucide-vue-next';
 import { SearchMethod } from '@/types/api';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui';
 import { formatCount } from '@/components/custom/wordlist/utils/formatting';
 
 interface UnifiedResult {

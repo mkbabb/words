@@ -64,5 +64,5 @@
 </template>
 
 <script setup lang="ts">
-import { Card, CardHeader, CardContent, Skeleton } from '@/components/ui';
+import { Card, CardHeader, CardContent, Skeleton } from '@mkbabb/glass-ui';
 </script>

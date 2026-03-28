@@ -20,7 +20,7 @@
 
           <!-- Word title — clickable for lookup -->
           <button
-            class="text-title sm:text-display text-left
+            class="text-heading sm:text-title text-left
                    decoration-primary/40 underline-offset-[6px] decoration-1
                    hover:underline cursor-pointer
                    outline-none transition-fast"
@@ -153,8 +153,8 @@ import {
   DialogContent,
   DialogClose,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+  Button,
+} from '@mkbabb/glass-ui';
 import { wordlistApi } from '@/api';
 import type { WordListItem } from '@/types';
 import { formatRelativeTime } from '@/utils';
@@ -238,7 +238,7 @@ async function handleRemove() {
   gap: 0.25rem;
   border-radius: 9999px;
   padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--type-caption);
   font-weight: 500;
 }
 

@@ -4,7 +4,7 @@
     <aside
       data-sidebar
       :class="cn(
-        'bg-background/95 backdrop-blur-xl border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-clip rounded-r-2xl border-r shadow-lg transform-gpu lg:flex',
+        'bg-background/95 backdrop-blur-xl border-border fixed top-0 left-0 z-overlay hidden h-full flex-col overflow-clip rounded-r-2xl border-r shadow-lg transform-gpu lg:flex',
         sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar-expanded'
       )"
     >
@@ -14,7 +14,7 @@
     </aside>
 
     <!-- Mobile Sidebar Modal -->
-    <div class="pointer-events-none fixed inset-0 z-60 lg:hidden">
+    <div class="pointer-events-none fixed inset-0 z-hovercard lg:hidden">
       <!-- Overlay -->
       <Transition
         enter-active-class="transition-opacity duration-400 ease-apple-smooth"
@@ -35,7 +35,7 @@
       <div
         data-sidebar
         :class="cn(
-          'border-border pointer-events-auto fixed top-0 left-0 z-sidebar-mobile flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-light transform-gpu transition-[transform,opacity,box-shadow] duration-500 ease-apple-smooth will-change-[transform,opacity,box-shadow]',
+          'border-border pointer-events-auto fixed top-0 left-0 z-modal flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-subtle transform-gpu transition-[transform,opacity,box-shadow] duration-500 ease-apple-smooth will-change-[transform,opacity,box-shadow]',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
         @touchstart.passive="onTouchStart"
@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useUIStore } from '@/stores/ui/ui-state';
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import SidebarHeader from './sidebar/SidebarHeader.vue';
 import SidebarContent from './sidebar/SidebarContent.vue';
 import SidebarFooter from './sidebar/SidebarFooter.vue';

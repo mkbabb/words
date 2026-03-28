@@ -36,7 +36,7 @@
             </div>
 
             <!-- Word -->
-            <p class="text-title text-center py-6">
+            <p class="text-heading text-center py-6">
               {{ currentWord.word }}
             </p>
 
@@ -65,7 +65,7 @@
           </div>
 
           <!-- Back: Definition (post-reveal) -->
-          <div v-else key="back" class="p-5 max-h-[55vh] overflow-y-auto scrollbar-thin">
+          <div v-else key="back" class="p-5 max-h-[55dvh] overflow-y-auto scrollbar-thin">
             <!-- Word (compact, top-aligned) -->
             <div class="flex items-center justify-between gap-2 mb-1">
               <p class="text-lg font-serif font-bold">
@@ -118,8 +118,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button, Badge } from '@mkbabb/glass-ui';
 import { ThemedCard } from '@/components/custom/card';
 import type { DueWordItem, SM2Quality } from '@/types/wordlist';
 import type { SynthesizedDictionaryEntry } from '@/types';

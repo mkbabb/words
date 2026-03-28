@@ -3,10 +3,10 @@
     <Transition name="pwa-prompt">
       <div
         v-if="showPrompt && !isMinimized"
-        class="fixed bottom-6 left-6 right-6 z-50 max-w-md mx-auto"
+        class="fixed bottom-6 left-6 right-6 z-toast max-w-md mx-auto"
       >
         <div
-          class="shadow-cartoon-md rounded-2xl glass-heavy
+          class="shadow-cartoon-md rounded-2xl glass-elevated
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >
@@ -34,16 +34,16 @@
             </div>
             
             <div class="space-y-3 text-sm">
-              <div 
-                v-for="(step, index) in iosSteps" 
-                :key="index"
+              <div
+                v-for="(step, index) in iosSteps"
+                :key="step"
                 class="flex items-center gap-3 group"
               >
                 <div
                   class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20
                          flex items-center justify-center text-xs font-semibold
                          group-hover:scale-110 group-hover:bg-primary/30 transition-fast"
-                  :style="{ transitionDelay: `${index * 150}ms` }"
+                  :style="{ transitionDelay: `${index * STAGGER_SLOW}ms` }"
                 >
                   {{ index + 1 }}
                 </div>
@@ -136,7 +136,7 @@
       <button
         v-if="showPrompt && isMinimized"
         @click="restore"
-        class="fixed bottom-6 right-6 z-50 p-3 rounded-full
+        class="fixed bottom-6 right-6 z-toast p-3 rounded-full
                bg-primary text-primary-foreground shadow-cartoon-sm
                hover-lift hover:scale-110 transition-smooth active-scale"
         title="Show install prompt"
@@ -150,6 +150,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Share2, Download, Minus, CheckCircle2 } from 'lucide-vue-next';
+import { STAGGER_SLOW } from '@/utils/animations';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStores } from '@/stores';
 

@@ -7,7 +7,7 @@
     >
         <div
             v-if="show"
-            class="pointer-events-none absolute right-2 -bottom-2 left-2 z-50"
+            class="pointer-events-none absolute -bottom-2 left-0 right-0 z-overlay overflow-x-clip"
         >
             <div
                 class="pointer-events-auto cursor-pointer"

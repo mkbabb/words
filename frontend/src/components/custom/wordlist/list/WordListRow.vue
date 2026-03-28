@@ -128,7 +128,7 @@ function formatIntervalShort(interval: number): string {
     align-items: center;
     border-radius: 9999px;
     padding: 1px 6px;
-    font-size: 10px;
+    font-size: var(--type-micro);
     font-weight: 500;
     line-height: 1.4;
 }

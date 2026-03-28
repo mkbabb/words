@@ -122,7 +122,7 @@
                 <!-- Info button — top-left of first provider icon -->
                 <PopoverTrigger as-child>
                     <button
-                    class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-sm transition-[background-color,color,opacity,transform] duration-200 ease-apple-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground hover:scale-105 z-20"
+                    class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-sm transition-[background-color,color,opacity,transform] duration-200 ease-apple-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground hover:scale-105 z-controls"
                     >
                         <Info :size="14" />
                     </button>
@@ -163,7 +163,7 @@
             align="end"
             :side-offset="12"
             :collision-padding="16"
-            class="z-50 w-64 rounded-xl border border-border/40 bg-popover p-1.5 shadow-xl backdrop-blur-xl"
+            class="z-popover w-64 rounded-xl border border-border/40 bg-popover p-1.5 shadow-xl backdrop-blur-xl"
         >
             <ProviderMetadataCard
                 v-for="src in sortedDropdownEntries"
@@ -185,18 +185,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Wand2, Info } from 'lucide-vue-next';
-import {
-    Popover,
-    PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverTrigger, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import {
     PopoverContent as InlinePopoverContent,
 } from 'reka-ui';
-import {
-    Tooltip,
-    TooltipTrigger,
-    TooltipContent,
-} from '@/components/ui/tooltip';
 import {
     getProviderIcon,
     getProviderDisplayName,

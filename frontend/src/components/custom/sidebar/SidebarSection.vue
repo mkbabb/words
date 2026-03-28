@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { AccordionItem, AccordionTrigger, AccordionContent } from '@mkbabb/glass-ui';
 import type { Component } from 'vue';
 
 interface Props {

@@ -1,6 +1,6 @@
 <template>
     <!-- Loading skeleton -->
-    <Card v-if="isLoading && items.length === 0" class="overflow-hidden p-0">
+    <Card v-if="isLoading && items.length === 0" class="shadow-cartoon-sm overflow-hidden rounded-2xl border p-0">
         <div v-for="i in 10" :key="i" :class="['flex items-center gap-4 px-4 py-3', i > 1 && 'border-t border-border/15']">
             <div class="flex-1 space-y-1.5">
                 <div class="h-4 w-32 rounded bg-muted animate-pulse" />
@@ -11,7 +11,7 @@
     </Card>
 
     <!-- Word list inside a Card -->
-    <Card v-else class="overflow-hidden p-0">
+    <Card v-else class="shadow-cartoon-sm overflow-hidden rounded-2xl border p-0">
         <div :style="{ height: `${totalSize}px`, position: 'relative', width: '100%' }">
             <div
                 v-for="vItem in virtualItems"
@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useWindowVirtualizer } from '@tanstack/vue-virtual';
-import { Card } from '@/components/ui/card';
+import { Card } from '@mkbabb/glass-ui';
 import type { WordListItem } from '@/types';
 import WordListRow from './WordListRow.vue';
 

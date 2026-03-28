@@ -3,14 +3,14 @@
         <!-- Header: inline title + big stats -->
         <div class="flex items-baseline justify-between gap-4">
             <div class="flex items-baseline gap-4">
-                <h2 class="text-title tracking-tight">Your Wordlists</h2>
+                <h2 class="text-heading tracking-tight">Your Wordlists</h2>
                 <span class="text-sm text-muted-foreground/50">
                     {{ filteredWordlists.length }} {{ filteredWordlists.length === 1 ? 'list' : 'lists' }}
                 </span>
             </div>
             <button
                 @click="showCreate = true"
-                class="glass-light inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
+                class="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
                        transition-fast hover:shadow-sm hover:bg-background/90
                        focus-ring"
             >
@@ -68,7 +68,7 @@
         <div
             v-else-if="allWordlists.length === 0"
             class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/40
-                   glass-light px-6 py-16 text-center"
+                   glass-subtle px-6 py-16 text-center"
         >
             <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
                 <BookOpen class="h-7 w-7 text-muted-foreground/50" />
@@ -79,7 +79,7 @@
             </p>
             <button
                 @click="showCreate = true"
-                class="glass-light mt-5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
+                class="glass-subtle mt-5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
                        transition-fast hover:shadow-sm hover:bg-background/90"
             >
                 <Plus class="h-3.5 w-3.5" />
@@ -90,7 +90,7 @@
         <!-- No matching results -->
         <div
             v-else-if="filteredWordlists.length === 0"
-            class="flex flex-col items-center justify-center rounded-2xl glass-light px-6 py-12 text-center"
+            class="flex flex-col items-center justify-center rounded-2xl glass-subtle px-6 py-12 text-center"
         >
             <BookOpen class="mb-3 h-8 w-8 text-muted-foreground/30" />
             <p class="font-serif text-base font-semibold">No matching wordlists</p>
@@ -145,10 +145,8 @@
             v-if="showDeleteDialog"
             v-model:open="showDeleteDialog"
             title="Delete Wordlist"
-            :description="`Are you sure you want to delete &quot;${wordlistToDelete?.name ?? 'this wordlist'}&quot;?`"
-            message="This action cannot be undone. All words and progress will be permanently deleted."
-            confirm-text="Delete"
-            cancel-text="Cancel"
+            :description="`Are you sure you want to delete &quot;${wordlistToDelete?.name ?? 'this wordlist'}&quot;? This action cannot be undone.`"
+            confirm-label="Delete"
             :destructive="true"
             @confirm="confirmDeleteWordlist"
         />
@@ -164,11 +162,10 @@ import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { wordlistApi } from '@/api/wordlists';
 import { Plus, BookOpen, Flame } from 'lucide-vue-next';
-import { useToast } from '@/components/ui/toast/use-toast';
+import { useToast, ConfirmDialog } from '@mkbabb/glass-ui';
 
 import WordlistGrid from '../WordlistGrid.vue';
 const CreateWordListModal = defineAsyncComponent(() => import('../modals/CreateWordListModal.vue'));
-const ConfirmDialog = defineAsyncComponent(() => import('../../ConfirmDialog.vue'));
 import type { WordList } from '@/types';
 import type { WordListSearchItem } from '@/types/wordlist';
 import { formatCount } from '../utils/formatting';

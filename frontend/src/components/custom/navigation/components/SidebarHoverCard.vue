@@ -1,7 +1,7 @@
 <template>
     <HoverCardContent
         :class="cn(
-            'themed-hovercard z-hovercard max-w-[min(384px,90vw)] w-96 glass-heavy bg-background/96 shadow-cartoon-lg',
+            'themed-hovercard z-hovercard max-w-[min(384px,90vw)] w-96 glass-elevated bg-background/96 shadow-cartoon-lg',
             variant !== 'default' ? 'shadow-cartoon-sm' : ''
         )"
         :data-theme="variant || 'default'"
@@ -63,8 +63,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { HoverCardContent } from '@/components/ui';
-import { cn } from '@/utils';
+import { HoverCardContent } from '@mkbabb/glass-ui';
+import { cn } from '@mkbabb/glass-ui';
 import type { SidebarCluster } from '../types';
 
 interface Props {

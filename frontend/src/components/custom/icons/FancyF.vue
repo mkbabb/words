@@ -10,9 +10,9 @@
     @click="handleClick"
     :title="clickable ? getTooltipText() : undefined"
   >
-    <LaTeX
+    <span
       ref="fancyFMain"
-      :expression="'\\mathfrak{F}'"
+      v-html="mainHtml"
       :class="[
         'font-bold transition-[transform,opacity] duration-300',
         {
@@ -34,9 +34,9 @@
         }
       ]"
     >
-      <LaTeX
+      <span
         ref="fancyFSubscript"
-        :expression="`_{\\text{${getModeSubscript()}}}`"
+        v-html="subscriptHtml"
         :class="[
           'transition-normal',
           {
@@ -53,9 +53,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
-import { gsap } from 'gsap';
-import { LaTeX } from '@/components/custom/latex';
+import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
+import { CSSKeyframesAnimation } from '@mkbabb/keyframes.js';
+import { useKatex } from '@mkbabb/latex-paper/vue';
 import type { LookupMode, ComponentSize } from '@/types';
 
 interface FancyFProps {
@@ -75,107 +75,100 @@ const emit = defineEmits<{
   'toggle-mode': [];
 }>();
 
-// Refs for animation (fancyFButton bound via template ref="fancyFButton")
-const fancyFButton = ref<HTMLButtonElement>(); void fancyFButton;
-const fancyFMain = ref<HTMLElement>();
-const fancyFSubscript = ref<HTMLElement>();
-const subscriptWrapper = ref<HTMLElement>();
-
-// Track whether the subscript has ever been shown (for entrance animation)
-const hasAnimatedIn = ref(false);
-
-// Animate subscript entrance on first show
-watch(() => props.showSubscript, (visible) => {
-  if (visible && !hasAnimatedIn.value && subscriptWrapper.value) {
-    hasAnimatedIn.value = true;
-    // Bounce-in entrance animation
-    gsap.fromTo(subscriptWrapper.value,
-      { scale: 0, opacity: 0 },
-      {
-        scale: 1,
-        opacity: 1,
-        duration: 0.5,
-        ease: "back.out(3)",
-      }
-    );
-  }
-});
-
-// Handle click with bouncy animation
-const handleClick = () => {
-  if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
-
-  // Ultra-bouncy click animation
-  const timeline = gsap.timeline();
-
-  timeline
-    // Squash on click
-    .to([fancyFMain.value, fancyFSubscript.value], {
-      scale: 0.85,
-      rotationZ: -2,
-      duration: 0.1,
-      ease: "power2.out"
-    })
-    // Big bounce back with overshoot
-    .to([fancyFMain.value, fancyFSubscript.value], {
-      scale: 1.2,
-      rotationZ: 2,
-      duration: 0.3,
-      ease: "back.out(4)",
-      stagger: 0.05
-    })
-    // Settle back to normal
-    .to([fancyFMain.value, fancyFSubscript.value], {
-      scale: 1,
-      rotationZ: 0,
-      duration: 0.4,
-      ease: "elastic.out(1, 0.5)",
-      stagger: 0.02
-    });
-
-  // Emit the toggle event
-  emit('toggle-mode');
-};
-
-// Helper function to get mode subscript
-const getModeSubscript = () => {
+// Helper functions (hoisted before computed properties that use them)
+function getModeSubscript() {
   switch (props.mode) {
     case 'dictionary': return 'd';
     case 'thesaurus': return 't';
     case 'suggestions': return 'w';
     default: return 'd';
   }
-};
+}
 
-// Helper function to get tooltip text
-const getTooltipText = () => {
+function getTooltipText() {
   switch (props.mode) {
     case 'dictionary': return 'Switch to thesaurus mode';
     case 'thesaurus': return 'Switch to dictionary mode';
     case 'suggestions': return 'AI-generated word suggestions';
     default: return '';
   }
+}
+
+// KaTeX rendering (replaces the old LaTeX component)
+const { renderInline } = useKatex({
+  '\\ornate': '\\mathfrak',
+});
+const mainHtml = renderInline('\\mathfrak{F}');
+const subscriptHtml = computed(() =>
+  renderInline(`_{\\text{${getModeSubscript()}}}`),
+);
+
+const fancyFButton = ref<HTMLButtonElement>(); void fancyFButton;
+const fancyFMain = ref<HTMLElement>();
+const fancyFSubscript = ref<HTMLElement>();
+const subscriptWrapper = ref<HTMLElement>();
+
+const hasAnimatedIn = ref(false);
+let breathingAnimations: CSSKeyframesAnimation<any>[] = [];
+
+// Bounce-in entrance on first show
+watch(() => props.showSubscript, (visible) => {
+  if (visible && !hasAnimatedIn.value && subscriptWrapper.value) {
+    hasAnimatedIn.value = true;
+    const anim = new CSSKeyframesAnimation<any>({ duration: 500, fillMode: 'forwards' }, subscriptWrapper.value);
+    anim.fromKeyframes({
+      '0%': { transform: 'scale(0)', opacity: '0' },
+      '70%': { transform: 'scale(1.1)', opacity: '0.8' },
+      '100%': { transform: 'scale(1)', opacity: '1' },
+    });
+    anim.play();
+  }
+});
+
+// Squash → overshoot → settle on click
+const handleClick = () => {
+  if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
+
+  [fancyFMain.value, fancyFSubscript.value].forEach((el, i) => {
+    const anim = new CSSKeyframesAnimation<any>({ duration: 800, delay: i * 30, fillMode: 'forwards' }, el);
+    anim.fromKeyframes({
+      '0%':    { transform: 'scale(1) rotate(0deg)' },
+      '12.5%': { transform: 'scale(0.85) rotate(-2deg)' },
+      '50%':   { transform: 'scale(1.2) rotate(2deg)' },
+      '100%':  { transform: 'scale(1) rotate(0deg)' },
+    });
+    anim.play();
+  });
+
+  emit('toggle-mode');
 };
 
-// Continuous subtle breathing animation when not clicked
+// Subtle breathing animation (infinite)
 const startBreathingAnimation = () => {
   if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
 
-  gsap.to([fancyFMain.value, fancyFSubscript.value], {
-    scale: 1.02,
-    duration: 2,
-    ease: "power2.inOut",
-    yoyo: true,
-    repeat: -1,
-    stagger: 0.1
+  breathingAnimations = [fancyFMain.value, fancyFSubscript.value].map((el, i) => {
+    const anim = new CSSKeyframesAnimation<any>(
+      { duration: 4000, iterationCount: Infinity, delay: i * 100 },
+      el,
+    );
+    anim.fromVars([
+      { transform: 'scale(1)' },
+      { transform: 'scale(1.02)' },
+      { transform: 'scale(1)' },
+    ]);
+    anim.play();
+    return anim;
   });
 };
 
-// Start breathing animation after component mounts
 nextTick(() => {
-  if (props.clickable) {
-    startBreathingAnimation();
-  }
+  if (props.clickable) startBreathingAnimation();
+});
+
+onUnmounted(() => {
+  breathingAnimations.forEach(a => a.stop());
+  breathingAnimations = [];
 });
 </script>
 

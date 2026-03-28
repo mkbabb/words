@@ -9,7 +9,6 @@ export const SEARCH_BAR_CONSTANTS = {
     ICON_SIZE: 48,
 
     // Animation durations (ms)
-    SEARCH_DEBOUNCE: 200,
     BLUR_DELAY: 150,
     INTERACTION_DELAY: 100,
     ERROR_ANIMATION_DURATION: 600,

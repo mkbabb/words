@@ -3,12 +3,7 @@ import { computed, ref } from 'vue';
 import { Skull, Ban, Play } from 'lucide-vue-next';
 import { api } from '@/api/core';
 import type { WordListItem } from '@/types';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@mkbabb/glass-ui';
 
 const props = defineProps<{
     wordlistId: string;

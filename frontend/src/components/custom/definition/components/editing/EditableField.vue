@@ -21,7 +21,7 @@
         <!-- Hover action buttons - positioned absolutely to not affect flow -->
         <span
             v-if="editMode && !isEditing"
-            class="pointer-events-none absolute -top-4 -right-4 z-10 flex gap-1 opacity-30 transition-opacity duration-150 group-hover:opacity-100"
+            class="pointer-events-none absolute -top-4 -right-4 z-content flex gap-1 opacity-30 transition-opacity duration-150 group-hover:opacity-100"
         >
             <button
                 @click.stop="startEdit"

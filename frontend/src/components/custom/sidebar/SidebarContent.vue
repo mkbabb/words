@@ -125,11 +125,10 @@ import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { FileText, LayoutDashboard } from 'lucide-vue-next';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';
-import type { SynthesizedDictionaryEntry, WordList } from '@/types';
+import type { SynthesizedDictionaryEntry, WordList, LookupHistory } from '@/types';
 import { wordlistApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 import { logger } from '@/utils/logger';
@@ -167,7 +166,7 @@ interface CombinedItem {
 }
 
 const combinedRecentItems = computed<CombinedItem[]>(() => {
-    const lookups: CombinedItem[] = recentLookups.value.map(lookup => ({
+    const lookups: CombinedItem[] = recentLookups.value.map((lookup: LookupHistory) => ({
         id: lookup.id,
         type: 'lookup' as const,
         word: lookup.word,
@@ -175,7 +174,7 @@ const combinedRecentItems = computed<CombinedItem[]>(() => {
         entry: lookup.entry
     }));
     
-    const aiQueries: CombinedItem[] = aiQueryHistory.value.map((item, index) => ({
+    const aiQueries: CombinedItem[] = aiQueryHistory.value.map((item: { query: string; timestamp: string }, index: number) => ({
         id: `ai-${index}-${item.timestamp}`,
         type: 'ai' as const,
         query: item.query,

@@ -49,9 +49,9 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+    Button,
+    Textarea,
+} from '@mkbabb/glass-ui';
 import type { WordListItem } from '@/types';
 
 interface Props {

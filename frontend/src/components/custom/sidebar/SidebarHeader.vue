@@ -37,7 +37,7 @@
                     </PopoverContent>
                 </Popover>
 
-                <DarkModeToggle class="h-9 w-9 flex-shrink-0" />
+                <DarkModeToggle class="h-5 w-5 flex-shrink-0" />
 
                 <!-- Spacer -->
                 <div class="flex-1" />
@@ -60,7 +60,7 @@
                 key="collapsed"
                 class="flex w-full flex-col items-center gap-3 py-3 transition-[opacity,transform] duration-350 ease-apple-spring transform-gpu"
             >
-                <DarkModeToggle class="h-9 w-9 flex-shrink-0" />
+                <DarkModeToggle class="h-5 w-5 flex-shrink-0" />
                 <button
                     @click="ui.setSidebarCollapsed(false)"
                     class="focus-ring cursor-ew-resize rounded-xl border border-border/50 bg-background/95 p-2 transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/70 hover:shadow-md"
@@ -75,11 +75,9 @@
 import { computed } from 'vue';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
-import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Avatar, AvatarImage, Button } from '@/components/ui';
+import { DarkModeToggle, Popover, PopoverTrigger, PopoverContent, Avatar, AvatarImage, Button } from '@mkbabb/glass-ui';
 import { PanelRight } from 'lucide-vue-next';
 
 interface Props {

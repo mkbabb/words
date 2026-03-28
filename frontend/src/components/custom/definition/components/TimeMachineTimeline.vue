@@ -13,7 +13,7 @@
                 v-for="(version, index) in versions"
                 :key="version.version"
                 :ref="(el) => { if (el) dotRefs[index] = el as HTMLElement }"
-                class="group relative z-10 flex shrink-0 cursor-pointer flex-col items-center px-3"
+                class="group relative z-content flex shrink-0 cursor-pointer flex-col items-center px-3"
                 @click="$emit('select', index)"
             >
                 <!-- Dot -->

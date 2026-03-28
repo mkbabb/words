@@ -59,7 +59,7 @@
                     key="review"
                     class="space-y-6"
                 >
-                    <div class="rounded-2xl glass-light p-4">
+                    <div class="rounded-2xl glass-subtle p-4">
                         <div class="mb-4 flex items-center justify-between gap-3">
                             <div>
                                 <p class="font-medium">Parsed output</p>
@@ -152,18 +152,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, toRef } from 'vue';
 import { ChevronLeft, X } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
 import { LoadingProgress } from '@/components/custom/loading';
-import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import UploadDropZone from '../UploadDropZone.vue';
 import WordPreviewList from '../cards/WordPreviewList.vue';
 import WordlistTargetForm from '../WordlistTargetForm.vue';
-import { useWordlistFileParser, type ParsedWord } from '../composables/useWordlistFileParser';
-import { useWordlistReconcilePreview, type ReviewCandidate } from '../composables/useWordlistReconcilePreview';
-import { useWordlistUpload } from '../composables/useWordlistUpload';
+import { useUploadWorkflow } from './composables/useUploadWorkflow';
 
 interface Props {
     modelValue: boolean;
@@ -178,17 +175,6 @@ const emit = defineEmits<{
     'wordlists-updated': [];
 }>();
 
-const { isGenerating: slugGenerating, generateSlugWithFallback } =
-    useSlugGeneration();
-
-const selectedWordlistId = ref(props.wordlistId || '');
-const uploadMode = ref<'new' | 'existing'>('new');
-const newWordlistName = ref('');
-const newWordlistDescription = ref('');
-const isSlugGenerated = ref(false);
-const uploadStep = ref<'dropzone' | 'review'>('dropzone');
-const candidateState = ref<Record<string, 'pending' | 'accepted' | 'ignored'>>({});
-
 const modelValue = computed({
     get: () => props.modelValue,
     set: (value) => emit('update:modelValue', value),
@@ -198,227 +184,40 @@ const closeModal = () => {
     modelValue.value = false;
 };
 
-const fileParser = useWordlistFileParser({
-    onError: (message) => {
-        upload.error.value = message;
-    },
+const workflow = useUploadWorkflow({
+    modelValue,
+    wordlistId: toRef(props, 'wordlistId'),
+    onUploaded: (words) => emit('uploaded', words),
+    onWordlistsUpdated: () => emit('wordlists-updated'),
+    onClose: () => closeModal(),
 });
 
-const upload = useWordlistUpload({
-    onComplete: (words) => {
-        emit('uploaded', words);
-    },
-    onWordlistsUpdated: () => {
-        emit('wordlists-updated');
-    },
-    onClose: () => {
-        closeModal();
-    },
-});
-
-const { reconcile, candidates: backendCandidates, isLoading: isLoadingReconcile } = useWordlistReconcilePreview();
-
-const selectedWordlist = computed(() =>
-    upload.wordlists.value.find((w) => w.id === selectedWordlistId.value)
-);
-
-const reviewCandidates = computed(() => {
-    return backendCandidates.value.map((candidate) => ({
-        ...candidate,
-        status: candidateState.value[candidate.id] ?? 'pending',
-    }));
-});
-
-const totalOccurrences = computed(() =>
-    fileParser.parsedWords.value.reduce((sum, word) => sum + (word.frequency || 1), 0)
-);
-
-const canUpload = computed(() => {
-    return (
-        fileParser.parsedWords.value.length > 0 &&
-        (uploadMode.value === 'existing' ? selectedWordlistId.value : true)
-    );
-});
-
-function normalizeKey(text: string) {
-    return text.trim().toLowerCase();
-}
-
-function mergeResolvedWord(sourceText: string, resolvedText: string) {
-    const source = normalizeKey(sourceText);
-    const next: ParsedWord[] = [];
-    const map = new Map<string, ParsedWord>();
-
-    for (const word of fileParser.parsedWords.value) {
-        const candidateText =
-            normalizeKey(word.text) === source ? resolvedText : (word.resolvedText || word.text);
-        const key = normalizeKey(candidateText);
-        const existing = map.get(key);
-        const nextWord: ParsedWord = {
-            ...word,
-            text: candidateText,
-            resolvedText: candidateText,
-        };
-        if (existing) {
-            existing.frequency += nextWord.frequency;
-            if (nextWord.notes && !existing.notes) existing.notes = nextWord.notes;
-        } else {
-            map.set(key, nextWord);
-        }
-    }
-
-    next.push(...map.values());
-    fileParser.parsedWords.value = next.sort((a, b) => b.frequency - a.frequency);
-}
-
-function acceptCandidate(candidate: ReviewCandidate) {
-    candidateState.value[candidate.id] = 'accepted';
-    mergeResolvedWord(candidate.sourceText, candidate.suggestedText);
-}
-
-function acceptCandidateById(candidateId: string) {
-    const candidate = reviewCandidates.value.find((item) => item.id === candidateId);
-    if (candidate) acceptCandidate(candidate);
-}
-
-function ignoreCandidate(candidate: ReviewCandidate) {
-    candidateState.value[candidate.id] = 'ignored';
-}
-
-function ignoreCandidateById(candidateId: string) {
-    const candidate = reviewCandidates.value.find((item) => item.id === candidateId);
-    if (candidate) ignoreCandidate(candidate);
-}
-
-function markAllForReview() {
-    for (const candidate of reviewCandidates.value) {
-        candidateState.value[candidate.id] = 'pending';
-    }
-}
-
-function reconcileAll() {
-    const candidates = [...reviewCandidates.value];
-    for (const candidate of candidates) {
-        acceptCandidate(candidate);
-    }
-}
-
-function ignoreAll() {
-    for (const candidate of reviewCandidates.value) {
-        ignoreCandidate(candidate);
-    }
-}
-
-const handleAddFiles = async (files: File[]) => {
-    upload.error.value = '';
-    await fileParser.addFiles(files);
-    if (fileParser.parsedWords.value.length > 0) {
-        uploadStep.value = 'review';
-        // Trigger backend reconcile preview
-        await reconcile(
-            fileParser.parsedWords.value,
-            uploadMode.value === 'existing' ? selectedWordlistId.value : undefined,
-        );
-    }
-};
-
-/** Allow dropping files anywhere in the modal content area. */
-const onModalDrop = async (event: DragEvent) => {
-    event.preventDefault();
-    const files = Array.from(event.dataTransfer?.files || []);
-    if (files.length > 0) {
-        await handleAddFiles(files);
-    }
-};
-
-const resetState = () => {
-    fileParser.reset();
-    upload.resetUploadState();
-    selectedWordlistId.value = props.wordlistId || '';
-    uploadMode.value = 'new';
-    newWordlistName.value = '';
-    newWordlistDescription.value = '';
-    isSlugGenerated.value = false;
-    uploadStep.value = 'dropzone';
-    candidateState.value = {};
-    backendCandidates.value = [];
-};
-
-const generateSlugName = async () => {
-    const slugName = await generateSlugWithFallback();
-    if (slugName) {
-        newWordlistName.value = slugName;
-        isSlugGenerated.value = true;
-    }
-};
-
-const handleNameInput = () => {
-    if (isSlugGenerated.value) {
-        isSlugGenerated.value = false;
-    }
-};
-
-const handleUpload = async () => {
-    if (!canUpload.value) return;
-    await upload.handleUpload(
-        fileParser.parsedWords.value,
-        uploadMode.value,
-        selectedWordlistId.value,
-        newWordlistName.value,
-        newWordlistDescription.value
-    );
-};
-
-watch(
-    () => props.modelValue,
-    async (isOpen, wasOpen) => {
-        if (isOpen) {
-            if (upload.wordlists.value.length === 0) {
-                await upload.loadWordlists();
-            }
-            if (uploadMode.value === 'new' && !newWordlistName.value.trim()) {
-                await generateSlugName();
-            }
-        } else if (!isOpen && wasOpen) {
-            setTimeout(() => {
-                resetState();
-            }, 250);
-        }
-    }
-);
-
-watch(
-    () => props.wordlistId,
-    (newId) => {
-        selectedWordlistId.value = newId || '';
-    }
-);
-
-watch(
-    () => fileParser.parsedWords.value.length,
-    (count) => {
-        if (count > 0) {
-            uploadStep.value = 'review';
-        } else if (!upload.isUploading.value) {
-            uploadStep.value = 'dropzone';
-        }
-    }
-);
-
-watch(
-    () => uploadMode.value,
-    async (mode) => {
-        if (mode === 'new' && !newWordlistName.value.trim()) {
-            await generateSlugName();
-        }
-    }
-);
-
-onMounted(async () => {
-    if (props.modelValue) {
-        await upload.loadWordlists();
-    }
-});
+const {
+    uploadStep,
+    uploadMode,
+    selectedWordlistId,
+    newWordlistName,
+    newWordlistDescription,
+    isSlugGenerated,
+    slugGenerating,
+    fileParser,
+    upload,
+    isLoadingReconcile,
+    selectedWordlist,
+    reviewCandidates,
+    totalOccurrences,
+    canUpload,
+    acceptCandidateById,
+    ignoreCandidateById,
+    markAllForReview,
+    reconcileAll,
+    ignoreAll,
+    handleAddFiles,
+    onModalDrop,
+    generateSlugName,
+    handleNameInput,
+    handleUpload,
+} = workflow;
 </script>
 
 <style scoped>

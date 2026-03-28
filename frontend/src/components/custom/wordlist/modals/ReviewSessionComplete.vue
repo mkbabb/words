@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
 import yoshiGreenStanding from '@/assets/yoshi/standing/yoshi_green_standing.png';
 import type { ReviewResult, SM2Quality } from '@/types/wordlist';
 

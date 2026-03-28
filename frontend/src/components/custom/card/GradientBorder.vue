@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 
 interface Props {
   variant?: 'default' | 'rainbow' | 'primary' | 'accent';

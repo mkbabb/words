@@ -111,14 +111,7 @@
 
 <script setup lang="ts">
 import { ChevronDown } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Button, Input, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@mkbabb/glass-ui';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import type { WordList } from '@/types';
 import { formatCount } from './utils/formatting';

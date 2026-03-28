@@ -1,6 +1,6 @@
 <template>
     <!-- Admin Edit Dock — anchor point below separator, zero height, no flow impact -->
-    <div class="relative h-0 z-50">
+    <div class="relative h-0 z-overlay">
         <ThemeSelector
             v-model="modelValue"
             :isMounted="isMounted"

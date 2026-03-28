@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { CameraIcon, LoaderIcon } from 'lucide-vue-next';
-import { useToast } from '@/components/ui/toast/use-toast';
+import { useToast } from '@mkbabb/glass-ui';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 import { imageApi, entriesApi } from '@/api';

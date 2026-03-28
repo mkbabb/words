@@ -153,7 +153,7 @@ import { Clock, Flame, RotateCcw, Tag } from 'lucide-vue-next';
 import { DEFAULT_WORDLIST_FILTERS } from '@/stores/types/constants';
 import WordListSortBuilder from '../../../wordlist/sorting/WordListSortBuilder.vue';
 import DashboardSortBuilder from '../../../wordlist/sorting/DashboardSortBuilder.vue';
-import { BouncyToggle } from '@/components/custom/animation';
+import { BouncyToggle } from '@mkbabb/glass-ui';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import type { WordList } from '@/types';

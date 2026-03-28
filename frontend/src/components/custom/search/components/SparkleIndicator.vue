@@ -9,7 +9,7 @@
     >
         <div
             v-if="show"
-            class="pointer-events-none absolute -top-2 -left-2 z-50"
+            class="pointer-events-none absolute -top-2 -left-2 z-overlay"
         >
             <div class="relative">
                 <Sparkles

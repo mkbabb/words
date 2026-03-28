@@ -104,7 +104,7 @@ import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useRouter } from 'vue-router';
-import { Accordion } from '@/components/ui/accordion';
+import { Accordion } from '@mkbabb/glass-ui';
 import { Plus, Search, Sparkles } from 'lucide-vue-next';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
@@ -113,7 +113,7 @@ import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import { useVocabularySuggestions } from '@/composables/useVocabularySuggestions';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { wordlistApi } from '@/api';
-import { useToast } from '@/components/ui/toast/use-toast';
+import { useToast } from '@mkbabb/glass-ui';
 import type { SynthesizedDictionaryEntry } from '@/types';
 import { logger } from '@/utils/logger';
 
@@ -122,18 +122,18 @@ const searchBar = useSearchBarStore();
 const wordlistMode = useWordlistMode();
 const router = useRouter();
 const { toast } = useToast();
-const { recentLookups, vocabularySuggestions, recentSearches, aiQueryHistory } = storeToRefs(history);
+const { recentLookups, recentSearches, aiQueryHistory } = storeToRefs(history);
 
 // Create orchestrator for API operations
 const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery)
 });
 
-const { refreshSuggestions } = useVocabularySuggestions();
+const { vocabularySuggestions, refreshSuggestions } = useVocabularySuggestions();
 
 // Computed property to format AI query history for display
 const recentAISuggestions = computed(() => 
-    aiQueryHistory.value.map(item => ({
+    aiQueryHistory.value.map((item: { query: string; timestamp: string }) => ({
         query: item.query,
         timestamp: new Date(item.timestamp)
     }))
@@ -246,7 +246,7 @@ const extractWordCount = (query: string): number => {
 
 // Initialize vocabulary suggestions on component mount
 onMounted(async () => {
-    if (history.vocabularySuggestions.length === 0 && history.recentLookups.length > 0) {
+    if (vocabularySuggestions.value.length === 0 && history.recentLookups.length > 0) {
         try {
             await refreshSuggestions();
         } catch (error) {

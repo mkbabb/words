@@ -107,7 +107,7 @@
 
     <!-- Etymology (shown below definitions, matching AI Synthesis layout) -->
     <div v-if="provider.etymology?.text" class="border-t border-border/50 pt-4">
-      <h3 class="mb-3 text-heading">Etymology</h3>
+      <h3 class="mb-3 text-subheading">Etymology</h3>
       <div class="rounded-md border border-border/30 bg-muted/5 px-3 py-2 transition-fast hover:border-border/50 hover:bg-muted/10">
         <EditableField
           v-if="editModeEnabled"
@@ -141,7 +141,7 @@
 
 <script setup lang="ts">
 import type { ProviderEntry } from '@/api/providers';
-import { useContentStore } from '@/stores';
+import { useContentMutations } from '../composables/useContentMutations';
 import EditableField from './editing/EditableField.vue';
 import { logger } from '@/utils/logger';
 
@@ -154,7 +154,7 @@ const props = withDefaults(defineProps<Props>(), {
   editModeEnabled: false,
 });
 
-const contentStore = useContentStore();
+const mutations = useContentMutations();
 
 type ProviderDefinition = ProviderEntry['definitions'][number];
 
@@ -168,7 +168,7 @@ async function handleFieldUpdate(
     return;
   }
   try {
-    await contentStore.updateDefinition(def.id, { [field]: value });
+    await mutations.updateDefinition(def.id, { [field]: value });
   } catch (error) {
     logger.error('[ProviderDataView] Failed to update definition:', error);
   }
@@ -190,12 +190,12 @@ async function handleExampleUpdate(
   try {
     const exampleWithId = example as { text: string; source?: string; id?: string };
     if (exampleWithId.id) {
-      await contentStore.updateExample(def.id, exampleWithId.id, value);
+      await mutations.updateExample(def.id, exampleWithId.id, value);
     } else {
       // Fallback: update the example text in-place via definition patch
       const updatedExamples = [...def.examples];
       updatedExamples[exampleIndex] = { ...example, text: value };
-      await contentStore.updateDefinition(def.id, {
+      await mutations.updateDefinition(def.id, {
         examples: updatedExamples as any,
       });
     }

@@ -78,7 +78,7 @@
     </div>
 
     <!-- Normal Content -->
-    <div v-else-if="entry" ref="definitionCardRef" class="relative">
+    <div v-else-if="entry" ref="definitionCardRef" class="paper-article relative">
         <!-- Main Card -->
         <ThemedCard
             :variant="selectedCardVariant"
@@ -183,8 +183,26 @@
         <DefinitionModals
             :word="entry?.word"
             :currentVersion="entry?.version != null ? String(entry.version) : undefined"
-            :timeMachineState="timeMachineState"
-            :inlineLookupState="inlineLookupState"
+            :tmIsOpen="timeMachine.isOpen.value"
+            :tmVersions="timeMachine.versions.value"
+            :tmSelectedIndex="timeMachine.selectedIndex.value"
+            :tmSelectedVersion="timeMachine.selectedVersion.value"
+            :tmVersionDetail="timeMachine.versionDetail.value"
+            :tmVersionDiff="timeMachine.versionDiff.value"
+            :tmDiffFields="timeMachine.diffFields.value"
+            :tmTextChanges="timeMachine.textChanges.value"
+            :tmHydratedEntry="timeMachine.hydratedEntry.value"
+            :tmNavigationDirection="timeMachine.navigationDirection.value"
+            :tmLoading="timeMachine.loading.value"
+            :tmDetailLoading="timeMachine.detailLoading.value"
+            :tmRollingBack="timeMachine.rollingBack.value"
+            :tmIsNewest="timeMachine.isNewest.value"
+            :tmIsOldest="timeMachine.isOldest.value"
+            :tmExpandedView="timeMachine.expandedView.value"
+            :ilSelectedWord="inlineLookup.selectedWord.value"
+            :ilIsPillVisible="inlineLookup.isPillVisible.value"
+            :ilIsPopoverVisible="inlineLookup.isPopoverVisible.value"
+            :ilPosition="inlineLookup.position.value"
             v-model:showWordlistModal="actions.showWordlistModal.value"
             :wordToAdd="actions.wordToAdd.value"
             @time-machine-close="handleTimeMachineClose"
@@ -203,12 +221,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, provide, ref, watch } from 'vue';
 import { useContentStore } from '@/stores';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
+import { PAPER_CONTEXT, useKatex, createRenderTitle } from '@mkbabb/latex-paper/vue';
 import {
     WordHeader,
     ImageCarousel,
@@ -226,12 +245,13 @@ import {
     useDefinitionActions,
     useTimeMachine,
 } from './composables';
+import { useEntryState } from './composables/useEntryState';
+import { useSourceTabManagement } from './composables/useSourceTabManagement';
 import {
     getErrorTitle,
     getEmptyTitle,
     getEmptyMessage,
 } from './utils/stateMessages';
-import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { useInlineWordLookup } from '@/composables/useInlineWordLookup';
 
@@ -239,7 +259,22 @@ import { useInlineWordLookup } from '@/composables/useInlineWordLookup';
 const contentStore = useContentStore();
 const lookupMode = useLookupMode();
 const searchBar = useSearchBarStore();
-const authStore = useAuthStore();
+
+// Set up shared KaTeX rendering context for all definition content
+const { renderInline, renderDisplay } = useKatex({
+    '\\mathscr': '\\mathcal',
+    '\\ornate': '\\mathfrak',
+});
+
+provide(PAPER_CONTEXT, {
+    sections: [],
+    labelMap: {},
+    renderInline,
+    renderDisplay,
+    renderTitle: createRenderTitle(renderInline),
+    assetBase: '',
+    scrollToId: () => {},
+});
 
 // Orchestrator for auto-fetching thesaurus data
 const orchestrator = useSearchOrchestrator({
@@ -265,153 +300,29 @@ watch(() => searchBar.getSubMode('lookup'), async (newSubMode) => {
 const isMounted = ref(true);
 const editModeEnabled = ref(false);
 
-// Backed by content store so sidebar can read it
-const activeSourceTab = computed({
-    get: () => contentStore.activeSourceTab,
-    set: (v: string) => contentStore.setActiveSourceTab(v),
-});
-
-// In dev mode, treat user as premium (matching backend's admin passthrough)
-const effectivelyPremium = computed(() =>
-    authStore.isPremium || import.meta.env.DEV
-);
-
-// Smart computed properties - merge streaming and complete data
-const entry = computed(() => {
-    if (contentStore.definitionError?.hasError) {
-        return null;
-    }
-
-    if (contentStore.isStreamingData && contentStore.partialEntry) {
-        return {
-            word:
-                contentStore.partialEntry.word ||
-                contentStore.currentEntry?.word,
-            id: contentStore.partialEntry.id || contentStore.currentEntry?.id,
-            last_updated:
-                contentStore.partialEntry.last_updated ||
-                contentStore.currentEntry?.last_updated,
-            model_info:
-                contentStore.partialEntry.model_info ||
-                contentStore.currentEntry?.model_info,
-            pronunciation:
-                contentStore.partialEntry.pronunciation ||
-                contentStore.currentEntry?.pronunciation,
-            languages:
-                contentStore.partialEntry.languages ||
-                contentStore.currentEntry?.languages ||
-                [],
-            etymology:
-                contentStore.partialEntry.etymology ||
-                contentStore.currentEntry?.etymology,
-            images: [
-                ...(contentStore.partialEntry.images || []),
-                ...(contentStore.currentEntry?.images || []),
-            ],
-            definitions:
-                contentStore.partialEntry.definitions ||
-                contentStore.currentEntry?.definitions ||
-                [],
-            source_entries:
-                contentStore.currentEntry?.source_entries ||
-                [],
-            _isStreaming: true,
-            _streamingProgress: 0,
-        } as any;
-    }
-
-    return contentStore.currentEntry
-        ? ({
-              ...contentStore.currentEntry,
-              _isStreaming: false,
-          } as any)
-        : null;
-});
-
-// Streaming state indicators
-const isStreaming = computed(() => contentStore.isStreamingData);
-
 // UI State computed properties
 const selectedCardVariant = computed({
     get: () => lookupMode.selectedCardVariant,
     set: (value) => lookupMode.setCardVariant(value),
 });
 
-// Thesaurus data (with provider synonym extraction)
-const thesaurusData = computed(() => {
-    const currentSource = activeSourceTab.value;
+// Entry state (merged streaming + complete data, isEmpty, isStreaming, thesaurusData)
+// We need activeSourceTab for thesaurusData, but sourceTab depends on usedProviders which depends on entry.
+// Break the cycle: create a temporary ref for activeSourceTab, then wire up once both are ready.
+const tempActiveSourceTab = ref('synthesis');
+const entryState = useEntryState(tempActiveSourceTab);
+const { entry, isStreaming, isEmpty, thesaurusData } = entryState;
 
-    if (currentSource && currentSource !== 'synthesis' && entry.value) {
-        const providerSynonyms = extractProviderSynonyms(entry.value, currentSource);
-        if (providerSynonyms.length > 0) {
-            return {
-                word: entry.value.word,
-                synonyms: providerSynonyms,
-                confidence: 0.7,
-            };
-        }
-    }
-
-    const data = contentStore.currentThesaurus;
-    if (data) {
-        return {
-            word: data.word,
-            synonyms: [...data.synonyms],
-            confidence: data.confidence,
-        };
-    }
-
-    if (entry.value?.definitions) {
-        const synonyms = (entry.value.definitions as any[])
-            .flatMap((d: any) => d.synonyms || [])
-            .filter((s: string, i: number, arr: string[]) => arr.indexOf(s) === i)
-            .map((word: string) => ({ word, score: 0.8 }));
-        if (synonyms.length > 0) {
-            return { word: entry.value.word, synonyms, confidence: 0.7 };
-        }
-    }
-
-    return null;
-});
-
-function extractProviderSynonyms(entryData: any, provider: string) {
-    const synonymSet = new Set<string>();
-
-    if (entryData.definitions) {
-        for (const def of entryData.definitions) {
-            if (!def.providers_data) continue;
-            const providerEntries = Array.isArray(def.providers_data)
-                ? def.providers_data
-                : [def.providers_data];
-
-            for (const pd of providerEntries) {
-                if (pd.provider !== provider) continue;
-                if (pd.definitions) {
-                    for (const pDef of pd.definitions) {
-                        if (pDef.synonyms) {
-                            for (const s of pDef.synonyms) {
-                                synonymSet.add(s);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return Array.from(synonymSet).map((word) => ({ word, score: 1.0 }));
-}
-
-// Error and empty state handling
-const isEmpty = computed(() => {
-    return (
-        entry.value &&
-        (!entry.value.definitions || entry.value.definitions.length === 0)
-    );
-});
-
-// Composables
+// Providers derived from entry
 const { usedProviders } = useProviders(entry);
+
+// Source tab management
+const sourceTab = useSourceTabManagement(entry, usedProviders);
+const { activeSourceTab, sourceSelectionDisabled } = sourceTab;
+
+// Sync the temp ref so thesaurusData stays reactive
+watch(activeSourceTab, (v) => { tempActiveSourceTab.value = v; }, { immediate: true });
+
 const { allImages, handleImageClick, handleImageError } =
     useImageManagement(entry);
 const actions = useDefinitionActions({ entry, editModeEnabled });
@@ -420,33 +331,6 @@ const timeMachine = useTimeMachine(computed(() => entry.value?.word));
 // Inline word lookup
 const definitionCardRef = ref<HTMLElement | null>(null);
 const inlineLookup = useInlineWordLookup(definitionCardRef);
-
-// Reactive state bundles for DefinitionModals props
-const timeMachineState = computed(() => ({
-    isOpen: timeMachine.isOpen.value,
-    versions: timeMachine.versions.value,
-    selectedIndex: timeMachine.selectedIndex.value,
-    selectedVersion: timeMachine.selectedVersion.value,
-    versionDetail: timeMachine.versionDetail.value,
-    versionDiff: timeMachine.versionDiff.value,
-    diffFields: timeMachine.diffFields.value,
-    textChanges: timeMachine.textChanges.value,
-    hydratedEntry: timeMachine.hydratedEntry.value,
-    navigationDirection: timeMachine.navigationDirection.value,
-    loading: timeMachine.loading.value,
-    detailLoading: timeMachine.detailLoading.value,
-    rollingBack: timeMachine.rollingBack.value,
-    isNewest: timeMachine.isNewest.value,
-    isOldest: timeMachine.isOldest.value,
-    expandedView: timeMachine.expandedView.value,
-}));
-
-const inlineLookupState = computed(() => ({
-    selectedWord: inlineLookup.selectedWord.value,
-    isPillVisible: inlineLookup.isPillVisible.value,
-    isPopoverVisible: inlineLookup.isPopoverVisible.value,
-    position: inlineLookup.position.value,
-}));
 
 // Router captured in setup context
 const router = useRouter();
@@ -500,51 +384,6 @@ watch(() => actions.showVersionHistory.value, (show) => {
         actions.showVersionHistory.value = false;
     }
 });
-
-const hasAISynthesis = computed(() => !!entry.value?.model_info);
-const selectableSources = computed(() => {
-    const sources: string[] = [];
-    if (hasAISynthesis.value) {
-        sources.push('synthesis');
-    }
-    sources.push(...usedProviders.value);
-    return sources;
-});
-
-const sourceSelectionDisabled = computed(() => {
-    return selectableSources.value.length <= 1;
-});
-
-// Keep source selection valid and auto-lock when only one source exists
-watch(
-    () => [
-        entry.value?.word,
-        selectableSources.value.join('|'),
-        effectivelyPremium.value,
-    ],
-    () => {
-        const sources = selectableSources.value;
-        if (sources.length === 0) {
-            activeSourceTab.value = 'synthesis';
-            return;
-        }
-
-        if (sources.length === 1) {
-            activeSourceTab.value = sources[0];
-            return;
-        }
-
-        if (hasAISynthesis.value && effectivelyPremium.value) {
-            activeSourceTab.value = 'synthesis';
-            return;
-        }
-
-        if (!sources.includes(activeSourceTab.value)) {
-            activeSourceTab.value = sources[0];
-        }
-    },
-    { immediate: true },
-);
 
 // Time Machine handlers
 const handleTimeMachineClose = () => {

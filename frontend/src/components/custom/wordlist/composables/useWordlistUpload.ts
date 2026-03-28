@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { wordlistApi } from '@/api';
-import { useToast } from '@/components/ui/toast/use-toast';
+import { useToast } from '@mkbabb/glass-ui';
 import { logger } from '@/utils/logger';
 import type { WordList } from '@/types';
 import type { ParsedWord } from './useWordlistFileParser';

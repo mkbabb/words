@@ -1,5 +1,5 @@
 <template>
-    <div class="themed-card overflow-visible shadow-cartoon-lg bg-card p-2 pt-3 rounded-xl">
+    <div class="themed-card overflow-visible shadow-cartoon-lg bg-background/92 p-2 pt-3 rounded-xl">
         <!-- Instant swap — no transition. out-in doubles DOM during mode switch. -->
             <!-- Wordlist selected: show wordlist summary + controls -->
             <div v-if="currentWordlist" :key="'wl-' + currentWordlist.id" class="space-y-3">
@@ -7,7 +7,7 @@
                 <div class="flex items-start gap-2">
                     <button
                         @click="goBack"
-                        class="glass-light p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-200 ease-apple-default flex-shrink-0 shadow-sm hover:shadow-md"
+                        class="glass-subtle p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-200 ease-apple-default flex-shrink-0 shadow-sm hover:shadow-md"
                     >
                         <ChevronLeft class="h-4 w-4" />
                     </button>
@@ -191,7 +191,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ChevronDown, ChevronLeft, Clock, Filter, Flame, RotateCcw, Tag } from 'lucide-vue-next';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { DEFAULT_WORDLIST_FILTERS } from '@/stores/types/constants';
 import WordListSortBuilder from '@/components/custom/wordlist/sorting/WordListSortBuilder.vue';

@@ -132,11 +132,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 // import { useStores } from '@/stores'; // Unused
 import { ThemedCard } from '@/components/custom/card';
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import { getCardVariant, formatPercent, formatExampleUsage } from './utils';
 import { useContentStore } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';

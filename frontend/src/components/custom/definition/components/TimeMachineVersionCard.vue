@@ -164,8 +164,7 @@
 <script setup lang="ts">
 import { computed, h, type FunctionalComponent } from 'vue';
 import { BookOpen, Maximize2, RotateCcw } from 'lucide-vue-next';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge, Button } from '@mkbabb/glass-ui';
 import ProviderIcons from './metadata/ProviderIcons.vue';
 import EditMetadataBlock from './editing/EditMetadataBlock.vue';
 import { useAuthStore } from '@/stores/auth';

@@ -24,7 +24,7 @@
         </HoverCardTrigger>
         <HoverCardContent
             :class="cn(
-                'themed-hovercard z-hovercard w-80 glass-heavy bg-background/96 shadow-cartoon-lg',
+                'themed-hovercard z-hovercard w-80 glass-elevated bg-background/96 shadow-cartoon-lg',
                 cardVariant !== 'default' ? 'shadow-cartoon-sm' : ''
             )"
             :data-theme="cardVariant || 'default'"
@@ -41,8 +41,8 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
-import { cn } from '@/utils';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@mkbabb/glass-ui';
+import { cn } from '@mkbabb/glass-ui';
 import PartOfSpeechPreview from './PartOfSpeechPreview.vue';
 
 interface Props {

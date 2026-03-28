@@ -7,7 +7,7 @@
             v-if="editMode"
             @click="$emit('delete', image.id, index)"
             :disabled="deleting"
-            class="absolute right-1 bottom-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:scale-110 hover:bg-destructive/80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+            class="absolute right-1 bottom-1 z-content flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:scale-110 hover:bg-destructive/80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
             :aria-label="`Delete image ${index + 1}`"
         >
             <svg
@@ -137,11 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import type { ImageMedia } from '@/types/api';
 
 interface Props {

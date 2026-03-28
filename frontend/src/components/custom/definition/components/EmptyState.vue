@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
 import { Lightbulb } from 'lucide-vue-next';
 import heartBubble from '@/assets/yoshi/ui/heart_speech_bubble.png';
 

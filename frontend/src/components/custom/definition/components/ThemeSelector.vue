@@ -1,7 +1,7 @@
 <template>
     <div
         v-if="isMounted && isAdmin"
-        class="absolute top-2 right-2 z-50"
+        class="absolute top-2 right-2 z-overlay"
     >
         <GlassDock ref="dockRef" manual :start-collapsed="!editModeEnabled">
             <!-- Collapsed summary: click expands dock AND enters edit mode -->
@@ -141,8 +141,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Edit2, Check, History, RefreshCw, Layers, ImagePlus } from 'lucide-vue-next';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import GlassDock from '@/components/custom/animation/GlassDock.vue';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { GlassDock } from '@mkbabb/glass-ui';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';

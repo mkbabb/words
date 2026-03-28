@@ -14,7 +14,7 @@
     <StarIcon 
       v-if="variant && variant !== 'default' && !hideStar"
       :variant="variant" 
-      class="absolute top-1.5 right-1.5 z-30 h-6 w-6"
+      class="absolute top-1.5 right-1.5 z-controls h-6 w-6"
     />
 
     <!-- Border Shimmer (optional) -->

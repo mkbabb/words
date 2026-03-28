@@ -18,12 +18,12 @@
             >
                 <template #display>
                     <p class="text-base leading-relaxed text-foreground">
-                        {{ etymology.text }}
+                        <ContentBlockRenderer :blocks="parsedBlocks" />
                     </p>
                 </template>
             </EditableField>
             <p v-else class="text-base leading-relaxed text-foreground">
-                {{ etymology.text }}
+                <ContentBlockRenderer :blocks="parsedBlocks" />
             </p>
             <div
                 v-if="etymology.language || etymology.period"
@@ -46,18 +46,25 @@
 </template>
 
 <script setup lang="ts">
-import { CardContent } from '@/components/ui/card';
+import { computed } from 'vue';
+import { CardContent } from '@mkbabb/glass-ui';
 import type { Etymology } from '@/types/api';
 import EditableField from './editing/EditableField.vue';
+import ContentBlockRenderer from './content/ContentBlockRenderer.vue';
+import { parseContentBlocks } from '../utils/parseContentBlocks';
 
 interface EtymologyProps {
     etymology: Etymology | null | undefined;
     editModeEnabled?: boolean;
 }
 
-withDefaults(defineProps<EtymologyProps>(), {
+const props = withDefaults(defineProps<EtymologyProps>(), {
     editModeEnabled: false,
 });
+
+const parsedBlocks = computed(() =>
+    parseContentBlocks(props.etymology?.text || ''),
+);
 
 defineEmits<{
     'update:text': [value: string];

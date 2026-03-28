@@ -1,43 +1,30 @@
 <template>
-    <div
-        :class="{ ios: isIOS, 'ios-standalone': isStandalone }"
-        class="app-shell min-h-screen bg-background text-foreground"
-    >
-        <router-view />
-        <Toaster />
-        <PWAInstallPrompt />
-        <PWANotificationPrompt />
-        <NotificationToast />
-    </div>
+    <TooltipProvider :delay-duration="200">
+        <div
+            :class="{ ios: isIOS, 'ios-standalone': isStandalone }"
+            class="app-shell min-h-screen bg-background text-foreground"
+        >
+            <router-view />
+            <Toaster />
+            <PWAInstallPrompt />
+            <PWANotificationPrompt />
+            <NotificationToast />
+        </div>
+    </TooltipProvider>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue';
-import { useUIStore } from '@/stores/ui/ui-state';
-import { Toaster } from '@/components/ui/toast';
+import { onMounted, onUnmounted } from 'vue';
+import { Toaster, TooltipProvider, useGlobalDark } from '@mkbabb/glass-ui';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStateSync } from '@/composables/useStateSync';
 import { useAuthProfile } from '@/composables/useAuthProfile';
 
-// Sync UIStore resolvedTheme to <html> class (single source of truth)
-// Note: { immediate: true } is intentionally omitted to prevent FOUC.
-// The inline script in index.html applies the initial dark class from localStorage
-// before Vue mounts. Using immediate here would flash light mode because the store
-// initializes with DEFAULT_THEME before persistence restores the saved value.
-const ui = useUIStore();
-watch(() => ui.resolvedTheme, (theme) => {
-    const html = document.documentElement;
-    // Suppress all CSS transitions during the swap — 200+ elements with
-    // transition-all would otherwise animate their colors over 150-500ms.
-    html.classList.add('no-transition');
-    html.classList.toggle('dark', theme === 'dark');
-    // Force a synchronous repaint so the browser applies the new colors
-    // in a single frame, then re-enable transitions.
-    html.offsetHeight;
-    html.classList.remove('no-transition');
-});
+// glass-ui's useGlobalDark handles dark mode class on <html> and
+// suppresses CSS transitions during the swap via disableTransitions.
+useGlobalDark();
 
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();

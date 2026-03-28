@@ -5,7 +5,7 @@
             <button
                 v-if="isPillVisible && !isPopoverVisible"
                 data-word-lookup-pill
-                class="lookup-popover fixed z-50 rounded-full border-2 border-border/30 bg-background/90 px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm backdrop-blur-md transition-[background,box-shadow] duration-200 hover:bg-background/95 hover:shadow-cartoon-sm-hover"
+                class="lookup-popover fixed z-popover rounded-full border-2 border-border/30 bg-background/90 px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm backdrop-blur-md transition-[background,box-shadow] duration-200 hover:bg-background/95 hover:shadow-cartoon-sm-hover"
                 :style="pillStyle"
                 @mousedown.prevent.stop="onPillClick"
             >
@@ -18,8 +18,8 @@
             <div
                 v-if="isPopoverVisible"
                 data-word-lookup-popover
-                class="lookup-popover fixed z-50 w-64 rounded-xl border-2 border-border/30 bg-background/90 p-3 shadow-cartoon-sm backdrop-blur-md"
-                :style="{ ...popoverStyle, backgroundImage: 'var(--paper-clean-texture)', backgroundBlendMode: 'multiply' }"
+                class="lookup-popover paper-texture-overlay fixed z-popover w-64 rounded-xl border-2 border-border/30 bg-background/90 p-3 shadow-cartoon-sm backdrop-blur-md"
+                :style="popoverStyle"
             >
                 <!-- Loading state -->
                 <div v-if="loading" class="space-y-1.5">
@@ -192,12 +192,12 @@ function handleAddToWordlist() {
 }
 
 .lookup-fade-enter-active {
-    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                scale 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.25s var(--ease-standard),
+                scale 0.25s var(--ease-standard);
 }
 .lookup-fade-leave-active {
-    transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-                scale 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.15s var(--ease-standard),
+                scale 0.15s var(--ease-standard);
 }
 .lookup-fade-enter-from {
     opacity: 0;

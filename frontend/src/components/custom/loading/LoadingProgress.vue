@@ -36,8 +36,8 @@
             <!-- Checkpoint Markers -->
             <div class="absolute top-0 bottom-0 w-full">
                 <div
-                    v-for="(checkpoint, index) in effectiveCheckpoints"
-                    :key="index"
+                    v-for="checkpoint in effectiveCheckpoints"
+                    :key="checkpoint.progress"
                     class="absolute flex items-center justify-center"
                     :style="{
                         left: checkpoint.progress === 0 
@@ -133,11 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import { getDefaultStages, getCheckpointDescription } from './pipeline-stages';
 import { logger } from '@/utils/logger';
 
@@ -264,26 +260,43 @@ const handleProgressBarInteraction = (event: MouseEvent) => {
     }
 };
 
+// Drag handler references — stored at component scope so cleanup can match them
+let activeMoveHandler: ((e: MouseEvent) => void) | null = null;
+let activeUpHandler: (() => void) | null = null;
+
+const cleanupDragListeners = () => {
+    if (activeMoveHandler) {
+        document.removeEventListener('mousemove', activeMoveHandler);
+        activeMoveHandler = null;
+    }
+    if (activeUpHandler) {
+        document.removeEventListener('mouseup', activeUpHandler);
+        activeUpHandler = null;
+    }
+};
+
 // Mouse drag handlers
 const handleMouseDown = (event: MouseEvent) => {
     if (!props.interactive || !isMounted.value) return;
     isDragging.value = true;
     handleProgressBarInteraction(event);
 
-    const handleMouseMove = (e: MouseEvent) => {
+    // Clean up any prior listeners before attaching new ones
+    cleanupDragListeners();
+
+    activeMoveHandler = (e: MouseEvent) => {
         if (isDragging.value && isMounted.value) {
             handleProgressBarInteraction(e);
         }
     };
 
-    const handleMouseUp = () => {
+    activeUpHandler = () => {
         isDragging.value = false;
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        cleanupDragListeners();
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', activeMoveHandler);
+    document.addEventListener('mouseup', activeUpHandler);
 };
 
 // Lifecycle management
@@ -293,16 +306,8 @@ onMounted(() => {
 
 onUnmounted(() => {
     isMounted.value = false;
-    
-    // Clean up any ongoing drag operations
-    if (isDragging.value) {
-        isDragging.value = false;
-        // Remove any lingering event listeners
-        document.removeEventListener('mousemove', () => {});
-        document.removeEventListener('mouseup', () => {});
-    }
-    
-    // Clear any refs that might be accessed by Reka UI
+    isDragging.value = false;
+    cleanupDragListeners();
     progressBarRef.value = undefined;
 });
 </script>

@@ -1,7 +1,7 @@
 <template>
     <div
         :class="[
-            'absolute z-20 flex items-center gap-1',
+            'absolute z-controls flex items-center gap-1',
             aiMode ? 'right-2 bottom-2' : 'top-1/2 right-2 -translate-y-1/2',
         ]"
     >
@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { Maximize2, X } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
 
 defineProps<{
     aiMode: boolean;

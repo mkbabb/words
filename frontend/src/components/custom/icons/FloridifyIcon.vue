@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import FancyF from './FancyF.vue';
 import type { LookupMode } from '@/types';
 

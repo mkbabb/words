@@ -15,7 +15,7 @@
                         :size="20"
                         :class="[
                             'transition-normal',
-                            aiAnimating && 'animate-sparkle',
+                            ai.isAnimating && 'animate-sparkle',
                         ]"
                     />
                 </ActionButton>
@@ -50,7 +50,7 @@
                         :class="[
                             'transition-normal',
                             'group-hover:rotate-180',
-                            refreshAnimating && 'animate-rotate-once',
+                            refresh.isAnimating && 'animate-rotate-once',
                         ]"
                     />
                 </ActionButton>
@@ -74,7 +74,7 @@
                         :size="20"
                         :class="[
                             'transition-normal',
-                            trashAnimating && 'animate-wiggle',
+                            trash.isAnimating && 'animate-wiggle',
                         ]"
                     />
                 </ActionButton>
@@ -92,7 +92,7 @@
                         :size="20"
                         :class="[
                             'transition-normal',
-                            pwaInstallAnimating && 'animate-bounce-in',
+                            pwaInstall.isAnimating && 'animate-bounce-in',
                         ]"
                     />
                 </ActionButton>
@@ -113,7 +113,7 @@
                         :size="20"
                         :class="[
                             'transition-normal',
-                            notificationAnimating && 'animate-ring',
+                            notification.isAnimating && 'animate-ring',
                         ]"
                     />
                 </ActionButton>
@@ -134,7 +134,7 @@
                         :size="20"
                         :class="[
                             'transition-normal',
-                            notificationPromptAnimating && 'animate-pulse',
+                            notificationPrompt.isAnimating && 'animate-pulse',
                         ]"
                     />
                 </ActionButton>
@@ -147,12 +147,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot, Lock } from 'lucide-vue-next';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import ActionButton from './ActionButton.vue';
 import { useStores } from '@/stores';
 import { useAuthStore } from '@/stores/auth';
+import { useAnimationToggle } from '../composables';
 import { logger } from '@/utils/logger';
 
 interface ActionsRowProps {
@@ -175,117 +175,65 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const isPremium = auth.isPremium;
 
-// PWA composables
-// const { subscribeToPush } = usePWA();
 const { notifications } = useStores();
 
-// Animation states
-const aiAnimating = ref(false);
-const trashAnimating = ref(false);
-const refreshAnimating = ref(false);
-const pwaInstallAnimating = ref(false);
-const notificationAnimating = ref(false);
-const notificationPromptAnimating = ref(false);
+// Animation states — auto-reset after duration
+const ai = useAnimationToggle(600);
+const trash = useAnimationToggle(600);
+const refresh = useAnimationToggle(300);
+const pwaInstall = useAnimationToggle(600);
+const notification = useAnimationToggle(600);
+const notificationPrompt = useAnimationToggle(600);
 
 // Event handlers
 const handleAIToggle = () => {
     if (!isPremium) return;
     noAI.value = !noAI.value;
-    aiAnimating.value = true;
-    setTimeout(() => {
-        aiAnimating.value = false;
-    }, 600);
+    ai.trigger();
 };
 
 const handleClearStorage = () => {
-    trashAnimating.value = true;
-    setTimeout(() => {
-        trashAnimating.value = false;
-        emit('clear-storage');
-    }, 600);
+    trash.trigger();
+    setTimeout(() => emit('clear-storage'), 600);
 };
 
 const handleRefreshClick = () => {
-    refreshAnimating.value = true;
-    setTimeout(() => {
-        refreshAnimating.value = false;
-    }, 300);
+    refresh.trigger();
     emit('toggle-refresh');
 };
 
-// PWA Debug handlers
 const handleShowPWAPrompt = () => {
-    pwaInstallAnimating.value = true;
-    setTimeout(() => {
-        pwaInstallAnimating.value = false;
-    }, 600);
-
-    // Force show PWA install prompt
-    const event = new Event('show-pwa-prompt');
-    window.dispatchEvent(event);
+    pwaInstall.trigger();
+    window.dispatchEvent(new Event('show-pwa-prompt'));
 };
 
 const handleSendNotification = async () => {
-    notificationAnimating.value = true;
+    notification.trigger();
 
     try {
-        // Check if notifications are supported
         if (!('Notification' in window)) {
-            notifications.showNotification({
-                type: 'error',
-                message: 'Notifications not supported',
-            });
+            notifications.showNotification({ type: 'error', message: 'Notifications not supported' });
             return;
         }
 
-        // Request permission if needed
         if (Notification.permission === 'default') {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
-                notifications.showNotification({
-                    type: 'error',
-                    message: 'Notification permission denied',
-                });
+                notifications.showNotification({ type: 'error', message: 'Notification permission denied' });
                 return;
             }
         }
 
-        // Send test notification
-        // new Notification('Floridify Test', {
-        //     body: 'PWA notifications are working! 🎉',
-        //     icon: '/favicon-256.png',
-        //     badge: '/favicon-128.png',
-        //     tag: 'test-notification',
-        //     renotify: true
-        // });
-
-        // Just show in-app notification
-        notifications.showNotification({
-            type: 'success',
-            message: 'Notifications are enabled! 🎉',
-        });
+        notifications.showNotification({ type: 'success', message: 'Notifications are enabled! 🎉' });
     } catch (error) {
         logger.error('Notification error:', error);
-        notifications.showNotification({
-            type: 'error',
-            message: 'Failed to send notification',
-        });
-    } finally {
-        setTimeout(() => {
-            notificationAnimating.value = false;
-        }, 600);
+        notifications.showNotification({ type: 'error', message: 'Failed to send notification' });
     }
 };
 
 const handleShowNotificationPrompt = () => {
-    notificationPromptAnimating.value = true;
-    setTimeout(() => {
-        notificationPromptAnimating.value = false;
-    }, 600);
-
-    // Show notification permission prompt
-    const event = new Event('show-notification-prompt');
-    window.dispatchEvent(event);
+    notificationPrompt.trigger();
+    window.dispatchEvent(new Event('show-notification-prompt'));
 };
 
 </script>

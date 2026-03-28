@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { formatRelativeTime } from '@/utils/time';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 
 interface Props {
     item: any;

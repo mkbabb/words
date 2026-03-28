@@ -116,8 +116,9 @@
 </template>
 
 <script setup lang="ts">
-import { formatDate, cn } from '@/utils';
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
+import { formatDate } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@mkbabb/glass-ui';
 import type { LookupHistory } from '@/types';
 
 interface Props {

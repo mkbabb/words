@@ -1,6 +1,6 @@
 <template>
     <div
-        class="themed-card overflow-visible shadow-cartoon-lg bg-card p-2 rounded-xl"
+        class="themed-card overflow-visible shadow-cartoon-lg bg-background/92 p-2 rounded-xl"
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
@@ -56,8 +56,10 @@
 import { ref, computed, watch, inject } from 'vue';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useStores } from '@/stores';
-import { useSidebarState, useSidebarNavigation, useScrollTracker, useSidebarFollow } from './composables';
+import { useSidebarState, useSidebarNavigation } from './composables';
+import { useScrollTracker, useSidebarFollow } from '@mkbabb/glass-ui';
 import SidebarCluster from './components/SidebarCluster.vue';
+import { EnsureTargetWindowKey } from '@/components/custom/definition/constants';
 
 const lookupMode = useLookupMode();
 const { content } = useStores();
@@ -66,8 +68,8 @@ const selectedCardVariant = computed(() => lookupMode.selectedCardVariant);
 // Template refs
 const navContainer = ref<HTMLElement | null>(null);
 
-// Inject ensureTargetWindow from DefinitionDisplay (provided via provide/inject)
-const ensureTargetWindow = inject<((id: string) => void) | null>('ensureTargetWindow', null);
+// Inject ensureTargetWindow from DefinitionContentView (provided via typed InjectionKey)
+const ensureTargetWindow = inject(EnsureTargetWindowKey, undefined);
 
 // Use composables
 const {
@@ -82,25 +84,26 @@ const {
     scrollToCluster,
     scrollToPartOfSpeech,
 } = useSidebarNavigation({
-    ensureTargetWindow: ensureTargetWindow ?? undefined,
+    ensureTargetWindow,
 });
 
 // Set up tree-based scroll tracking (reactive — re-initializes on tree change)
 const { activeId, activeRootId } = useScrollTracker(
     () => treeNodes.value,
     () => treeIndex.value.index,
-    { sidebarEl: navContainer },
 );
 
 // Set up damped sidebar follow
+// Cast navContainer to satisfy glass-ui's Ref type (cross-package RefSymbol mismatch).
 useSidebarFollow({
-    sidebarEl: navContainer,
+    sidebarEl: navContainer as any,
     activeId,
     activeRootId,
 });
 
-// Sync scroll tracker's activeId back to content store
-watch(activeId, (id) => {
+// Sync scroll tracker's activeId back to content store.
+// Use a getter to unwrap the glass-ui Ref (avoids cross-package RefSymbol mismatch).
+watch(() => activeId.value, (id) => {
     if (!id) return;
 
     const entry = treeIndex.value.index.get(id);

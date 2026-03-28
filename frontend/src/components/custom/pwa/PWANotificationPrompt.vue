@@ -3,7 +3,7 @@
     <Transition name="pwa-prompt">
       <div
         v-if="showPrompt"
-        class="fixed top-6 left-6 right-6 z-50 max-w-md mx-auto"
+        class="fixed top-6 left-6 right-6 z-toast max-w-md mx-auto"
       >
         <div
           class="shadow-cartoon-md rounded-2xl bg-background/95 backdrop-blur-xl

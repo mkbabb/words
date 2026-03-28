@@ -1,80 +1,60 @@
 <template>
     <CardHeader class="relative">
-        <!-- Row 1: Word Title + Speaker + Plus + [spacer] + Providers -->
-        <CardTitle class="space-y-2">
-            <!-- Word title — full width, wraps mid-word -->
-            <div
-                class="relative w-full"
-                style="overflow-wrap: anywhere;"
-                lang="en"
-            >
-                <!-- Invisible text to reserve space (pr-3 for cursor) -->
-                <span
-                    class="invisible text-5xl sm:text-6xl md:text-7xl leading-tight font-bold font-serif pr-3"
-                >
-                    {{ word }}
-                </span>
+        <!-- Word + controls: all on one line, wrapping only when needed -->
+        <CardTitle>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-2" style="overflow-wrap: anywhere;" lang="en">
+                <!-- Word title — inline, takes natural width -->
+                <AnimatedTitle
+                    :text="word"
+                    class="inline"
+                />
 
-                <!-- Animated text overlay — absolute so it doesn't expand the container -->
-                <div class="absolute top-0 left-0 right-0">
-                    <AnimatedTitle
-                        :text="word"
-                        class="inline"
-                    />
-                </div>
-            </div>
+                <!-- Audio + Add buttons -->
+                <AudioPlaybackButton
+                    :state="audioState"
+                    :error-message="audioError"
+                    class="flex-shrink-0"
+                    size="md"
+                    @play="playAudio"
+                />
+                <HoverCard>
+                    <HoverCardTrigger as-child>
+                        <button
+                            @click="showAddToWordlistModal = true"
+                            class="group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/96 shadow-sm opacity-80 transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:border-border/60 hover:bg-background hover:opacity-100 hover:shadow-md"
+                        >
+                            <Plus
+                                :size="16"
+                                class="text-muted-foreground group-hover:text-foreground"
+                            />
+                        </button>
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" :sideOffset="4" class="w-48">
+                        <div class="text-small">
+                            <p class="font-medium">Add to Wordlist</p>
+                            <p class="mt-1 text-caption">
+                                Save this word to your wordlists for study
+                            </p>
+                        </div>
+                    </HoverCardContent>
+                </HoverCard>
 
-            <!-- Action buttons row (below the word, not competing for width) -->
-            <div class="flex flex-wrap items-center gap-2">
+                <!-- Spacer pushes providers right -->
+                <div class="flex-1" />
 
-            <!-- Audio Playback Button -->
-            <AudioPlaybackButton
-                :state="audioState"
-                :error-message="audioError"
-                class="flex-shrink-0 ml-1"
-                size="md"
-                @play="playAudio"
-            />
-
-            <!-- Plus / Add to Wordlist -->
-            <HoverCard>
-                <HoverCardTrigger as-child>
-                    <button
-                        @click="showAddToWordlistModal = true"
-                        class="group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/96 shadow-sm opacity-80 transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:border-border/60 hover:bg-background hover:opacity-100 hover:shadow-md"
-                    >
-                        <Plus
-                            :size="16"
-                            class="text-muted-foreground group-hover:text-foreground"
-                        />
-                    </button>
-                </HoverCardTrigger>
-                <HoverCardContent side="top" :sideOffset="4" class="w-48">
-                    <div class="text-sm">
-                        <p class="font-medium">Add to Wordlist</p>
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            Save this word to your wordlists for study
-                        </p>
-                    </div>
-                </HoverCardContent>
-            </HoverCard>
-
-            <!-- Spacer pushes providers to the right -->
-            <div class="flex-1" />
-
-            <!-- Provider Icons — right-justified -->
-            <ProviderIcons
-                v-if="providers && (providers.length > 0 || showSynthesis)"
-                :providers="providers"
-                :active-source="activeSource"
-                :show-synthesis="showSynthesis"
-                :interactive="interactive"
-                :source-entries="sourceEntries"
-                :word="word"
-                layout="horizontal"
-                class="flex-shrink-0"
-                @select-source="$emit('select-source', $event)"
-            />
+                <!-- Provider Icons — right-justified, same row -->
+                <ProviderIcons
+                    v-if="providers && (providers.length > 0 || showSynthesis)"
+                    :providers="providers"
+                    :active-source="activeSource"
+                    :show-synthesis="showSynthesis"
+                    :interactive="interactive"
+                    :source-entries="sourceEntries"
+                    :word="word"
+                    layout="horizontal"
+                    class="flex-shrink-0"
+                    @select-source="$emit('select-source', $event)"
+                />
             </div>
         </CardTitle>
 
@@ -133,7 +113,7 @@
                         side="bottom"
                         align="start"
                         :side-offset="12"
-                        class="z-50 w-44 rounded-xl border border-border/40 bg-background/96 p-1.5 shadow-cartoon-lg backdrop-blur-xl"
+                        class="z-popover w-44 rounded-xl border border-border/40 bg-background/96 p-1.5 shadow-cartoon-lg backdrop-blur-xl"
                     >
                         <div
                             v-for="lang in languages"
@@ -246,25 +226,10 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
-import { CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
-import {
-    Popover,
-    PopoverTrigger,
-    PopoverContent,
-} from '@/components/ui/popover';
+import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import {
     PopoverContent as InlinePopoverContent,
 } from 'reka-ui';
-import {
-    Tooltip,
-    TooltipTrigger,
-    TooltipContent,
-} from '@/components/ui/tooltip';
 import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './media/AudioPlaybackButton.vue';

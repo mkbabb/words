@@ -3,7 +3,7 @@
     <TransitionGroup
       name="notification"
       tag="div"
-      class="fixed bottom-6 right-6 z-50 space-y-3 max-w-sm"
+      class="fixed bottom-6 right-6 z-toast space-y-3 max-w-sm"
     >
       <div
         v-for="notification in notificationList"

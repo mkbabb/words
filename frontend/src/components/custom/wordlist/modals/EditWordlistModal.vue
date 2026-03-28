@@ -154,12 +154,8 @@
 import { ref, computed, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Button, Input, Textarea, Label, useToast } from '@mkbabb/glass-ui';
 import { wordlistApi } from '@/api';
-import { useToast } from '@/components/ui/toast/use-toast';
 import { logger } from '@/utils/logger';
 import type { WordList } from '@/types';
 

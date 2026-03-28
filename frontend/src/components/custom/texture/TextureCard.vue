@@ -13,7 +13,7 @@
     <StarIcon 
       v-if="variant && variant !== 'default'"
       :variant="variant" 
-      class="absolute top-2 right-2 z-30"
+      class="absolute top-2 right-2 z-controls"
     />
 
     <!-- Sparkle Animation Overlay -->
@@ -26,7 +26,7 @@
     <!-- Custom Texture Overlay (when texture override is enabled) -->
     <div
       v-if="textureOverride && textureEnabled"
-      class="absolute inset-0 pointer-events-none z-10"
+      class="absolute inset-0 pointer-events-none z-content"
       :style="textureOverlayStyles"
     />
 

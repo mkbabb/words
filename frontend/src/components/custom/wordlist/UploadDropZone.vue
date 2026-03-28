@@ -14,13 +14,13 @@
     >
         <button
             type="button"
-            class="group/info absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full glass-light text-muted-foreground shadow-sm transition-fast hover:text-foreground"
+            class="group/info absolute right-4 top-4 z-content inline-flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-muted-foreground shadow-sm transition-fast hover:text-foreground"
             aria-label="Supported formats"
             @click.stop
         >
             <Info class="h-4 w-4" />
             <div
-                class="pointer-events-none absolute right-0 top-10 z-20 w-64 translate-y-1 opacity-0 transition-fast group-hover/info:translate-y-0 group-hover/info:opacity-100"
+                class="pointer-events-none absolute right-0 top-10 z-controls w-64 translate-y-1 opacity-0 transition-fast group-hover/info:translate-y-0 group-hover/info:opacity-100"
             >
                 <div class="popover-surface space-y-2 p-3 text-left text-xs">
                     <p class="font-medium text-foreground">Supported formats</p>
@@ -47,7 +47,7 @@
                 <Upload class="h-8 w-8" />
             </div>
             <div class="space-y-1">
-                <p class="text-heading">
+                <p class="text-subheading">
                     Drop wordlist files here
                 </p>
                 <p class="text-sm text-muted-foreground">

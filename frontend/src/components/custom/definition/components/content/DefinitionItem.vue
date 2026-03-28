@@ -4,7 +4,7 @@
         :data-definition-index="definitionIndex"
         :data-part-of-speech="`${definition.meaning_cluster?.slug || definition.meaning_cluster?.id || 'default'}-${definition.part_of_speech}`"
         class="space-y-2 animate-def-fade-in"
-        :style="{ animationDelay: `${definitionIndex * 40}ms` }"
+        :style="{ animationDelay: `${definitionIndex * STAGGER_FAST}ms` }"
     >
         <!-- Separator for definitions within same cluster -->
         <hr v-if="isSeparatorNeeded" class="my-2 border-border/50" />
@@ -43,30 +43,11 @@
             }}</sup>
 
             <!-- Frequency temperature slider (edit mode) -->
-            <div v-if="editModeEnabled" class="ml-auto flex items-center gap-2">
-                <span class="text-micro text-muted-foreground/50">Freq</span>
-                <div class="relative flex items-center">
-                    <div
-                        class="h-1.5 w-16 rounded-full"
-                        :style="{ background: TEMPERATURE_GRADIENT }"
-                    />
-                    <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        :value="(fields.frequency_band.value || 3) * 20"
-                        class="freq-slider absolute inset-0 h-1.5 w-16 cursor-pointer appearance-none bg-transparent"
-                        :style="{ '--thumb-color': temperatureColor((fields.frequency_band.value || 3) / 5) }"
-                        @input="handleFrequencySlider($event)"
-                    />
-                </div>
-                <span
-                    class="min-w-[1ch] text-center text-micro font-mono font-medium"
-                    :style="{ color: temperatureColor((fields.frequency_band.value || 3) / 5) }"
-                >
-                    {{ fields.frequency_band.value || '—' }}
-                </span>
-            </div>
+            <FrequencySlider
+                v-if="editModeEnabled"
+                :value="fields.frequency_band.value || 3"
+                @update:value="handleFrequencySlider"
+            />
 
             <!-- Streaming Indicator -->
             <div
@@ -104,7 +85,7 @@
                         <p
                             class="text-base leading-relaxed font-serif"
                         >
-                            {{ definition.definition || definition.text }}
+                            <ContentBlockRenderer :blocks="parsedBlocks" />
                         </p>
                     </template>
                 </EditableField>
@@ -115,26 +96,21 @@
                 <div class="h-4 w-4/5 rounded bg-muted" />
             </div>
 
-            <!-- Source Attribution Labels (admin edit mode) -->
-            <div
-                v-if="editModeEnabled && definition.source_definitions?.length"
-                class="mt-1 flex flex-wrap gap-1"
-            >
-                <span
-                    v-for="src in definition.source_definitions"
-                    :key="src.entry_id"
-                    class="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-micro font-medium text-muted-foreground"
-                >
-                    {{ getProviderDisplayName(src.provider) }}
-                    <span v-if="src.entry_version" class="ml-0.5 opacity-60">v{{ src.entry_version }}</span>
-                </span>
-            </div>
+            <!-- Source Attribution + Domain/Region/Usage/Grammar/Collocations (admin edit mode) -->
+            <DefinitionMetadata
+                v-if="editModeEnabled"
+                :definition="definition"
+                :fields="fields"
+                :can-regenerate="canRegenerate"
+                @regenerate-component="regenerateComponent"
+                @save="save"
+            />
 
             <!-- Progressive Examples -->
             <ExampleListEditable
                 v-if="definition.examples && definition.examples.length > 0"
                 :examples="definition.examples"
-                :word="props.word || contentStore.currentEntry?.word || ''"
+                :word="props.word || ''"
                 :edit-mode="props.editModeEnabled"
                 :isStreaming="isStreaming"
                 @update:example="handleExampleUpdate"
@@ -208,124 +184,25 @@
                 @synonym-click="emit('searchWord', $event)"
             />
 
-            <!-- Domain & Region (edit mode, only when values exist) -->
-            <div v-if="editModeEnabled && (definition.domain || definition.region)" class="mt-3 flex flex-wrap items-center gap-3">
-                <EditableField
-                    v-if="definition.domain"
-                    v-model="fields.domain.value"
-                    field-name="domain"
-                    :edit-mode="editModeEnabled"
-                    :can-regenerate="canRegenerate('domain')"
-                    :is-regenerating="fields.domain.isRegenerating"
-                    @regenerate="regenerateComponent('domain')"
-                    @update:model-value="
-                        (val) => {
-                            fields.domain.value = String(val || '');
-                            fields.domain.isDirty = true;
-                            save();
-                        }
-                    "
-                >
-                    <template #display>
-                        <span class="text-xs text-muted-foreground">
-                            Domain: {{ definition.domain }}
-                        </span>
-                    </template>
-                </EditableField>
-
-                <EditableField
-                    v-if="definition.region"
-                    v-model="fields.region.value"
-                    field-name="region"
-                    :edit-mode="editModeEnabled"
-                    @update:model-value="
-                        (val) => {
-                            fields.region.value = String(val || '');
-                            fields.region.isDirty = true;
-                            save();
-                        }
-                    "
-                >
-                    <template #display>
-                        <span class="text-xs text-muted-foreground">
-                            Region: {{ definition.region }}
-                        </span>
-                    </template>
-                </EditableField>
-            </div>
-
-            <!-- Usage Notes (edit mode) -->
-            <div v-if="editModeEnabled && definition.usage_notes?.length" class="mt-3 space-y-1">
-                <div class="text-xs font-medium text-muted-foreground">Usage Notes</div>
-                <div
-                    v-for="(note, i) in definition.usage_notes"
-                    :key="i"
-                    class="rounded-lg border border-border/50 bg-muted/20 px-2 py-1 text-xs"
-                >
-                    <span class="font-medium text-muted-foreground">{{ note.type }}:</span>
-                    {{ note.text }}
-                </div>
-            </div>
-
-            <!-- Grammar Patterns (edit mode) -->
-            <div v-if="editModeEnabled && definition.grammar_patterns?.length" class="mt-3 space-y-1">
-                <div class="text-xs font-medium text-muted-foreground">Grammar Patterns</div>
-                <div
-                    v-for="(pattern, i) in definition.grammar_patterns"
-                    :key="i"
-                    class="rounded-lg border border-border/50 bg-muted/20 px-2 py-1 text-xs font-mono"
-                >
-                    {{ pattern.pattern }}
-                    <span v-if="pattern.description" class="ml-1 font-sans text-muted-foreground">
-                        — {{ pattern.description }}
-                    </span>
-                </div>
-            </div>
-
-            <!-- Collocations (edit mode) -->
-            <div v-if="editModeEnabled && definition.collocations?.length" class="mt-3">
-                <div class="text-xs font-medium text-muted-foreground mb-1">Collocations</div>
-                <div class="flex flex-wrap gap-1">
-                    <span
-                        v-for="(coll, i) in definition.collocations"
-                        :key="i"
-                        class="rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-xs"
-                    >
-                        {{ coll.text }}
-                        <span class="text-muted-foreground/50">{{ coll.type }}</span>
-                    </span>
-                </div>
-            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useContentStore, useNotificationStore } from '@/stores';
+import { useNotificationStore } from '@/stores';
 import { useDefinitionEditMode } from '../../composables';
+import { useContentMutations } from '../../composables/useContentMutations';
 import type { TransformedDefinition } from '@/types';
 import ExampleListEditable from '../ExampleListEditable.vue';
 import SynonymListEditable from '../SynonymListEditable.vue';
 import EditableField from '../editing/EditableField.vue';
-import { DictionaryProvider } from '@/types/api';
-import { TEMPERATURE_GRADIENT, temperatureColor } from '@/utils/animations';
+import FrequencySlider from './FrequencySlider.vue';
+import DefinitionMetadata from './DefinitionMetadata.vue';
+import ContentBlockRenderer from './ContentBlockRenderer.vue';
+import { parseContentBlocks } from '../../utils/parseContentBlocks';
+import { temperatureColor, STAGGER_FAST } from '@/utils/animations';
 import { logger } from '@/utils/logger';
-
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-    [DictionaryProvider.WIKTIONARY]: 'Wiktionary',
-    [DictionaryProvider.OXFORD]: 'Oxford',
-    [DictionaryProvider.APPLE_DICTIONARY]: 'Apple Dict',
-    [DictionaryProvider.MERRIAM_WEBSTER]: 'Merriam-Webster',
-    [DictionaryProvider.FREE_DICTIONARY]: 'Free Dict',
-    [DictionaryProvider.WORDHIPPO]: 'WordHippo',
-    [DictionaryProvider.AI_FALLBACK]: 'AI Fallback',
-    [DictionaryProvider.SYNTHESIS]: 'Synthesis',
-};
-
-function getProviderDisplayName(provider: string): string {
-    return PROVIDER_DISPLAY_NAMES[provider] || provider.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
 
 interface DefinitionItemProps {
     definition: TransformedDefinition;
@@ -338,9 +215,14 @@ interface DefinitionItemProps {
     word?: string;
 }
 
-const contentStore = useContentStore();
+const mutations = useContentMutations();
 const notificationStore = useNotificationStore();
 const props = defineProps<DefinitionItemProps>();
+
+// Parse definition text into ContentBlock[] for rich rendering (LaTeX, code)
+const parsedBlocks = computed(() =>
+    parseContentBlocks(props.definition.definition || props.definition.text || ''),
+);
 
 // Frequency temperature visualization (continuous 0.0-1.0 → border color)
 const frequencyTemperatureStyle = computed(() => {
@@ -349,10 +231,8 @@ const frequencyTemperatureStyle = computed(() => {
     return { borderLeftColor: temperatureColor(score) };
 });
 
-function handleFrequencySlider(e: Event) {
-    const value = Math.round(parseInt((e.target as HTMLInputElement).value) / 20);
-    const clamped = Math.max(1, Math.min(5, value));
-    fields.frequency_band.value = clamped;
+function handleFrequencySlider(value: number) {
+    fields.frequency_band.value = value;
     fields.frequency_band.isDirty = true;
     save();
 }
@@ -374,7 +254,7 @@ const { fields, save, regenerateComponent, canRegenerate } =
     useDefinitionEditMode(definitionRef, {
         onSave: async (updates) => {
             if (props.definition.id) {
-                await contentStore.updateDefinition(
+                await mutations.updateDefinition(
                     props.definition.id,
                     updates
                 );
@@ -384,7 +264,7 @@ const { fields, save, regenerateComponent, canRegenerate } =
         },
         onRegenerate: async (component) => {
             if (props.definition.id) {
-                await contentStore.regenerateDefinitionComponent(
+                await mutations.regenerateDefinitionComponent(
                     props.definition.id,
                     component as 'definition' | 'examples' | 'usage_notes'
                 );
@@ -424,7 +304,7 @@ async function handleExampleUpdate(index: number, value: string) {
         if (example.id) {
             try {
                 // Update via the examples API endpoint
-                await contentStore.updateExample(
+                await mutations.updateExample(
                     props.definition.id,
                     example.id,
                     value
@@ -468,27 +348,5 @@ async function handleExampleRegenerate(index: number) {
 }
 .animate-def-fade-in {
     animation: defFadeIn 0.3s ease both;
-}
-
-.freq-slider::-webkit-slider-thumb {
-    appearance: none;
-    height: 12px;
-    width: 12px;
-    border-radius: 9999px;
-    background: var(--thumb-color, hsl(40, 80%, 55%));
-    border: 2px solid hsl(var(--background));
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    transition: transform 0.15s ease;
-}
-.freq-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.25);
-}
-.freq-slider::-moz-range-thumb {
-    height: 12px;
-    width: 12px;
-    border-radius: 9999px;
-    background: var(--thumb-color, hsl(40, 80%, 55%));
-    border: 2px solid hsl(var(--background));
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 </style>

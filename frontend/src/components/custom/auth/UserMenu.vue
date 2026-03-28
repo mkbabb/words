@@ -68,16 +68,9 @@ import { LogIn, LogOut, Shield } from 'lucide-vue-next';
 import { YoshiAvatar } from '@/components/custom/sidebar';
 import { useClerk } from '@clerk/vue';
 import { useAuthStore } from '@/stores/auth';
-import { cn } from '@/utils';
+import { cn } from '@mkbabb/glass-ui';
 import RoleBadge from './RoleBadge.vue';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@mkbabb/glass-ui';
 
 interface Props {
   collapsed?: boolean;

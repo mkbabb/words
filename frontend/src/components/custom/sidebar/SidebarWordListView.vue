@@ -146,10 +146,8 @@
         <ConfirmDialog
             v-model:open="showDeleteDialog"
             title="Delete Wordlist"
-            :description="`Are you sure you want to delete &quot;${wordlistToDelete?.name}&quot;?`"
-            message="This action cannot be undone. All words and progress will be permanently deleted."
-            confirm-text="Delete"
-            cancel-text="Cancel"
+            :description="`Are you sure you want to delete &quot;${wordlistToDelete?.name}&quot;? This action cannot be undone.`"
+            confirm-label="Delete"
             :destructive="true"
             @confirm="confirmDelete"
         />
@@ -158,56 +156,50 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useStores } from '@/stores';
-import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { FileText, Plus, Search, Upload } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
+import { Button } from '@mkbabb/glass-ui';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/modals/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/modals/CreateWordListModal.vue';
-import ConfirmDialog from '../ConfirmDialog.vue';
+import { ConfirmDialog } from '@mkbabb/glass-ui';
 import type { WordList } from '@/types';
-import { wordlistApi } from '@/api';
-import { useAuthStore } from '@/stores/auth';
-import { useToast } from '@/components/ui/toast/use-toast';
-import { useWordlistData } from '@/composables/useWordlistData';
-import { logger } from '@/utils/logger';
+import { useSidebarWordlistActions } from './composables/useSidebarWordlistActions';
 
-const searchBarStore = useSearchBarStore();
 const wordlistMode = useWordlistMode();
-const auth = useAuthStore();
-const { toast } = useToast();
-const { fetchAllWordlists } = useWordlistData();
 
-// Access UI store for sidebar control
-const { ui } = useStores();
+const actions = useSidebarWordlistActions();
+
+const {
+    isDragging,
+    showUploadModal,
+    showCreateModal,
+    pendingFiles,
+    activeUploads,
+    showDeleteDialog,
+    wordlistToDelete,
+    onDrop,
+    onFileChange,
+    loadWordlists,
+    handleWordlistSelect,
+    handleWordlistEdit,
+    handleWordlistDelete,
+    confirmDelete,
+    handleWordlistDuplicate,
+    handleWordsUploaded,
+    handleUploadCancel,
+    handleWordlistCreated,
+} = actions;
 
 // Component state
 const fileInput = ref<HTMLInputElement>();
 void fileInput; // bound via template ref="fileInput"
-const isDragging = ref(false);
-const showUploadModal = ref(false);
-const showCreateModal = ref(false);
-const pendingFiles = ref<File[]>([]);
-
-// Dialog state
-const showDeleteDialog = ref(false);
-const wordlistToDelete = ref<WordList | null>(null);
 
 // Shared wordlists from store
 const wordlists = computed({
     get: () => wordlistMode.allWordlists as WordList[],
     set: (val: WordList[]) => { wordlistMode.allWordlists = val; },
 });
-const activeUploads = ref<
-    Array<{
-        id: string;
-        filename: string;
-        status: string;
-        progress: number;
-    }>
->([]);
 const isLoading = computed(() => wordlistMode.wordlistsLoading);
 
 // Search/filter
@@ -220,236 +212,6 @@ const filteredWordlists = computed(() => {
 
 // Computed properties
 const selectedWordlist = computed(() => wordlistMode.selectedWordlist);
-
-// Methods
-const onDrop = (event: DragEvent) => {
-    event.preventDefault();
-    isDragging.value = false;
-
-    const files = Array.from(event.dataTransfer?.files || []);
-    handleFiles(files);
-};
-
-const onFileChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const files = Array.from(target.files || []);
-    handleFiles(files);
-};
-
-const handleFiles = async (files: File[]) => {
-    if (files.length === 0) return;
-
-    // Validate files
-    const validFiles = files.filter((file) => {
-        const isValidType = file.name.match(/\.(txt|csv|json)$/i);
-        const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
-        return isValidType && isValidSize;
-    });
-
-    if (validFiles.length === 0) {
-        logger.error('No valid files selected');
-        return;
-    }
-
-    // If single file and we have existing wordlists, show upload modal
-    if (validFiles.length === 1 && wordlists.value.length > 0) {
-        pendingFiles.value = validFiles;
-        showUploadModal.value = true;
-    } else {
-        // Multiple files or no existing wordlists - create new wordlists
-        processFilesDirectly(validFiles);
-    }
-};
-
-const processFilesDirectly = async (files: File[]) => {
-    for (const file of files) {
-        const uploadId = `upload_${Date.now()}_${Math.random()}`;
-
-        // Add to active uploads
-        activeUploads.value.push({
-            id: uploadId,
-            filename: file.name,
-            status: 'Processing...',
-            progress: 0,
-        });
-
-        try {
-            const upload = activeUploads.value.find((u) => u.id === uploadId);
-            if (upload) {
-                upload.progress = 25;
-                upload.status = 'Uploading...';
-
-                // Upload to backend
-                const result = await wordlistApi.uploadWordlist(file, {
-                    owner_id: 'current_user',
-                });
-
-                upload.progress = 100;
-                upload.status = 'Complete';
-
-                // Transform backend response to frontend format
-                const newWordlist = transformWordlistFromAPI(result.data);
-                wordlists.value.unshift(newWordlist);
-
-                // Remove from active uploads after a delay
-                setTimeout(() => {
-                    activeUploads.value = activeUploads.value.filter(
-                        (u) => u.id !== uploadId
-                    );
-                }, 2000);
-            }
-        } catch (error) {
-            logger.error('File processing error:', error);
-            const upload = activeUploads.value.find((u) => u.id === uploadId);
-            if (upload) {
-                upload.status = 'Error';
-                upload.progress = 0;
-            }
-        }
-    }
-};
-
-// Transform API response to frontend WordList format
-const transformWordlistFromAPI = (apiWordlist: any): WordList => {
-    return {
-        id: apiWordlist._id || apiWordlist.id,
-        name: apiWordlist.name,
-        description: apiWordlist.description,
-        hash_id: apiWordlist.hash_id,
-        words: apiWordlist.words || [],
-        total_words: apiWordlist.total_words,
-        unique_words: apiWordlist.unique_words,
-        learning_stats: apiWordlist.learning_stats,
-        last_accessed: apiWordlist.last_accessed,
-        created_at: apiWordlist.created_at,
-        updated_at: apiWordlist.updated_at,
-        metadata: apiWordlist.metadata || {},
-        tags: apiWordlist.tags || [],
-        is_public: apiWordlist.is_public || false,
-        owner_id: apiWordlist.owner_id,
-    };
-};
-
-// Load wordlists via shared store
-const loadWordlists = async () => {
-    if (!auth.isAuthenticated) return;
-    await fetchAllWordlists();
-};
-
-const handleWordlistSelect = async (wordlist: WordList) => {
-    wordlistMode.setWordlist(wordlist.id);
-    // ✅ Use simple mode system - just change the mode
-    searchBarStore.setMode('wordlist');
-
-    // Close mobile sidebar if open (match SidebarLookupView pattern)
-    if (ui.sidebarOpen) {
-        ui.toggleSidebar();
-    }
-};
-
-const handleWordlistEdit = (wordlist: WordList) => {
-    // For now, just open a prompt to rename
-    const newName = prompt('Enter new name for wordlist:', wordlist.name);
-    if (newName && newName !== wordlist.name) {
-        updateWordlistName(wordlist, newName);
-    }
-};
-
-const updateWordlistName = async (wordlist: WordList, newName: string) => {
-    try {
-        await wordlistApi.updateWordlist(wordlist.id, { name: newName });
-
-        // Update local data
-        const index = wordlists.value.findIndex((w) => w.id === wordlist.id);
-        if (index >= 0) {
-            wordlists.value[index].name = newName;
-        }
-    } catch (error) {
-        logger.error('Failed to update wordlist name:', error);
-        toast({
-            title: 'Error',
-            description: 'Failed to update wordlist name',
-            variant: 'destructive',
-        });
-    }
-};
-
-const handleWordlistDelete = (wordlist: WordList) => {
-    wordlistToDelete.value = wordlist;
-    showDeleteDialog.value = true;
-};
-
-const confirmDelete = async () => {
-    if (!wordlistToDelete.value) return;
-
-    try {
-        await wordlistApi.deleteWordlist(wordlistToDelete.value.id);
-        wordlists.value = wordlists.value.filter(
-            (w) => w.id !== wordlistToDelete.value!.id
-        );
-
-        // Handle graceful fallback if deleted wordlist was selected
-        if (selectedWordlist.value === wordlistToDelete.value?.id) {
-            const firstWordlist = wordlists.value[0];
-            wordlistMode.setWordlist(firstWordlist?.id || null);
-        }
-
-        toast({
-            title: 'Success',
-            description: `Wordlist "${wordlistToDelete.value.name}" has been deleted`,
-        });
-    } catch (error) {
-        logger.error('Failed to delete wordlist:', error);
-        toast({
-            title: 'Error',
-            description: 'Failed to delete wordlist',
-            variant: 'destructive',
-        });
-    } finally {
-        showDeleteDialog.value = false;
-        wordlistToDelete.value = null;
-    }
-};
-
-const handleWordlistDuplicate = async (wordlist: WordList) => {
-    try {
-        const words = wordlist.words.map((w) => w.word);
-        const result = await wordlistApi.createWordlist({
-            name: `${wordlist.name} (Copy)`,
-            description: wordlist.description,
-            words,
-            tags: wordlist.tags,
-            owner_id: 'current_user',
-        });
-
-        const newWordlist = transformWordlistFromAPI(result.data);
-        wordlists.value.unshift(newWordlist);
-    } catch (error) {
-        logger.error('Failed to duplicate wordlist:', error);
-    }
-};
-
-const handleWordsUploaded = (_words: string[]) => {
-    showUploadModal.value = false;
-    pendingFiles.value = [];
-};
-
-const handleUploadCancel = () => {
-    showUploadModal.value = false;
-    pendingFiles.value = [];
-};
-
-const handleWordlistCreated = async (wordlist: WordList) => {
-    wordlists.value.unshift(wordlist);
-    wordlistMode.setWordlist(wordlist.id);
-    // ✅ Use simple mode system - just change the mode
-    searchBarStore.setMode('wordlist');
-
-    // Close mobile sidebar if open
-    if (ui.sidebarOpen) {
-        ui.toggleSidebar();
-    }
-};
 
 // Lifecycle
 onMounted(() => {

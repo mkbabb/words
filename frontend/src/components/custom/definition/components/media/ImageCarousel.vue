@@ -1,7 +1,7 @@
 <template>
     <div
         v-if="(images && images.length > 0) || editMode"
-        class="absolute top-2 right-2 z-10 sm:top-4 sm:right-4"
+        class="absolute top-2 right-2 z-content sm:top-4 sm:right-4"
     >
         <div class="group relative" @mouseenter="handleMouseEnter">
             <Carousel
@@ -86,8 +86,8 @@ import {
     CarouselItem,
     CarouselNext,
     CarouselPrevious,
-} from '@/components/ui/carousel';
-import type { CarouselApi } from '@/components/ui/carousel';
+} from '@mkbabb/glass-ui';
+import type { CarouselApi } from '@mkbabb/glass-ui';
 import CarouselSlide from './CarouselSlide.vue';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';

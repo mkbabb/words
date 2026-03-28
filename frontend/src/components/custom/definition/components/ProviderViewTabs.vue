@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted } from 'vue';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@mkbabb/glass-ui';
 import ProviderDataView from './ProviderDataView.vue';
 import { providersApi, type ProviderEntry } from '@/api/providers';
 import { versionsApi } from '@/api';
@@ -128,18 +128,7 @@ async function loadProviders() {
   }
 }
 
-// Load when a non-synthesis tab is selected
-watch(() => props.modelValue, (tab) => {
-  if (tab !== 'synthesis' && !loaded.value) {
-    loadProviders();
-  }
-  // Load per-provider version history in admin mode
-  if (tab !== 'synthesis' && props.showVersionHistory) {
-    loadProviderVersions(tab);
-  }
-});
-
-// Reset when word changes
+// Reset provider cache when word changes
 watch(() => props.word, () => {
   loaded.value = false;
   providers.value = [];
@@ -148,22 +137,35 @@ watch(() => props.word, () => {
     emit('update:modelValue', 'synthesis');
     return;
   }
-
   if (props.availableProviders.length > 0) {
     emit('update:modelValue', props.availableProviders[0]);
   }
 });
 
+// Validate active tab & load provider data when tab/providers/showSynthesis change.
+// Consolidates tab-validation and data-loading into a single watcher.
 watch(
   () => [props.availableProviders, props.showSynthesis, props.modelValue] as const,
   ([availableProviders, showSynthesis, activeTab]) => {
+    // 1. Ensure current tab is still valid
     const validTabs = showSynthesis
       ? ['synthesis', ...availableProviders]
       : [...availableProviders];
 
-    if (validTabs.length === 0) return;
-    if (validTabs.includes(activeTab)) return;
-    emit('update:modelValue', validTabs[0]);
+    if (validTabs.length > 0 && !validTabs.includes(activeTab)) {
+      emit('update:modelValue', validTabs[0]);
+      return; // Will re-fire with corrected tab
+    }
+
+    // 2. Load provider data when on a non-synthesis tab
+    if (activeTab !== 'synthesis') {
+      if (!loaded.value) {
+        loadProviders();
+      }
+      if (props.showVersionHistory) {
+        loadProviderVersions(activeTab);
+      }
+    }
   },
   { immediate: true },
 );
