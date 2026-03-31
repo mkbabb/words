@@ -274,10 +274,16 @@ Provider data → Dedup → Cluster
 
 ```
 backend/tests/
-├── conftest.py              # Root: MongoDB infra, factories
+├── conftest.py              # Root: .env auto-load, MongoDB setup, factories
+├── ai/                      # AI connector, assessment, dedup, clustering, synthesis
+│   ├── assessment/          # Local frequency, CEFR, domain, register, regional
+│   ├── clustering/          # Agglomerative clustering, slug generation
+│   ├── dedup/               # 3-tier local dedup
+│   ├── quality/             # Integration quality gates (bank polysemy)
+│   └── synthesis/           # Hybrid synonyms, language filter, postprocess
 ├── api/                     # Endpoint integration tests
 ├── search/                  # All search methods
-├── providers/               # All provider types
+├── providers/               # All provider types (Wiktionary, WordNet, Wikipedia, etc.)
 ├── corpus/                  # Tree ops, cascade deletion
 ├── caching/                 # L1/L2/L3 tiers
 ├── models/                  # Pydantic validation
@@ -286,7 +292,11 @@ backend/tests/
 └── fixtures/                # Test fixtures (epub, pdf)
 ```
 
-**Strategy**: Real MongoDB per test (unique DB), real FAISS indices, real file ops. Only external APIs mocked (OpenAI, dictionary providers). Session-scoped fixtures for expensive operations (semantic indices).
+**Strategy**: Real MongoDB per test (unique DB per test function, dropped after). Real FAISS indices, real file ops. Only external APIs mocked (OpenAI, dictionary providers). Session-scoped fixtures for expensive operations (semantic indices).
+
+**Database**: Tests use the Docker Mongo container (`localhost:27017`). The conftest auto-loads `.env` via `python-dotenv` to get `MONGO_USERNAME`/`MONGO_PASSWORD`. No manual env setup needed — just run `pytest`.
+
+**Requirements**: Docker Mongo must be running (`docker compose up -d mongo`). Port 27017 is exposed to host via docker-compose.
 
 ## Development
 
@@ -299,6 +309,8 @@ uv run scripts/run_api.py                      # Port 8003
 # Quality
 ruff check --fix && ruff format
 mypy src/ --strict
+
+# Tests — just run pytest, .env is auto-loaded
 pytest tests/ -v
 pytest tests/ --cov=src/floridify --cov-report=html
 ```
