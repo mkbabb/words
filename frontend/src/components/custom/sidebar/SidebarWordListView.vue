@@ -7,14 +7,14 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="Search wordlists..."
-                class="w-full rounded-lg bg-background/96 dark:bg-background/85 border border-border/40 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/60 shadow-sm transition-[background-color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
+                class="w-full rounded-lg bg-background/96 dark:bg-background/85 border border-border/40 pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground/60 shadow-cartoon-sm transition-[background-color,border-color,box-shadow] duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
             />
         </div>
 
         <!-- All Wordlists -->
         <div v-if="isLoading" class="space-y-2">
             <div v-for="i in 3" :key="i" class="animate-pulse">
-                <div class="h-16 rounded-md border border-border/20 bg-background/96 shadow-sm"></div>
+                <div class="h-16 rounded-md border border-border/20 bg-background/96 shadow-cartoon-sm"></div>
             </div>
         </div>
 
@@ -57,10 +57,10 @@
             @dragenter.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             :class="[
-                'cursor-pointer rounded-lg border-2 border-dashed border-border/30 bg-background/96 p-4 text-center shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring',
+                'cursor-pointer rounded-lg border-2 border-dashed border-border/30 bg-background/96 p-4 text-center shadow-cartoon-sm transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy',
                 isDragging
-                    ? 'border-primary bg-primary/5 shadow-md'
-                    : 'hover:-translate-y-0.5 hover:border-muted-foreground/50 hover:bg-background hover:shadow-md',
+                    ? 'border-primary bg-primary/5 shadow-cartoon-md'
+                    : 'hover:-translate-y-0.5 hover:border-muted-foreground/50 hover:bg-background hover:shadow-cartoon-md',
             ]"
             @click="showUploadModal = true"
         >
@@ -104,7 +104,7 @@
                 <div
                     v-for="upload in activeUploads"
                     :key="upload.id"
-                    class="flex items-center justify-between rounded-md border border-border/30 bg-background/96 p-2 shadow-sm"
+                    class="flex items-center justify-between rounded-md border border-border/30 bg-background/96 p-2 shadow-cartoon-sm"
                 >
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium">

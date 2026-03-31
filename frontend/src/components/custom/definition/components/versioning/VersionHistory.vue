@@ -74,7 +74,7 @@
                 v-if="auth.isAdmin && version.version !== currentVersion"
                 variant="ghost"
                 size="sm"
-                class="h-6 px-2 text-xs text-blue-500 hover:text-blue-600"
+                class="h-6 px-2 text-xs text-[var(--color-info)] hover:text-[var(--color-info)]"
                 @click="handlePreview(version.version)"
               >
                 <Eye :size="12" class="mr-1" />

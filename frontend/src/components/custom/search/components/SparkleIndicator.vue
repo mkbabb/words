@@ -1,7 +1,7 @@
 <template>
     <Transition
         enter-active-class="transition-smooth"
-        leave-active-class="transition-[opacity,transform] duration-300 ease-in"
+        leave-active-class="transition-[opacity,transform] duration-normal ease-in"
         enter-from-class="opacity-0 scale-0"
         enter-to-class="opacity-100 scale-100"
         leave-from-class="opacity-100 scale-100"
@@ -14,11 +14,11 @@
             <div class="relative">
                 <Sparkles
                     :size="size"
-                    class="animate-pulse fill-amber-600 text-amber-600 drop-shadow-lg dark:fill-amber-400 dark:text-amber-400"
+                    class="animate-pulse fill-[var(--color-gold)] text-[var(--color-gold)] drop-shadow-lg dark:fill-[var(--color-gold)] dark:text-[var(--color-gold)]"
                 />
                 <Sparkles
                     :size="size"
-                    class="animate-spin-slow absolute inset-0 fill-amber-300 text-amber-300 opacity-50 dark:fill-amber-600 dark:text-amber-600"
+                    class="animate-spin-slow absolute inset-0 fill-[var(--color-gold)]/50 text-[var(--color-gold)]/50 opacity-50 dark:fill-[var(--color-gold)]/60 dark:text-[var(--color-gold)]/60"
                 />
             </div>
         </div>

@@ -63,7 +63,7 @@ defineEmits<{
 
 const buttonClasses = [
     'group flex w-full items-center justify-between rounded-md px-3 py-2',
-    'transition-colors duration-200',
+    'transition-colors duration-fast',
     'hover:bg-muted/50',
     'active:scale-[0.98]',
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',

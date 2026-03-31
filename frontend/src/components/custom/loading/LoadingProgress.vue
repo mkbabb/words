@@ -7,18 +7,18 @@
         <div class="relative">
             <div
                 ref="progressBarRef"
-                class="relative overflow-hidden rounded-full bg-gray-200
-                    dark:bg-gray-700"
+                class="relative overflow-hidden rounded-full bg-muted
+                    dark:bg-muted"
                 :class="[
                     variant === 'thin' ? 'h-1.5' : 'h-8',
-                    variant === 'thin' ? 'bg-muted/60 shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
+                    variant === 'thin' ? 'bg-muted/60 shadow-sm' : 'shadow-inner border border-border',
                     interactive ? 'cursor-pointer' : '',
                 ]"
                 @mousedown="handleMouseDown"
                 @click="handleProgressBarInteraction"
             >
                 <div
-                    class="h-full rounded-full transition-[width] duration-300
+                    class="h-full rounded-full transition-[width] duration-normal
                         ease-out"
                     :style="{
                         width: `${normalizedProgress}%`,
@@ -61,7 +61,7 @@
                                     variant === 'thin' ? 'h-2 w-2 border' : 'h-6 w-6 border-2',
                                     normalizedProgress >= checkpoint.progress
                                         ? 'scale-110 border-primary bg-primary'
-                                        : 'border-gray-400 bg-background dark:border-gray-500',
+                                        : 'border-muted-foreground/50 bg-background',
                                     isActiveCheckpoint(checkpoint.progress)
                                         ? 'animate-pulse'
                                         : '',
@@ -124,7 +124,7 @@
 
         <!-- Progress Percentage -->
         <!-- <div class="text-center">
-      <span class="text-2xl font-bold text-gray-800 dark:text-gray-200 tracking-tight">
+      <span class="text-2xl font-bold text-foreground tracking-tight">
         {{ Math.round(progress) }}%
       </span>
     </div> -->

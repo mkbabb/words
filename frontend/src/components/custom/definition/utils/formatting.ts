@@ -43,7 +43,7 @@ export function getHeatmapClass(score: number): string {
         return cn(
             'bg-gradient-to-br from-green-300 to-green-400 dark:from-green-700 dark:to-green-800',
             'text-green-900 dark:text-green-100',
-            'border-green-400 dark:border-green-600'
+            'border-[var(--color-success)]'
         );
     } else if (score >= 0.8) {
         return cn(
@@ -55,7 +55,7 @@ export function getHeatmapClass(score: number): string {
         return cn(
             'bg-gradient-to-br from-yellow-300 to-yellow-400 dark:from-yellow-700 dark:to-yellow-800',
             'text-yellow-900 dark:text-yellow-100',
-            'border-yellow-400 dark:border-yellow-600'
+            'border-[var(--color-gold)]'
         );
     } else if (score >= 0.6) {
         return cn(

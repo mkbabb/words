@@ -8,7 +8,7 @@
         <!-- Expand Button -->
         <Transition
             enter-active-class="transition-fast"
-            leave-active-class="transition-[opacity,transform] duration-200 ease-in"
+            leave-active-class="transition-[opacity,transform] duration-fast ease-in"
             enter-from-class="opacity-0 scale-90"
             leave-to-class="opacity-0 scale-90"
         >
@@ -33,7 +33,7 @@
         <!-- Clear Button -->
         <Transition
             enter-active-class="transition-fast"
-            leave-active-class="transition-[opacity,transform] duration-200 ease-in"
+            leave-active-class="transition-[opacity,transform] duration-fast ease-in"
             enter-from-class="opacity-0 scale-90"
             leave-to-class="opacity-0 scale-90"
         >

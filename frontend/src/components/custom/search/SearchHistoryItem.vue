@@ -5,8 +5,8 @@
                 :class="
                     cn(
                         'group hover-lift-md relative w-full cursor-pointer overflow-hidden rounded-lg',
-                        'border border-border bg-background shadow-sm',
-                        'hover:bg-accent hover:shadow-md'
+                        'border border-border bg-background shadow-cartoon-sm',
+                        'hover:bg-accent hover:shadow-cartoon-md'
                     )
                 "
                 @click="$emit('lookup', entry.word)"

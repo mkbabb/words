@@ -3,7 +3,7 @@
         <!-- Back button header -->
         <div class="mb-3 flex items-center gap-3">
             <button
-                class="flex h-8 items-center gap-1.5 rounded-lg border border-border/40 bg-background/80 px-3 text-xs text-muted-foreground backdrop-blur-sm transition-colors hover:bg-background/95 hover:text-foreground"
+                class="flex h-8 items-center gap-1.5 rounded-lg glass-default px-3 text-xs text-muted-foreground transition-colors hover:bg-background/95 hover:text-foreground"
                 @click="$emit('collapse')"
             >
                 <ChevronLeft :size="14" />
@@ -24,16 +24,16 @@
             </span>
             <span
                 v-if="diffFields.size > 0"
-                class="flex items-center gap-1.5 text-micro font-medium text-amber-500/80"
+                class="flex items-center gap-1.5 text-micro font-medium text-[var(--color-gold)]/80"
             >
-                <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-gold)]" />
                 {{ diffFields.size }} field{{ diffFields.size !== 1 ? 's' : '' }} changed
             </span>
         </div>
 
         <!-- Scrollable entry content — uses the same renderer as DefinitionDisplay -->
         <div
-            class="flex-1 overflow-y-auto rounded-xl border border-border/30 bg-background/80 shadow-2xl shadow-cartoon-lg backdrop-blur-xl scrollbar-thin"
+            class="flex-1 overflow-y-auto rounded-xl glass-elevated shadow-cartoon-lg scrollbar-thin"
         >
             <DefinitionContentRenderer
                 v-if="hydratedEntry"

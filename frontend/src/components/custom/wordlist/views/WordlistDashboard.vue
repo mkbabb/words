@@ -11,7 +11,7 @@
             <button
                 @click="showCreate = true"
                 class="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
-                       transition-fast hover:shadow-sm hover:bg-background/90
+                       transition-fast hover:shadow-cartoon-sm hover:bg-background/90
                        focus-ring"
             >
                 <Plus class="h-3.5 w-3.5" />
@@ -25,20 +25,20 @@
                 <p class="tabular-nums font-serif text-4xl font-bold tracking-tight leading-none">
                     {{ formatCount(globalStats?.global_stats?.total_words ?? totalWordsAcrossLists) }}
                 </p>
-                <p class="mt-1 text-xs text-muted-foreground/60 uppercase tracking-widest">unique words</p>
+                <p class="mt-1 section-label text-muted-foreground/60">unique words</p>
             </div>
             <div>
                 <p class="tabular-nums font-serif text-4xl font-bold tracking-tight leading-none mastery-gold">
                     {{ formatCount(globalStats?.global_stats?.words_mastered ?? totalMasteredAcrossLists) }}
                 </p>
-                <p class="mt-1 text-xs text-muted-foreground/60 uppercase tracking-widest">mastered</p>
+                <p class="mt-1 section-label text-muted-foreground/60">mastered</p>
             </div>
             <div v-if="globalStreakDays > 0">
                 <p class="tabular-nums font-serif text-4xl font-bold tracking-tight leading-none mastery-bronze flex items-end gap-1.5">
                     <Flame class="h-7 w-7 mb-0.5" />
                     {{ formatCount(globalStreakDays) }}
                 </p>
-                <p class="mt-1 text-xs text-muted-foreground/60 uppercase tracking-widest">day streak</p>
+                <p class="mt-1 section-label text-muted-foreground/60">day streak</p>
             </div>
         </div>
 
@@ -80,7 +80,7 @@
             <button
                 @click="showCreate = true"
                 class="glass-subtle mt-5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
-                       transition-fast hover:shadow-sm hover:bg-background/90"
+                       transition-fast hover:shadow-cartoon-sm hover:bg-background/90"
             >
                 <Plus class="h-3.5 w-3.5" />
                 Create a wordlist
@@ -101,7 +101,7 @@
 
         <!-- Aggregate word search results (across all wordlists) -->
         <div v-if="aggregateResults.length > 0 && searchQuery" class="space-y-3">
-            <h3 class="text-xs font-medium uppercase tracking-widest text-muted-foreground/50">
+            <h3 class="section-label text-muted-foreground/50">
                 Words matching "{{ searchQuery }}"
             </h3>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -119,8 +119,8 @@
                             v-if="item.mastery_level"
                             :class="[
                                 'rounded-full px-1.5 py-0.5',
-                                item.mastery_level === 'gold' && 'bg-amber-300/10 text-amber-600',
-                                item.mastery_level === 'silver' && 'bg-gray-300/10 text-gray-600',
+                                item.mastery_level === 'gold' && 'bg-[var(--mastery-gold)]/10 text-[var(--mastery-gold)]',
+                                item.mastery_level === 'silver' && 'bg-[var(--mastery-silver)]/10 text-[var(--mastery-silver)]',
                                 item.mastery_level === 'bronze' && 'bg-orange-300/10 text-orange-600',
                                 item.mastery_level === 'default' && 'bg-muted',
                             ]"

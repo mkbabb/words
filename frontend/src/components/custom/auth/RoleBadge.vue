@@ -4,7 +4,7 @@
     :class="cn(
       'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium align-middle',
       role === 'admin'
-        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+        ? 'bg-[var(--color-gold)]/10 text-[var(--color-gold)]'
         : 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
     )"
   >

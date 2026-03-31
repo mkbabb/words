@@ -55,7 +55,7 @@
                 <span v-if="isLookingUp" class="flex items-center gap-2">
                   Looking up...
                 </span>
-                <span v-else>Reveal <kbd class="ml-1 text-[10px] opacity-50 border rounded px-1">Space</kbd></span>
+                <span v-else>Reveal <kbd class="ml-1 text-2xs opacity-50 border rounded px-1">Space</kbd></span>
                 <span
                   v-if="isLookingUp"
                   class="absolute bottom-0 left-0 right-0 h-0.5 rainbow-shimmer"
@@ -94,7 +94,7 @@
             <!-- Lookup Timed Out -->
             <div
               v-if="lookupTimedOut"
-              class="mt-4 text-sm text-center cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-500 hover:bg-amber-500/15 transition-colors"
+              class="mt-4 text-sm text-center cursor-pointer rounded-lg border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/10 p-3 text-[var(--color-gold)] hover:bg-[var(--color-gold)]/15 transition-colors"
               @click="$emit('reveal')"
             >
               Lookup timed out — tap to retry

@@ -105,7 +105,7 @@
 
           <!-- Notes -->
           <div v-if="word.notes" class="card-surface mt-4 p-4">
-            <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Notes</div>
+            <div class="section-label mb-1.5">Notes</div>
             <p class="text-sm font-serif leading-relaxed text-foreground/90">{{ word.notes }}</p>
           </div>
 

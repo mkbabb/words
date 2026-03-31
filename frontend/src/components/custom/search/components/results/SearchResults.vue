@@ -5,7 +5,7 @@
         <div
             v-if="show"
             ref="searchResultsDropdown"
-            class="dropdown-element popover-surface origin-top overflow-hidden bg-background/96 border border-border/40 shadow-xl"
+            class="dropdown-element popover-surface origin-top overflow-hidden bg-background/96 border border-border/40 shadow-cartoon-lg"
             @mousedown.prevent
             @click="$emit('interaction')"
         >
@@ -51,16 +51,16 @@
                 v-if="!loading && results.length === 0 && query.length === 0 && recentSearches && recentSearches.length > 0"
                 class="max-h-64 overflow-y-auto bg-transparent"
             >
-                <div class="px-4 py-2 text-xs font-medium text-muted-foreground/50 uppercase tracking-wider">Recent</div>
+                <div class="px-4 py-2 section-label text-muted-foreground/50">Recent</div>
                 <button
                     v-for="(search, index) in recentSearches.slice(0, 8)"
                     :key="search.query"
                     :class="[
-                        'interactive-item ease-apple-spring flex w-full items-center border-l-4 border-transparent px-4 py-2.5 text-left transition-[background-color,color,box-shadow,transform] duration-250 transform-gpu',
+                        'interactive-item ease-spring-snappy flex w-full items-center border-l-4 border-transparent px-4 py-2.5 text-left transition-[background-color,color,box-shadow,transform] duration-fast transform-gpu',
                         'active:scale-[0.97]',
                         index === selectedIndex
-                            ? 'border-l-primary/60 bg-accent/35 shadow-sm'
-                            : 'hover:bg-accent/15 hover:shadow-sm',
+                            ? 'border-l-primary/60 bg-accent/35 shadow-cartoon-sm'
+                            : 'hover:bg-accent/15 hover:shadow-cartoon-sm',
                     ]"
                     @click="$emit('select-result', { word: search.query, score: 1.0, method: SearchMethod.EXACT })"
                     @mouseenter="selectedIndex = index"

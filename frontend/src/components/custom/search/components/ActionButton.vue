@@ -9,7 +9,7 @@
         ]"
         v-bind="$attrs"
     >
-        <span class="transition-transform duration-200 group-hover:scale-110">
+        <span class="transition-transform duration-fast group-hover:scale-110">
             <slot />
         </span>
     </Button>

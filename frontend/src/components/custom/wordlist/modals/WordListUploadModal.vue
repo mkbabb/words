@@ -224,8 +224,8 @@ const {
 .upload-step-enter-active,
 .upload-step-leave-active {
     transition:
-        opacity 180ms var(--ease-apple-smooth),
-        transform 220ms var(--ease-apple-spring);
+        opacity 180ms var(--ease-spring-smooth),
+        transform 220ms var(--ease-spring-snappy);
 }
 
 .upload-step-enter-from,

@@ -8,8 +8,8 @@
                 :class="[
                     'flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-fast select-none cursor-pointer',
                     modelValue === option.value
-                        ? 'border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 hover:border-primary/30 hover:shadow-sm'
-                        : 'border border-transparent hover:border-border/50 hover:bg-muted/60 hover:shadow-sm',
+                        ? 'border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 hover:border-primary/30 hover:shadow-cartoon-sm'
+                        : 'border border-transparent hover:border-border/50 hover:bg-muted/60 hover:shadow-cartoon-sm',
                 ]"
                 @click="$emit('update:modelValue', option.value)"
             >
@@ -38,8 +38,8 @@
                 :class="[
                     'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-fast select-none',
                     modelValue === option.value
-                        ? 'border border-primary/30 bg-primary/10 text-primary shadow-sm hover:bg-primary/15'
-                        : 'border border-border/50 bg-background hover:border-primary/20 hover:bg-muted/50 hover:shadow-sm text-muted-foreground hover:text-foreground',
+                        ? 'border border-primary/30 bg-primary/10 text-primary shadow-cartoon-sm hover:bg-primary/15'
+                        : 'border border-border/50 bg-background hover:border-primary/20 hover:bg-muted/50 hover:shadow-cartoon-sm text-muted-foreground hover:text-foreground',
                 ]"
             >
                 <component :is="option.icon" :size="14" class="shrink-0" />

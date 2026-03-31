@@ -9,7 +9,7 @@
                 v-for="wl in recentWordlists"
                 :key="wl.id"
                 @click="navigateToWordlist(wl.id)"
-                class="inline-flex items-center gap-1 rounded-md border border-border/40 bg-background/96 px-2.5 py-1 text-xs font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md text-muted-foreground hover:text-foreground"
+                class="inline-flex items-center gap-1 rounded-md border border-border/40 bg-background/96 px-2.5 py-1 text-xs font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md text-muted-foreground hover:text-foreground"
             >
                 {{ wl.name }}
             </button>
@@ -34,10 +34,10 @@
                 :key="tag"
                 @click="toggleDashboardTag(tag)"
                 :class="[
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer',
                     activeDashboardTags.has(tag)
                         ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                        : 'bg-background/96 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-foreground hover:shadow-md',
+                        : 'bg-background/96 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-foreground hover:shadow-cartoon-md',
                 ]"
             >
                 <Tag :size="10" />
@@ -73,10 +73,10 @@
                 :key="level.key"
                 @click="toggleFilter(level.key)"
                 :class="[
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer',
                     (filtersValue as any)[level.key]
                         ? `${level.pillActiveClass} ring-1`
-                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                 ]"
             >
                 <span :class="['h-2 w-2 rounded-full flex-shrink-0', level.dotClass]" />
@@ -85,10 +85,10 @@
             <button
                 @click="toggleFilter('showHotOnly')"
                 :class="[
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer',
                     filtersValue.showHotOnly
-                        ? 'bg-red-500/15 text-red-500 ring-1 ring-red-500/30'
-                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                        ? 'bg-destructive/15 text-destructive ring-1 ring-destructive/30'
+                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                 ]"
             >
                 <Flame :size="12" />
@@ -97,10 +97,10 @@
             <button
                 @click="toggleFilter('showDueOnly')"
                 :class="[
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer',
                     filtersValue.showDueOnly
-                        ? 'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30'
-                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                        ? 'bg-[var(--color-info)]/15 text-[var(--color-info)] ring-1 ring-[var(--color-info)]/30'
+                        : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                 ]"
             >
                 <Clock :size="12" />
@@ -323,13 +323,13 @@ const masteryButtons = [
     {
         key: 'showSilver',
         label: 'Familiar',
-        pillActiveClass: 'bg-gray-400/15 text-gray-500 ring-gray-400/30',
+        pillActiveClass: 'bg-[var(--mastery-silver)]/15 text-[var(--mastery-silver)] ring-[var(--mastery-silver)]/30',
         dotClass: 'bg-gradient-to-r from-gray-400 to-gray-600',
     },
     {
         key: 'showGold',
         label: 'Mastered',
-        pillActiveClass: 'bg-amber-500/15 text-amber-500 ring-amber-500/30',
+        pillActiveClass: 'bg-[var(--mastery-gold)]/15 text-[var(--mastery-gold)] ring-[var(--mastery-gold)]/30',
         dotClass: 'bg-gradient-to-r from-yellow-400 to-amber-600',
     },
 ];

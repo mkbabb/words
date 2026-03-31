@@ -51,11 +51,11 @@ const hasClerk = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkAppearance = computed(() => ({
   variables: {
     fontFamily: 'var(--font-serif)',
-    colorPrimary: 'hsl(var(--primary))',
+    colorPrimary: 'var(--primary)',
     colorBackground: 'transparent',
-    colorText: 'hsl(var(--card-foreground))',
-    colorInputBackground: 'hsl(var(--input))',
-    colorInputText: 'hsl(var(--foreground))',
+    colorText: 'var(--card-foreground)',
+    colorInputBackground: 'var(--input)',
+    colorInputText: 'var(--foreground)',
     borderRadius: '0.75rem',
   },
   layout: {

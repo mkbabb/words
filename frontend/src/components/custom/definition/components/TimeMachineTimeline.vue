@@ -37,7 +37,7 @@
 
                 <!-- Version label -->
                 <div
-                    class="mt-2 flex flex-col items-center transition-opacity duration-200"
+                    class="mt-2 flex flex-col items-center transition-opacity duration-fast"
                     :class="[
                         index === selectedIndex
                             ? 'opacity-100'

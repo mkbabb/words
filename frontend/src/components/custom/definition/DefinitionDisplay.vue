@@ -83,7 +83,7 @@
         <ThemedCard
             :variant="selectedCardVariant"
             :class="[
-                'relative transition-[box-shadow] duration-350 ease-apple-default',
+                'relative transition-[box-shadow] duration-normal ease',
                 editModeEnabled && 'ring-1 ring-inset ring-muted-foreground/15',
             ]"
         >

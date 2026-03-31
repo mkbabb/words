@@ -10,7 +10,7 @@
         >
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="space-y-1">
-                    <p class="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                    <p class="section-label">
                         Words found
                     </p>
                     <h3 class="font-serif text-lg font-semibold">
@@ -69,7 +69,7 @@
                             <div
                                 v-for="word in displayedWords"
                                 :key="`${word.text}-${word.frequency}`"
-                                class="flex items-start justify-between gap-3 rounded-xl border border-border/30 bg-background/50 px-3 py-2 shadow-sm"
+                                class="flex items-start justify-between gap-3 rounded-xl border border-border/30 bg-background/50 px-3 py-2 shadow-cartoon-sm"
                             >
                                 <div class="min-w-0">
                                     <p class="truncate font-serif text-sm font-semibold">

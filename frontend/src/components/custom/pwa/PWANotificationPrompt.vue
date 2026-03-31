@@ -6,13 +6,13 @@
         class="fixed top-6 left-6 right-6 z-toast max-w-md mx-auto"
       >
         <div
-          class="shadow-cartoon-md rounded-2xl bg-background/95 backdrop-blur-xl
+          class="shadow-cartoon-md rounded-2xl glass-elevated
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >
           <div class="flex items-start gap-4">
-            <div class="rounded-xl bg-amber-100 dark:bg-amber-900/30 p-3 hover-lift-md transition-fast">
-              <Bell class="h-6 w-6 text-amber-700 dark:text-amber-300 animate-wiggle-bounce" />
+            <div class="rounded-xl bg-[var(--color-gold)]/15 p-3 hover-lift-md transition-fast">
+              <Bell class="h-6 w-6 text-[var(--color-gold)] animate-wiggle-bounce" />
             </div>
             <div class="flex-1">
               <h3 class="text-subheading text-foreground">
@@ -33,23 +33,23 @@
           <!-- Benefits -->
           <div class="space-y-2 pl-14">
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Sparkles class="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <Sparkles class="h-4 w-4 text-[var(--color-gold)]" />
               <span>Expand your vocabulary effortlessly</span>
             </div>
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
-              <BookOpen class="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <BookOpen class="h-4 w-4 text-[var(--color-gold)]" />
               <span>Learn fascinating word origins</span>
             </div>
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock class="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <Clock class="h-4 w-4 text-[var(--color-gold)]" />
               <span>Perfect timing for your morning routine</span>
             </div>
           </div>
           
           <!-- iOS-specific message -->
           <div v-if="isIOS && !isInstalled" 
-               class="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-            <p class="text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+               class="p-3 rounded-lg bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/30">
+            <p class="text-xs text-[var(--color-gold)] flex items-center gap-2">
               <Info class="h-3 w-3 flex-shrink-0" />
               Please install the app first to enable notifications on iOS
             </p>
@@ -213,14 +213,14 @@ onUnmounted(() => {
 <style scoped>
 .pwa-prompt-enter-active {
     transition:
-        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 450ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 200ms var(--ease-out),
+        transform 450ms var(--spring-bouncy);
 }
 
 .pwa-prompt-leave-active {
     transition:
-        opacity 200ms cubic-bezier(0.4, 0.0, 0.2, 1),
-        transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+        opacity 200ms var(--ease-standard),
+        transform 300ms var(--ease-standard);
 }
 
 .pwa-prompt-enter-from,

@@ -4,7 +4,7 @@
     <aside
       data-sidebar
       :class="cn(
-        'bg-background/95 backdrop-blur-xl border-border fixed top-0 left-0 z-overlay hidden h-full flex-col overflow-clip rounded-r-2xl border-r shadow-lg transform-gpu lg:flex',
+        'glass-elevated fixed top-0 left-0 z-overlay hidden h-full flex-col overflow-clip rounded-r-2xl shadow-cartoon-lg transform-gpu lg:flex',
         sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar-expanded'
       )"
     >
@@ -17,10 +17,10 @@
     <div class="pointer-events-none fixed inset-0 z-hovercard lg:hidden">
       <!-- Overlay -->
       <Transition
-        enter-active-class="transition-opacity duration-400 ease-apple-smooth"
+        enter-active-class="transition-opacity duration-400 ease-spring-smooth"
         enter-from-class="opacity-0"
         enter-to-class="opacity-100"
-        leave-active-class="transition-opacity duration-300 ease-apple-smooth"
+        leave-active-class="transition-opacity duration-normal ease-spring-smooth"
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
@@ -35,7 +35,7 @@
       <div
         data-sidebar
         :class="cn(
-          'border-border pointer-events-auto fixed top-0 left-0 z-modal flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-subtle transform-gpu transition-[transform,opacity,box-shadow] duration-500 ease-apple-smooth will-change-[transform,opacity,box-shadow]',
+          'border-border pointer-events-auto fixed top-0 left-0 z-modal flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-subtle transform-gpu transition-[transform,opacity,box-shadow] duration-slow ease-spring-smooth will-change-[transform,opacity,box-shadow]',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
         @touchstart.passive="onTouchStart"

@@ -95,15 +95,15 @@
             
             <div class="space-y-2">
               <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 class="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 class="h-4 w-4 text-[var(--color-success)]" />
                 <span>Works offline</span>
               </div>
               <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 class="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 class="h-4 w-4 text-[var(--color-success)]" />
                 <span>Daily word notifications</span>
               </div>
               <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 class="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 class="h-4 w-4 text-[var(--color-success)]" />
                 <span>Faster loading</span>
               </div>
             </div>
@@ -272,14 +272,14 @@ onUnmounted(() => {
 /* PWA prompt: opacity fast ease-out, transform spring */
 .pwa-prompt-enter-active {
     transition:
-        opacity 200ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 450ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 200ms var(--ease-out),
+        transform 450ms var(--spring-bouncy);
 }
 
 .pwa-prompt-leave-active {
     transition:
-        opacity 200ms cubic-bezier(0.4, 0.0, 0.2, 1),
-        transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+        opacity 200ms var(--ease-standard),
+        transform 300ms var(--ease-standard);
 }
 
 .pwa-prompt-enter-from,
@@ -297,14 +297,14 @@ onUnmounted(() => {
 /* PWA minimized button */
 .pwa-minimized-enter-active {
     transition:
-        opacity 180ms cubic-bezier(0.0, 0.0, 0.2, 1),
-        transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity 180ms var(--ease-out),
+        transform 300ms var(--spring-bouncy);
 }
 
 .pwa-minimized-leave-active {
     transition:
-        opacity 150ms cubic-bezier(0.4, 0.0, 0.2, 1),
-        transform 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+        opacity 150ms var(--ease-standard),
+        transform 200ms var(--ease-standard);
 }
 
 .pwa-minimized-enter-from,

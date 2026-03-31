@@ -9,10 +9,10 @@
                     :data-sidebar-cluster="cluster.clusterId"
                     :aria-current="isActive ? 'true' : undefined"
                     :class="[
-                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring focus-ring transform-gpu',
+                        'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy focus-ring transform-gpu',
                         isActive
-                            ? 'bg-background/96 font-medium text-foreground shadow-sm'
-                            : 'bg-background/96 font-normal text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-sm'
+                            ? 'bg-background/96 font-medium text-foreground shadow-cartoon-sm'
+                            : 'bg-background/96 font-normal text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-cartoon-sm'
                     ]"
                 >
                     <div class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2">
@@ -32,7 +32,7 @@
                     </div>
                     <div
                         v-if="isActive"
-                        class="ml-2 h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[transform,opacity] duration-300 ease-apple-smooth"
+                        class="ml-2 h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[transform,opacity] duration-normal ease-spring-smooth"
                     />
                 </button>
             </HoverCardTrigger>

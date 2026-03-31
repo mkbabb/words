@@ -25,7 +25,7 @@
         >
             <button
                 @click.stop="startEdit"
-                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-md transition-micro hover:bg-muted hover:border-border hover:shadow-lg hover:scale-110"
+                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-cartoon-md transition-micro hover:bg-muted hover:border-border hover:shadow-cartoon-lg hover:scale-110"
                 :title="`Edit ${fieldName}`"
             >
                 <Edit2 class="h-[18px] w-[18px] text-muted-foreground" />
@@ -34,7 +34,7 @@
                 v-if="canRegenerate"
                 @click.stop="$emit('regenerate')"
                 :disabled="isRegenerating"
-                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-md transition-micro hover:bg-muted hover:border-border hover:shadow-lg hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+                class="pointer-events-auto rounded-full border border-border/60 bg-background p-1.5 shadow-cartoon-md transition-micro hover:bg-muted hover:border-border hover:shadow-cartoon-lg hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                 :title="`Regenerate ${fieldName}`"
             >
                 <RefreshCw

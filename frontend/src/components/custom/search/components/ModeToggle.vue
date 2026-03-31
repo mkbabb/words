@@ -18,9 +18,9 @@
             :clickable="canToggle"
             :show-subscript="showSubscript"
             :class="[
-                'transition-colors duration-200',
+                'transition-colors duration-fast',
                 {
-                    'text-amber-950 dark:text-amber-300': aiMode,
+                    'text-[var(--color-gold)]': aiMode,
                     'cursor-not-allowed opacity-50': !canToggle,
                     'cursor-pointer hover:scale-110': canToggle,
                 },

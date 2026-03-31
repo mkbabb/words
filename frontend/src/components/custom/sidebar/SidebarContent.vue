@@ -17,8 +17,8 @@
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="item.type === 'lookup' ? handleCollapsedWordClick(item.word!) : handleCollapsedAIClick(item.query!)"
-                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
-                                :class="{ 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 hover:bg-yellow-500/15 hover:border-yellow-500/30 dark:text-yellow-300': item.type === 'ai' }"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu hover:-translate-y-0.5 hover:shadow-cartoon-md hover:border-border/60 hover:bg-background"
+                                :class="{ 'bg-[var(--color-gold)]/10 border-[var(--color-gold)]/20 text-[var(--color-gold)] hover:bg-[var(--color-gold)]/15 hover:border-[var(--color-gold)]/30': item.type === 'ai' }"
                             >
                                 <template v-if="item.type === 'lookup'">
                                     {{ item.word!.substring(0, 2).toUpperCase() }}
@@ -37,7 +37,7 @@
                                     </p>
                                 </template>
                                 <template v-else>
-                                    <h4 class="font-medium text-yellow-600 dark:text-yellow-400">AI Query</h4>
+                                    <h4 class="font-medium text-[var(--color-gold)]">AI Query</h4>
                                     <p class="text-sm text-muted-foreground">{{ item.query }}</p>
                                 </template>
                                 <p class="text-xs text-muted-foreground/70">
@@ -55,7 +55,7 @@
                         <HoverCardTrigger as-child>
                             <button
                                 @click="handleCollapsedDashboardClick"
-                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu hover:-translate-y-0.5 hover:shadow-cartoon-md hover:border-border/60 hover:bg-background"
                                 :class="{ 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/15 hover:border-primary/30': !wordlistMode.selectedWordlist }"
                             >
                                 <LayoutDashboard :size="18" class="text-muted-foreground" />
@@ -72,7 +72,7 @@
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="handleCollapsedWordlistClick(wordlist.id)"
-                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                                class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu hover:-translate-y-0.5 hover:shadow-cartoon-md hover:border-border/60 hover:bg-background"
                                 :class="{ 'bg-primary/10 border-primary/20 text-primary hover:bg-primary/15 hover:border-primary/30': wordlistMode.selectedWordlist === wordlist.id }"
                             >
                                 {{ wordlist.name.substring(0, 2).toUpperCase() }}
@@ -100,7 +100,7 @@
                             <TooltipTrigger as-child>
                         <button
                             @click="ui.setSidebarCollapsed(false)"
-                            class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu hover:-translate-y-0.5 hover:shadow-md hover:border-border/60 hover:bg-background"
+                            class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu hover:-translate-y-0.5 hover:shadow-cartoon-md hover:border-border/60 hover:bg-background"
                         >
                                     <FileText :size="18" class="text-muted-foreground" />
                                 </button>

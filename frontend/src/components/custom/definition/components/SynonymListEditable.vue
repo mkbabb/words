@@ -38,7 +38,7 @@
         <span v-if="editMode" class="inline-flex items-center gap-1">
             <button
                 @click="addSynonym"
-                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-cartoon-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
                 title="Add synonym"
             >
                 <Plus class="h-3.5 w-3.5" />
@@ -47,7 +47,7 @@
                 v-if="canRegenerate"
                 @click="$emit('regenerate')"
                 :disabled="isRegenerating"
-                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-cartoon-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                 title="Regenerate synonyms"
             >
                 <RefreshCw :class="['h-3.5 w-3.5', isRegenerating && 'animate-spin']" />
@@ -61,7 +61,7 @@
         class="fixed inset-0 z-overlay flex items-center justify-center bg-black/50 p-4"
     >
         <div
-            class="w-full max-w-sm rounded-lg border border-border bg-background p-4 shadow-lg"
+            class="w-full max-w-sm rounded-lg border border-border bg-background p-4 shadow-cartoon-lg"
         >
             <h3 class="mb-2 text-sm font-medium">Edit Synonym</h3>
             <input

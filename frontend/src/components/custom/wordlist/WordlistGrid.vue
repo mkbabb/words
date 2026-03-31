@@ -6,15 +6,15 @@
       :variant="cardVariant(wl)"
       @click="$emit('select', wl)"
       :class="[
-        'group relative overflow-hidden rounded-2xl p-5 text-left shadow-sm h-[11rem] cursor-pointer',
-        'transition-[transform,box-shadow] duration-200 ease-apple-default hover:shadow-md hover:-translate-y-px active:scale-[0.98] focus-ring',
+        'group relative overflow-hidden rounded-2xl p-5 text-left shadow-cartoon-sm h-[11rem] cursor-pointer',
+        'transition-[transform,box-shadow] duration-fast ease hover:shadow-cartoon-md hover:-translate-y-px active:scale-[0.98] focus-ring',
       ]"
       :texture-enabled="false"
       hide-star
       :border-shimmer="false"
     >
       <!-- Three-dot menu (lazy) -->
-      <div class="absolute right-3 top-3 z-content opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      <div class="absolute right-3 top-3 z-content opacity-0 transition-opacity duration-fast group-hover:opacity-100"
            @mouseenter="activeMenu = wl.id">
         <DropdownMenu v-if="activeMenu === wl.id">
           <DropdownMenuTrigger as-child>
@@ -32,7 +32,7 @@
               <span
                 v-for="tag in wl.tags"
                 :key="tag"
-                class="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground tracking-wide"
+                class="rounded-full bg-muted/60 px-2 py-0.5 text-2xs font-medium text-muted-foreground tracking-wide"
               >
                 {{ tag }}
               </span>
@@ -93,7 +93,7 @@
       <!-- Hover arrow -->
       <div
         class="absolute right-4 top-1/2 -translate-y-1/2 translate-x-2 opacity-0 transition-[opacity,transform]
-               duration-200 group-hover:translate-x-0 group-hover:opacity-40"
+               duration-fast group-hover:translate-x-0 group-hover:opacity-40"
       >
         <ChevronRight class="h-4 w-4" />
       </div>

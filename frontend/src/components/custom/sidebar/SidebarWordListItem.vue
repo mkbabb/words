@@ -4,11 +4,11 @@
     :title="wordlist.name"
     :class="[
       'group flex w-full items-center justify-between rounded-lg border px-2 py-1.5',
-      'transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu',
+      'transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu',
       'text-left active-scale focus-ring disabled-base',
       isSelected
-        ? 'border-primary/20 bg-primary/10 text-foreground shadow-sm'
-        : 'border-border/40 bg-background/96 text-foreground/80 hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:shadow-sm hover:border-border/60'
+        ? 'border-primary/20 bg-primary/10 text-foreground shadow-cartoon-sm'
+        : 'border-border/40 bg-background/96 text-foreground/80 hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:shadow-cartoon-sm hover:border-border/60'
     ]"
   >
     <div class="min-w-0 flex-1">
@@ -27,7 +27,7 @@
         <!-- Active indicator (matches SidebarCluster) -->
         <div
           v-if="isSelected"
-          class="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[opacity] duration-350 ease-apple-default"
+          class="ml-auto h-2 w-2 flex-shrink-0 rounded-full bg-primary/30 transition-[opacity] duration-normal ease"
         />
       </div>
 
@@ -60,7 +60,7 @@
     </div>
 
     <!-- Action menu (only visible on hover) -->
-    <div class="ml-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity duration-200">
+    <div class="ml-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity duration-fast">
       <DropdownMenu>
         <DropdownMenuTrigger as-child @click.stop>
           <Button variant="ghost" size="sm" class="h-5 w-5 p-0">

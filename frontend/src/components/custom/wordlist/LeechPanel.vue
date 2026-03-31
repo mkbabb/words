@@ -67,7 +67,7 @@ async function unsuspendLeech(word: string) {
             <div
                 v-for="item in leechWords"
                 :key="item.word"
-                class="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 transition-colors duration-200 hover:bg-accent/50"
+                class="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 transition-colors duration-fast hover:bg-accent/50"
             >
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{{ item.word }}</p>

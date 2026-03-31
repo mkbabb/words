@@ -3,7 +3,7 @@
         <div class="flex flex-col items-center space-y-6">
             <AnimatedText
                 :text="displayText || word || ''"
-                text-class="text-[clamp(1.5rem,8vw,3.75rem)] font-black pb-8"
+                text-class="text-pane-title font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
                 :force-single-line="true"
@@ -25,12 +25,12 @@
             <div class="max-w-md text-center space-y-2">
                 <ShimmerText
                     :text="currentStageText"
-                    text-class="text-[clamp(1rem,4vw,1.25rem)] font-semibold italic text-gray-800 dark:text-gray-100"
+                    text-class="text-subheading italic text-foreground"
                     :class="progressTextClass"
                     :duration="3200"
                 />
                 <!-- Stage Sub-description -->
-                <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p class="text-small text-muted-foreground">
                     {{ stageDescription }}
                 </p>
             </div>
@@ -88,7 +88,7 @@ const currentStageText = computed(() => {
 
 const progressTextClass = computed(() => ({
     'animate-pulse': props.progress < 100,
-    'text-green-600 dark:text-green-400': props.progress >= 100,
+    'text-[var(--color-success)]': props.progress >= 100,
 }));
 
 // Computed property for stage description using centralized config

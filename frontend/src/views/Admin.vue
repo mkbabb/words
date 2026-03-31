@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-background">
     <!-- Header -->
-    <div class="border-b border-border bg-background/95 backdrop-blur">
+    <div class="border-b border-border glass-elevated">
       <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
         <div class="flex items-center gap-3">
           <router-link to="/" class="text-muted-foreground hover:text-foreground transition-colors">
@@ -123,7 +123,7 @@
               Re-synthesize
             </button>
           </div>
-          <p v-if="reSynthResult" class="mt-2 text-sm text-green-600 dark:text-green-400">
+          <p v-if="reSynthResult" class="mt-2 text-sm text-[var(--color-success)]">
             {{ reSynthResult }}
           </p>
           <p v-if="reSynthError" class="mt-2 text-sm text-destructive">
@@ -169,7 +169,7 @@
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="truncate font-medium">{{ wl.name }}</span>
-                <span v-if="wl.is_public" class="rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-micro font-medium text-green-700 dark:text-green-400">Public</span>
+                <span v-if="wl.is_public" class="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-micro font-medium text-[var(--color-success)]">Public</span>
               </div>
               <div class="text-xs text-muted-foreground truncate">
                 {{ wl.total_words }} words

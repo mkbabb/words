@@ -12,7 +12,7 @@
                     <HoverCardTrigger as-child>
                         <ThemedCard
                             :variant="getCardVariant(index)"
-                            class="group ease-apple-spring relative cursor-pointer transition-smooth hover:-translate-y-0.5 hover:shadow-lg"
+                            class="group ease-spring-snappy relative cursor-pointer transition-smooth hover:-translate-y-0.5 hover:shadow-cartoon-lg"
                             @click="handleWordClick(suggestion.word)"
                         >
                             <div class="p-3">
@@ -42,7 +42,7 @@
                                             v-if="
                                                 suggestion.efflorescence > 0.7
                                             "
-                                            class="animate-pulse text-yellow-500"
+                                            class="animate-pulse text-[var(--color-gold)]"
                                         >
                                             ✨
                                         </div>
@@ -167,6 +167,6 @@ function handleWordClick(word: string) {
 
 <style scoped>
 .reasoning-container {
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.3s var(--ease-standard);
 }
 </style>

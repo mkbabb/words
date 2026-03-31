@@ -29,7 +29,7 @@
     <!-- Legend pills (only if there's any data) -->
     <div
       v-if="hasData"
-      class="flex items-center gap-2 text-[10px] text-muted-foreground/50"
+      class="flex items-center gap-2 text-2xs text-muted-foreground/50"
     >
       <span v-if="masteredCount > 0" class="flex items-center gap-1">
         <span class="inline-block h-1.5 w-1.5 rounded-full" style="background: var(--mastery-gold)" />

@@ -14,7 +14,7 @@
       ref="fancyFMain"
       v-html="mainHtml"
       :class="[
-        'font-bold transition-[transform,opacity] duration-300',
+        'font-bold transition-[transform,opacity] duration-normal',
         {
           'text-lg': size === 'sm',
           'text-2xl': size === 'base',

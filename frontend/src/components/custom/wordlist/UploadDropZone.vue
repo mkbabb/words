@@ -14,7 +14,7 @@
     >
         <button
             type="button"
-            class="group/info absolute right-4 top-4 z-content inline-flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-muted-foreground shadow-sm transition-fast hover:text-foreground"
+            class="group/info absolute right-4 top-4 z-content inline-flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-muted-foreground shadow-cartoon-sm transition-fast hover:text-foreground"
             aria-label="Supported formats"
             @click.stop
         >
@@ -43,7 +43,7 @@
         />
 
         <div class="space-y-4">
-            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm">
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-cartoon-sm">
                 <Upload class="h-8 w-8" />
             </div>
             <div class="space-y-1">

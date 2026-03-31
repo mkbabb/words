@@ -90,12 +90,12 @@
                     </div>
                     <div class="flex flex-col gap-1">
                         <div
-                            class="rounded bg-red-500/10 px-2 py-0.5 text-red-600 line-through dark:text-red-400"
+                            class="rounded bg-destructive/10 px-2 py-0.5 text-destructive line-through"
                         >
                             {{ truncateValue(change.old_value) }}
                         </div>
                         <div
-                            class="rounded bg-green-500/10 px-2 py-0.5 text-green-600 dark:text-green-400"
+                            class="rounded bg-[var(--color-success)]/10 px-2 py-0.5 text-[var(--color-success)]"
                         >
                             {{ truncateValue(change.new_value) }}
                         </div>
@@ -113,12 +113,12 @@
                 <div
                     v-for="(value, path) in diff.dictionary_item_added"
                     :key="String(path)"
-                    class="rounded border border-green-500/30 bg-green-500/5 p-2 text-xs"
+                    class="rounded border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-2 text-xs"
                 >
                     <span class="font-mono text-muted-foreground">{{
                         formatPath(String(path))
                     }}</span>
-                    <span class="ml-2 text-green-600 dark:text-green-400">{{
+                    <span class="ml-2 text-[var(--color-success)]">{{
                         truncateValue(value)
                     }}</span>
                 </div>
@@ -134,13 +134,13 @@
                 <div
                     v-for="(value, path) in diff.dictionary_item_removed"
                     :key="String(path)"
-                    class="rounded border border-red-500/30 bg-red-500/5 p-2 text-xs"
+                    class="rounded border border-destructive/30 bg-destructive/5 p-2 text-xs"
                 >
                     <span class="font-mono text-muted-foreground">{{
                         formatPath(String(path))
                     }}</span>
                     <span
-                        class="ml-2 text-red-600 line-through dark:text-red-400"
+                        class="ml-2 text-destructive line-through"
                         >{{ truncateValue(value) }}</span
                     >
                 </div>

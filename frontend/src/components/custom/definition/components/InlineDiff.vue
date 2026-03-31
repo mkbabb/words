@@ -1,11 +1,11 @@
 <template>
     <span v-if="isFullReplacement" class="inline-diff">
         <span
-            class="block rounded-sm bg-red-500/15 px-1 py-0.5 text-red-600 line-through decoration-red-400/60 dark:bg-red-500/10 dark:text-red-400"
+            class="block rounded-sm bg-destructive/15 px-1 py-0.5 text-destructive line-through decoration-destructive/60"
             >{{ segments[0].text }}</span
         >
         <span
-            class="mt-1 block rounded-sm bg-emerald-500/15 px-1 py-0.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+            class="mt-1 block rounded-sm bg-[var(--color-success)]/15 px-1 py-0.5 text-[var(--color-success)]"
             >{{ segments[1].text }}</span
         >
     </span>
@@ -13,12 +13,12 @@
         <template v-for="(seg, i) in segments" :key="i">
             <span
                 v-if="seg.type === 'removed'"
-                class="rounded-sm bg-red-500/15 px-0.5 text-red-600 line-through decoration-red-400/60 dark:bg-red-500/10 dark:text-red-400"
+                class="rounded-sm bg-destructive/15 px-0.5 text-destructive line-through decoration-destructive/60"
                 >{{ seg.text }}</span
             >
             <span
                 v-else-if="seg.type === 'added'"
-                class="rounded-sm bg-emerald-500/15 px-0.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                class="rounded-sm bg-[var(--color-success)]/15 px-0.5 text-[var(--color-success)]"
                 >{{ seg.text }}</span
             >
             <span v-else>{{ seg.text }}</span>

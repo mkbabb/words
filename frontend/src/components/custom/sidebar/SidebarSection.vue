@@ -19,8 +19,8 @@
             <div
                 v-if="items.length > 0"
                 :class="[
-                    'space-y-1 rounded-xl border border-border/30 bg-background/96 p-1.5 shadow-sm',
-                    items.length > 10 ? 'max-h-[40vh] overflow-y-auto scrollbar-thin pr-2' : ''
+                    'space-y-1 rounded-xl border border-border/30 bg-background/96 p-1.5 shadow-cartoon-sm',
+                    items.length > 10 ? 'max-h-[40svh] overflow-y-auto scrollbar-thin pr-2' : ''
                 ]"
             >
                 <div v-for="(item, index) in items" :key="(item as any).id ?? (item as any).word ?? index">

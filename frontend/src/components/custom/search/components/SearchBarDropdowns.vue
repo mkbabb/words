@@ -111,9 +111,9 @@ defineExpose({
     opacity: 1;
     margin-bottom: 0.25rem;
     transition:
-        grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 150ms cubic-bezier(0, 0, 0.2, 1),
-        margin-bottom 250ms cubic-bezier(0.4, 0, 0.2, 1);
+        grid-template-rows 250ms var(--ease-standard),
+        opacity 150ms var(--ease-out),
+        margin-bottom 250ms var(--ease-standard);
 }
 
 .controls-dropdown-closed {
@@ -121,8 +121,8 @@ defineExpose({
     opacity: 0;
     margin-bottom: 0;
     transition:
-        grid-template-rows 180ms cubic-bezier(0.4, 0, 1, 1),
-        opacity 120ms cubic-bezier(0.4, 0, 1, 1) 30ms,
-        margin-bottom 180ms cubic-bezier(0.4, 0, 1, 1);
+        grid-template-rows 180ms var(--ease-in),
+        opacity 120ms var(--ease-in) 30ms,
+        margin-bottom 180ms var(--ease-in);
 }
 </style>

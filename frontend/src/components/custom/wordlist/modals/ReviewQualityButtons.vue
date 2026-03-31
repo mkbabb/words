@@ -7,7 +7,7 @@
           :disabled="isSubmitting"
           :class="[
             'flex flex-col items-center gap-1 h-auto py-3 px-5 min-w-[7rem] rounded-2xl text-sm font-semibold transition-fast',
-            'hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.96]',
+            'hover:-translate-y-0.5 hover:shadow-cartoon-lg active:scale-[0.96]',
             'disabled:opacity-50 disabled:pointer-events-none',
             btn.buttonClass,
           ]"

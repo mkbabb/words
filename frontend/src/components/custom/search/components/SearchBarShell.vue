@@ -3,12 +3,12 @@
         ref="shellElement"
         :class="[
             'search-bar relative flex items-center gap-2 overflow-visible px-1 py-0.5 sm:px-1',
-            'shadow-cartoon-sm rounded-2xl transition-[border-color,background-color,box-shadow,backdrop-filter] duration-500 ease-apple-smooth',
+            'shadow-cartoon-sm rounded-2xl transition-[border-color,background-color,box-shadow,backdrop-filter] duration-slow ease-spring-smooth',
             searchBar.isAIQuery && !searchBar.hasErrorAnimation
-                ? 'border-2 border-amber-500 bg-amber-50 backdrop-blur-sm dark:border-amber-700/40 dark:bg-amber-950/30'
+                ? 'border-2 border-[var(--color-gold)] bg-[var(--color-gold)]/8 backdrop-blur-sm'
                 : searchBar.hasErrorAnimation
-                  ? 'border-2 border-red-400/50 bg-gradient-to-br from-red-50/20 to-red-50/10 dark:border-red-600/50 dark:from-red-900/20 dark:to-red-900/10'
-                  : 'border-2 border-border bg-background/90 backdrop-blur-xl',
+                  ? 'border-2 border-destructive/50 bg-gradient-to-br from-destructive/8 to-destructive/4'
+                  : 'glass-elevated border-2 border-border',
             {
                 'shadow-cartoon-sm-hover': containerHovered,
                 'bg-background/95': containerHovered && !searchBar.isAIQuery,
@@ -81,7 +81,7 @@
 
         <!-- Hamburger Button -->
         <div
-            class="search-hamburger-slot flex flex-shrink-0 items-center justify-center overflow-hidden transition-[opacity,transform] duration-350 ease-apple-default"
+            class="search-hamburger-slot flex flex-shrink-0 items-center justify-center overflow-hidden transition-[opacity,transform] duration-normal ease"
             :style="{
                 opacity: iconOpacity,
                 transform: `scale(${0.9 + iconOpacity * 0.1})`,

@@ -7,7 +7,7 @@
             Choose the Right Synonym
         </h3>
         <div
-            class="rounded-lg border border-border/30 bg-card px-4 py-3 shadow-sm transition-fast hover:border-border/50 hover:bg-card/90"
+            class="rounded-lg border border-border/30 bg-card px-4 py-3 shadow-cartoon-sm transition-fast hover:border-border/50 hover:bg-card/90"
         >
             <p class="text-sm font-serif leading-relaxed text-foreground whitespace-pre-line">
                 {{ synonymChooser.essay }}

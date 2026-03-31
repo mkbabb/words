@@ -26,7 +26,7 @@
                             enter-to-class="opacity-100 translate-y-0 scale-100"
                             leave-from-class="opacity-100 translate-y-0 scale-100"
                             leave-to-class="opacity-0 translate-y-4 scale-95"
-                            move-class="transition-transform duration-300 ease-apple-smooth"
+                            move-class="transition-transform duration-normal ease-spring-smooth"
                             tag="div"
                             class="space-y-1"
                         >
@@ -56,7 +56,7 @@
                     enter-to-class="opacity-100 translate-x-0"
                     leave-from-class="opacity-100 translate-x-0"
                     leave-to-class="opacity-0 translate-x-4"
-                    move-class="transition-transform duration-300 ease-apple-smooth"
+                    move-class="transition-transform duration-normal ease-spring-smooth"
                     tag="div"
                     class="space-y-1"
                 >
@@ -81,7 +81,7 @@
                             }}</span>
                         </div>
                         <span
-                            class="text-xs text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                            class="text-xs text-muted-foreground opacity-0 transition-opacity duration-fast group-hover:opacity-100"
                         >
                             {{ formatDate(entry.timestamp) }}
                         </span>
@@ -147,7 +147,7 @@ const lookupWord = (word: string) => {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
+    background: var(--muted);
     border-radius: 2px;
 }
 

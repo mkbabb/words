@@ -80,9 +80,9 @@ const OPERATION_LABELS: Record<string, string> = {
 };
 
 const CHANGE_TYPE_CLASSES: Record<string, string> = {
-    added: 'bg-green-500/10 text-green-600 dark:text-green-400',
-    removed: 'bg-red-500/10 text-red-600 dark:text-red-400',
-    modified: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    added: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
+    removed: 'bg-destructive/10 text-destructive',
+    modified: 'bg-[var(--color-info)]/10 text-[var(--color-info)]',
 };
 
 const props = defineProps<{

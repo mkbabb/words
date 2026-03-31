@@ -61,7 +61,7 @@
                             <Card
                                 :class="
                                     cn(
-                                        'h-full cursor-pointer overflow-hidden hover-lift-md hover:shadow-md',
+                                        'h-full cursor-pointer overflow-hidden hover-lift-md hover:shadow-cartoon-md',
                                         getHeatmapClass(synonym.score)
                                     )
                                 "
@@ -136,7 +136,7 @@
                                             <span class="font-medium">{{
                                                 synonym.efflorescence_score.toFixed(1)
                                             }}</span>
-                                            <Sparkles class="h-3 w-3 text-amber-500" />
+                                            <Sparkles class="h-3 w-3 text-[var(--color-gold)]" />
                                         </div>
                                     </div>
 

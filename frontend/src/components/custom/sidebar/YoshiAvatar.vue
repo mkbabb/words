@@ -1,6 +1,6 @@
 <template>
   <div
-    class="yoshi-avatar from-primary/20 to-primary/10 border-primary/20 flex aspect-square items-center justify-center rounded-full border bg-gradient-to-br cursor-pointer select-none transition-transform duration-300 ease-apple-spring hover:scale-125"
+    class="yoshi-avatar from-primary/20 to-primary/10 border-primary/20 flex aspect-square items-center justify-center rounded-full border bg-gradient-to-br cursor-pointer select-none transition-transform duration-normal ease-spring-snappy hover:scale-125"
     :class="{ 'animate-yoshi-bounce': bouncing, 'admin-shimmer': props.isAdmin }"
     :style="{ width: size, height: size }"
     @click="handleClick"
@@ -85,7 +85,7 @@ const handleClick = () => {
 }
 
 .animate-yoshi-bounce {
-  animation: yoshi-bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: yoshi-bounce 0.6s var(--spring-bouncy);
 }
 
 @keyframes golden-shimmer {

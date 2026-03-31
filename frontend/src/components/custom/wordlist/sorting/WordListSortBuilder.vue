@@ -14,8 +14,8 @@
                         'flex items-center transition-fast select-none cursor-grab active:cursor-grabbing',
                         'gap-1.5 rounded-md px-2 py-1.5',
                         isActive(option.field)
-                            ? 'border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 hover:border-primary/30 hover:shadow-sm'
-                            : 'border border-transparent hover:border-border/50 hover:bg-muted/60 hover:shadow-sm',
+                            ? 'border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 hover:border-primary/30 hover:shadow-cartoon-sm'
+                            : 'border border-transparent hover:border-border/50 hover:bg-muted/60 hover:shadow-cartoon-sm',
                     ]"
                     draggable="true"
                     @dragstart="handleDragStart(sortedOptions.indexOf(option))"
@@ -72,8 +72,8 @@
                 :class="[
                     'relative flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-fast select-none',
                     isActive(option.field)
-                        ? 'border border-primary/30 bg-primary/10 text-primary shadow-sm hover:bg-primary/15'
-                        : 'border border-border/50 bg-background hover:border-primary/20 hover:bg-muted/50 hover:shadow-sm text-muted-foreground hover:text-foreground',
+                        ? 'border border-primary/30 bg-primary/10 text-primary shadow-cartoon-sm hover:bg-primary/15'
+                        : 'border border-border/50 bg-background hover:border-primary/20 hover:bg-muted/50 hover:shadow-cartoon-sm text-muted-foreground hover:text-foreground',
                 ]"
             >
                 <!-- Priority badge (top-left overlay) -->
@@ -293,7 +293,7 @@ const handleDropSorted = (dropIndex: number, dropOption: SortOption) => {
 .sort-item-move,
 .sort-item-enter-active,
 .sort-item-leave-active {
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.3s var(--spring-bouncy);
 }
 .sort-item-enter-from {
     opacity: 0;

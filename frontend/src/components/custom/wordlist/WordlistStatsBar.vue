@@ -4,14 +4,14 @@
         <div class="flex items-end gap-8 flex-wrap">
             <!-- Words -->
             <div>
-                <p class="text-3xl font-bold tabular-nums font-serif leading-none">{{ formatCount(wordlist.unique_words) }}</p>
-                <p class="mt-1 text-xs text-muted-foreground/60 uppercase tracking-widest">Words</p>
+                <p class="text-title font-bold tabular-nums">{{ formatCount(wordlist.unique_words) }}</p>
+                <p class="mt-1 section-label text-muted-foreground/60">Words</p>
             </div>
 
             <!-- Mastered -->
             <div>
                 <div class="flex items-baseline gap-1.5">
-                    <p class="text-3xl font-bold tabular-nums font-serif leading-none mastery-gold">{{ formatCount(mastered) }}</p>
+                    <p class="text-title font-bold tabular-nums mastery-gold">{{ formatCount(mastered) }}</p>
                     <span v-if="wordlist.unique_words > 0" class="text-sm text-muted-foreground/40 tabular-nums">
                         / {{ formatCount(wordlist.unique_words) }}
                     </span>
@@ -22,7 +22,7 @@
             <!-- Due for Review -->
             <div>
                 <p :class="[
-                    'text-3xl font-bold tabular-nums font-serif leading-none',
+                    'text-title font-bold tabular-nums',
                     dueForReview > 0 ? 'text-primary' : ''
                 ]">{{ formatCount(dueForReview) }}</p>
                 <p :class="[
@@ -33,7 +33,7 @@
 
             <!-- Streak -->
             <div v-if="wordlist.learning_stats.streak_days > 0">
-                <p class="text-3xl font-bold tabular-nums font-serif leading-none mastery-bronze flex items-end gap-1">
+                <p class="text-title font-bold tabular-nums mastery-bronze flex items-end gap-1">
                     <Flame class="h-6 w-6 mb-0.5" />
                     {{ formatCount(wordlist.learning_stats.streak_days) }}
                 </p>

@@ -31,7 +31,7 @@
         </div>
 
         <!-- Right: telemetry numbers + mastery -->
-        <div class="flex items-center gap-3 shrink-0 text-[11px] text-muted-foreground/60 tabular-nums">
+        <div class="flex items-center gap-3 shrink-0 text-2xs text-muted-foreground/60 tabular-nums">
             <span v-if="word.review_data && word.review_data.repetitions > 0">
                 {{ word.review_data.ease_factor.toFixed(2) }}
             </span>

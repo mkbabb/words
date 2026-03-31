@@ -44,10 +44,10 @@
             >
                 <template #item="{ item }">
                     <button
-                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md"
+                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-cartoon-sm transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md"
                         @click="handleAISuggestionClick(item)"
                     >
-                        <Sparkles class="mt-0.5 h-3.5 w-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                        <Sparkles class="mt-0.5 h-3.5 w-3.5 text-[var(--color-gold)] flex-shrink-0" />
                         <div class="flex-1 min-w-0">
                             <p class="text-xs leading-relaxed text-foreground/90 line-clamp-2">
                                 {{ item.query }}
@@ -83,7 +83,7 @@
             >
                 <template #item="{ item }">
                     <button
-                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md"
+                        class="flex w-full items-start gap-3 rounded-lg border border-border/30 bg-background/96 px-3 py-2.5 text-left shadow-cartoon-sm transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md"
                         @click="handleSearchClick(item)"
                     >
                         <Search class="mt-0.5 h-3.5 w-3.5 text-foreground/40 flex-shrink-0" />

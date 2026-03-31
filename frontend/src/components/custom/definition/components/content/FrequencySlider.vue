@@ -58,7 +58,7 @@ function handleInput(e: Event) {
     width: 12px;
     border-radius: 9999px;
     background: var(--thumb-color, hsl(40, 80%, 55%));
-    border: 2px solid hsl(var(--background));
+    border: 2px solid var(--background);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     transition: transform 0.15s ease;
 }
@@ -70,7 +70,7 @@ function handleInput(e: Event) {
     width: 12px;
     border-radius: 9999px;
     background: var(--thumb-color, hsl(40, 80%, 55%));
-    border: 2px solid hsl(var(--background));
+    border: 2px solid var(--background);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 </style>

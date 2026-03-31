@@ -12,10 +12,10 @@
                         @click="toggleSource(source.id)"
                         @keydown.enter.stop.prevent="toggleSource(source.id)"
                         :class="[
-                        'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/30 shadow-sm transform-gpu transition-colors duration-150 transition-transform duration-200 ease-apple-spring select-none active:scale-[0.95]',
+                        'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/30 shadow-cartoon-sm transform-gpu transition-colors duration-150 transition-transform duration-fast ease-spring-snappy select-none active:scale-[0.95]',
                         selectedSources.includes(source.id)
-                                ? 'border-primary/40 bg-primary/10 ring-2 ring-primary/20 shadow-sm'
-                                : 'border-border/40 hover:bg-background hover:border-border/60 hover:shadow-md',
+                                ? 'border-primary/40 bg-primary/10 ring-2 ring-primary/20 shadow-cartoon-sm'
+                                : 'border-border/40 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md',
                         ]"
                     >
                         <component
@@ -45,10 +45,10 @@
                         @click="toggleLanguage(language.value)"
                         @keydown.enter.stop.prevent="toggleLanguage(language.value)"
                         :class="[
-                        'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/30 text-xs font-semibold uppercase shadow-sm transform-gpu transition-colors duration-150 transition-transform duration-200 ease-apple-spring select-none active:scale-[0.95]',
+                        'flex h-10 w-10 items-center justify-center rounded-full border bg-muted/30 text-xs font-semibold uppercase shadow-cartoon-sm transform-gpu transition-colors duration-150 transition-transform duration-fast ease-spring-snappy select-none active:scale-[0.95]',
                         selectedLanguages.includes(language.value)
-                                ? 'border-primary/40 bg-primary/10 text-primary ring-2 ring-primary/20 shadow-sm'
-                                : 'border-border/40 text-muted-foreground hover:bg-background hover:border-border/60 hover:text-foreground hover:shadow-md',
+                                ? 'border-primary/40 bg-primary/10 text-primary ring-2 ring-primary/20 shadow-cartoon-sm'
+                                : 'border-border/40 text-muted-foreground hover:bg-background hover:border-border/60 hover:text-foreground hover:shadow-cartoon-md',
                         ]"
                     >
                         {{ language.label }}
@@ -100,7 +100,7 @@
                 :key="word"
                 variant="outline"
                 size="default"
-                class="hover-lift flex-shrink-0 border-yellow-500/20 bg-yellow-500/10 text-sm font-medium whitespace-nowrap hover:border-yellow-500/30 hover:bg-yellow-500/20"
+                class="hover-lift flex-shrink-0 border-[var(--color-gold)]/20 bg-[var(--color-gold)]/10 text-sm font-medium whitespace-nowrap hover:border-[var(--color-gold)]/30 hover:bg-[var(--color-gold)]/20"
                 @click="$emit('word-select', word)"
                 @keydown.enter.stop="$emit('word-select', word)"
             >

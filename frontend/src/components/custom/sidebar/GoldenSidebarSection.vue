@@ -5,24 +5,24 @@
                 'group flex w-full items-center justify-between px-0 py-3',
                 'hover:no-underline hover:bg-transparent',
                 'transition-fast',
-                'text-sm font-medium text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300',
+                'text-sm font-medium text-[var(--color-gold)] hover:text-[var(--color-gold)]',
                 '[&[data-state=open]>svg]:rotate-90'
             ]"
         >
             <span class="flex items-center gap-2 text-left">
                 <component :is="icon" v-if="icon" class="h-4 w-4" />
                 {{ title }}
-                <span v-if="count" class="text-xs text-yellow-600/70 dark:text-yellow-400/70">({{ count }})</span>
+                <span v-if="count" class="text-xs text-[var(--color-gold)]/70">({{ count }})</span>
             </span>
         </AccordionTrigger>
         <AccordionContent class="pb-2 pt-0">
             <div
                 v-if="items.length > 0"
                 :class="[
-                    'space-y-1 rounded-xl border p-2 shadow-sm',
-                    'bg-yellow-50/80 dark:bg-yellow-900/15',
-                    'border-yellow-200/60 dark:border-yellow-700/30',
-                    items.length > 15 ? 'max-h-[60vh] overflow-y-auto scrollbar-thin pr-2' : ''
+                    'space-y-1 rounded-xl border p-2 shadow-cartoon-sm',
+                    'bg-[var(--color-gold)]/8',
+                    'border-[var(--color-gold)]/20',
+                    items.length > 15 ? 'max-h-[60svh] overflow-y-auto scrollbar-thin pr-2' : ''
                 ]"
             >
                 <div v-for="(item, index) in items" :key="(item as any).id ?? (item as any).word ?? index">

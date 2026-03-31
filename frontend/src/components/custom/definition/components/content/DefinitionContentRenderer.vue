@@ -196,17 +196,17 @@ const DiffSection: FunctionalComponent<
     return h(
         'div',
         {
-            class: 'relative border-l-2 border-amber-400/70 bg-amber-500/[0.04] rounded-r-lg',
+            class: 'relative border-l-2 border-[var(--color-gold)]/70 bg-[var(--color-gold)]/[0.04] rounded-r-lg',
         },
         [
             slots.default?.(),
             h(
                 'div',
                 {
-                    class: 'absolute top-2 right-2 flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-micro font-medium text-amber-600 dark:text-amber-400',
+                    class: 'absolute top-2 right-2 flex items-center gap-1 rounded-full bg-[var(--color-gold)]/10 px-2 py-0.5 text-micro font-medium text-[var(--color-gold)]',
                 },
                 [
-                    h('span', { class: 'inline-block h-1.5 w-1.5 rounded-full bg-amber-500' }),
+                    h('span', { class: 'inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-gold)]' }),
                     ` ${fProps.field} changed`,
                 ]
             ),

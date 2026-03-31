@@ -7,7 +7,7 @@
                 <div class="flex items-start gap-2">
                     <button
                         @click="goBack"
-                        class="glass-subtle p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-200 ease-apple-default flex-shrink-0 shadow-sm hover:shadow-md"
+                        class="glass-subtle p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-fast ease flex-shrink-0 shadow-cartoon-sm hover:shadow-cartoon-md"
                     >
                         <ChevronLeft class="h-4 w-4" />
                     </button>
@@ -37,7 +37,7 @@
                             :style="{ width: bronzePct + '%', background: 'var(--mastery-bronze)' }"
                         />
                     </div>
-                    <div class="flex justify-between text-[10px] text-muted-foreground/50 tabular-nums">
+                    <div class="flex justify-between text-2xs text-muted-foreground/50 tabular-nums">
                         <span v-if="mastered > 0" class="flex items-center gap-1">
                             <span class="inline-block h-1.5 w-1.5 rounded-full" style="background: var(--mastery-gold)" />
                             {{ formatCount(mastered) }}
@@ -62,24 +62,24 @@
                     <div class="px-2 py-1">
                         <Popover>
                             <PopoverTrigger as-child>
-                                <button class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md border border-border/40 bg-background/96 px-2.5 py-1.5 text-sm font-medium shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md">
+                                <button class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md border border-border/40 bg-background/96 px-2.5 py-1.5 text-sm font-medium shadow-cartoon-sm transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md">
                                     <Filter :size="14" class="text-muted-foreground flex-shrink-0" />
                                     <span class="truncate">{{ filterLabel }}</span>
                                     <ChevronDown :size="14" class="ml-auto text-muted-foreground/50 flex-shrink-0" />
                                 </button>
                             </PopoverTrigger>
                             <PopoverContent align="start" :side-offset="4" class="w-56 p-2">
-                                <p class="px-1 pt-0.5 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Mastery</p>
+                                <p class="px-1 pt-0.5 pb-1.5 section-label text-muted-foreground/50">Mastery</p>
                                 <div class="flex flex-wrap gap-1.5 mb-2">
                                     <button
                                         v-for="level in masteryButtons"
                                         :key="level.key"
                                         @click="toggleFilter(level.key)"
                                         :class="[
-                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer shadow-sm',
+                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer shadow-cartoon-sm',
                                             filtersValue[level.key as keyof typeof filtersValue]
                                                 ? `${level.pillActiveClass} ring-1`
-                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                                         ]"
                                     >
                                         <span :class="['h-2 w-2 rounded-full flex-shrink-0', level.dotClass]" />
@@ -87,15 +87,15 @@
                                     </button>
                                 </div>
                                 <div class="my-1.5 border-t border-border/30" />
-                                <p class="px-1 pt-0.5 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Status</p>
+                                <p class="px-1 pt-0.5 pb-1.5 section-label text-muted-foreground/50">Status</p>
                                 <div class="flex flex-wrap gap-1.5">
                                     <button
                                         @click="toggleFilter('showHotOnly')"
                                         :class="[
-                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer shadow-sm',
+                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer shadow-cartoon-sm',
                                             filtersValue.showHotOnly
-                                                ? 'bg-red-500/15 text-red-500 ring-1 ring-red-500/30'
-                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                                                ? 'bg-destructive/15 text-destructive ring-1 ring-destructive/30'
+                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                                         ]"
                                     >
                                         <Flame :size="12" />
@@ -104,10 +104,10 @@
                                     <button
                                         @click="toggleFilter('showDueOnly')"
                                         :class="[
-                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer shadow-sm',
+                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer shadow-cartoon-sm',
                                             filtersValue.showDueOnly
-                                                ? 'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30'
-                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-md',
+                                                ? 'bg-[var(--color-info)]/15 text-[var(--color-info)] ring-1 ring-[var(--color-info)]/30'
+                                                : 'bg-muted/30 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-muted-foreground hover:shadow-cartoon-md',
                                         ]"
                                     >
                                         <Clock :size="12" />
@@ -151,7 +151,7 @@
                 <div v-if="dashboardTags.length > 0" class="px-2 py-1">
                     <Popover>
                         <PopoverTrigger as-child>
-                                <button class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md border border-border/40 bg-background/96 px-2.5 py-1.5 text-sm font-medium shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-md">
+                                <button class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-md border border-border/40 bg-background/96 px-2.5 py-1.5 text-sm font-medium shadow-cartoon-sm transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:bg-background hover:border-border/60 hover:shadow-cartoon-md">
                                 <Filter :size="14" class="text-muted-foreground flex-shrink-0" />
                                 <span class="truncate">{{ activeDashboardTags.size > 0 ? `${activeDashboardTags.size} tag${activeDashboardTags.size > 1 ? 's' : ''}` : 'All tags' }}</span>
                                 <ChevronDown :size="14" class="ml-auto text-muted-foreground/50 flex-shrink-0" />
@@ -164,10 +164,10 @@
                                     :key="tag"
                                     @click="toggleDashboardTag(tag)"
                                     :class="[
-                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-spring select-none cursor-pointer shadow-sm',
+                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy select-none cursor-pointer shadow-cartoon-sm',
                                         activeDashboardTags.has(tag)
                                             ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                                            : 'bg-background/96 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-foreground hover:shadow-md',
+                                            : 'bg-background/96 text-muted-foreground ring-1 ring-border/30 hover:bg-background hover:text-foreground hover:shadow-cartoon-md',
                                     ]"
                                 >
                                     <Tag :size="10" />
@@ -300,13 +300,13 @@ const masteryButtons = [
     {
         key: 'showSilver',
         label: 'Familiar',
-        pillActiveClass: 'bg-gray-400/15 text-gray-500 ring-gray-400/30',
+        pillActiveClass: 'bg-[var(--mastery-silver)]/15 text-[var(--mastery-silver)] ring-[var(--mastery-silver)]/30',
         dotClass: 'bg-gradient-to-r from-gray-400 to-gray-600',
     },
     {
         key: 'showGold',
         label: 'Mastered',
-        pillActiveClass: 'bg-amber-500/15 text-amber-500 ring-amber-500/30',
+        pillActiveClass: 'bg-[var(--mastery-gold)]/15 text-[var(--mastery-gold)] ring-[var(--mastery-gold)]/30',
         dotClass: 'bg-gradient-to-r from-yellow-400 to-amber-600',
     },
 ];

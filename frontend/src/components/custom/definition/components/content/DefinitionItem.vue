@@ -55,13 +55,13 @@
                 class="ml-2 flex items-center gap-1"
             >
                 <div
-                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500"
+                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-info)]"
                 />
-                <span class="text-xs text-blue-500">loading...</span>
+                <span class="text-xs text-[var(--color-info)]">loading...</span>
             </div>
         </div>
 
-        <div class="border-l-2 border-accent pl-4 transition-colors duration-300" :style="frequencyTemperatureStyle">
+        <div class="border-l-2 border-accent pl-4 transition-colors duration-normal" :style="frequencyTemperatureStyle">
             <!-- Definition Text with Progressive Loading -->
             <div v-if="definition.text">
                 <EditableField

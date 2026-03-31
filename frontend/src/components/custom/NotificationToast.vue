@@ -50,24 +50,24 @@ const notificationIcons = {
 };
 
 const notificationClasses = {
-  success: 'bg-green-50/90 dark:bg-green-950/90 border-green-300 dark:border-green-700',
-  error: 'bg-red-50/90 dark:bg-red-950/90 border-red-300 dark:border-red-700',
-  info: 'bg-blue-50/90 dark:bg-blue-950/90 border-blue-300 dark:border-blue-700',
-  warning: 'bg-amber-50/90 dark:bg-amber-950/90 border-amber-300 dark:border-amber-700'
+  success: 'bg-[var(--color-success)]/10 border-[var(--color-success)]/30',
+  error: 'bg-destructive/10 border-destructive/30',
+  info: 'bg-[var(--color-info)]/10 border-[var(--color-info)]/30',
+  warning: 'bg-[var(--color-gold)]/10 border-[var(--color-gold)]/30'
 };
 
 const iconClasses = {
-  success: 'text-green-600 dark:text-green-400',
-  error: 'text-red-600 dark:text-red-400',
-  info: 'text-blue-600 dark:text-blue-400',
-  warning: 'text-amber-600 dark:text-amber-400'
+  success: 'text-[var(--color-success)]',
+  error: 'text-destructive',
+  info: 'text-[var(--color-info)]',
+  warning: 'text-[var(--color-gold)]'
 };
 </script>
 
 <style scoped>
 .notification-enter-active,
 .notification-leave-active {
-  transition: opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: opacity 0.3s var(--spring-bouncy), transform 0.3s var(--spring-bouncy);
 }
 
 .notification-enter-from {
@@ -81,6 +81,6 @@ const iconClasses = {
 }
 
 .notification-move {
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.3s var(--spring-bouncy);
 }
 </style>

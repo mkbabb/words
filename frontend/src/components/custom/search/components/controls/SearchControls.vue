@@ -1,7 +1,7 @@
 <template>
     <div
         ref="controlsDropdown"
-        class="dropdown-element popover-surface mb-2 flex max-h-[85dvh] origin-top flex-col overflow-hidden bg-background/98 shadow-xl"
+        class="dropdown-element popover-surface mb-2 flex max-h-[85dvh] origin-top flex-col overflow-hidden bg-background/98 shadow-cartoon-lg"
         tabindex="0"
         @mousedown.prevent
         @click="$emit('interaction')"
@@ -9,11 +9,11 @@
     >
             <!-- Header: Sidebar Toggle + Search Mode Underline Tabs -->
             <div
-                class="flex shrink-0 items-center justify-between border-border/30 bg-background/98 px-4 py-3 shadow-sm lg:justify-center"
+                class="flex shrink-0 items-center justify-between border-border/30 bg-background/98 px-4 py-3 shadow-cartoon-sm lg:justify-center"
             >
                 <!-- Mobile Sidebar Toggle (far left) -->
                 <button
-                    class="focus-ring rounded-xl p-2 transition-[background-color,color,transform] duration-200 ease-apple-smooth hover:bg-background hover:shadow-sm lg:hidden"
+                    class="focus-ring rounded-xl p-2 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-background hover:shadow-cartoon-sm lg:hidden"
                     @click="$emit('toggle-sidebar')"
                     title="Toggle Sidebar"
                 >
@@ -235,14 +235,14 @@ defineExpose({
 /* Mode switch transitions */
 .controls-mode-switch-enter-active {
     transition:
-        opacity 200ms var(--ease-apple-smooth),
-        transform 400ms var(--ease-apple-spring);
+        opacity 200ms var(--ease-spring-smooth),
+        transform 400ms var(--ease-spring-snappy);
 }
 
 .controls-mode-switch-leave-active {
     transition:
-        opacity 150ms var(--ease-apple-smooth),
-        transform 200ms var(--ease-apple-smooth);
+        opacity 150ms var(--ease-spring-smooth),
+        transform 200ms var(--ease-spring-smooth);
 }
 
 .controls-mode-switch-enter-from {

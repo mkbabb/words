@@ -3,7 +3,7 @@
             <div
                 v-if="!collapsed"
                 key="expanded"
-                class="flex w-full items-center gap-2 transition-[opacity,transform] duration-350 ease-apple-spring transform-gpu"
+                class="flex w-full items-center gap-2 transition-[opacity,transform] duration-normal ease-spring-snappy transform-gpu"
             >
                 <!-- Floridify icon -->
                 <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
@@ -49,7 +49,7 @@
                 <HamburgerIcon
                     :is-open="mobile ? ui.sidebarOpen : !collapsed"
                     :class="cn(
-                        'transform-gpu transition-[transform,opacity] duration-250 ease-apple-smooth flex-shrink-0',
+                        'transform-gpu transition-[transform,opacity] duration-fast ease-spring-smooth flex-shrink-0',
                         mobile ? 'cursor-pointer' : 'cursor-ew-resize'
                     )"
                     @toggle="mobile ? ui.toggleSidebar() : ui.setSidebarCollapsed(!collapsed)"
@@ -58,12 +58,12 @@
             <div
                 v-else
                 key="collapsed"
-                class="flex w-full flex-col items-center gap-3 py-3 transition-[opacity,transform] duration-350 ease-apple-spring transform-gpu"
+                class="flex w-full flex-col items-center gap-3 py-3 transition-[opacity,transform] duration-normal ease-spring-snappy transform-gpu"
             >
                 <DarkModeToggle class="h-5 w-5 flex-shrink-0" />
                 <button
                     @click="ui.setSidebarCollapsed(false)"
-                    class="focus-ring cursor-ew-resize rounded-xl border border-border/50 bg-background/95 p-2 transition-[background-color,border-color,box-shadow,transform] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:bg-background hover:border-border/70 hover:shadow-md"
+                    class="focus-ring cursor-ew-resize rounded-xl border border-border/50 bg-background/95 p-2 transition-[background-color,border-color,box-shadow,transform] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:bg-background hover:border-border/70 hover:shadow-cartoon-md"
                 >
                     <PanelRight :size="16" class="text-muted-foreground" />
                 </button>

@@ -40,13 +40,13 @@ const props = defineProps<StarIconProps>();
 const starClasses = computed(() => {
     switch (props.variant) {
         case 'gold':
-            return 'text-yellow-400 drop-shadow-xl star-shimmer-gold';
+            return 'text-[var(--color-gold)] drop-shadow-xl star-shimmer-gold';
         case 'silver':
-            return 'text-gray-300 drop-shadow-xl star-shimmer-silver';
+            return 'text-muted-foreground drop-shadow-xl star-shimmer-silver';
         case 'bronze':
-            return 'text-amber-600 drop-shadow-xl star-shimmer-bronze';
+            return 'text-[var(--color-gold)] drop-shadow-xl star-shimmer-bronze';
         default:
-            return 'text-yellow-400 drop-shadow-xl star-shimmer-gold';
+            return 'text-[var(--color-gold)] drop-shadow-xl star-shimmer-gold';
     }
 });
 </script>

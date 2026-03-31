@@ -133,9 +133,9 @@
             {{ entryId }}
             <div v-if="isStreaming" class="flex items-center gap-1">
                 <div
-                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500"
+                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-info)]"
                 />
-                <span class="text-blue-500">streaming</span>
+                <span class="text-[var(--color-info)]">streaming</span>
             </div>
         </div>
     </div>

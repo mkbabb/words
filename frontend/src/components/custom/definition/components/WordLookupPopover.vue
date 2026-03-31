@@ -5,7 +5,7 @@
             <button
                 v-if="isPillVisible && !isPopoverVisible"
                 data-word-lookup-pill
-                class="lookup-popover fixed z-popover rounded-full border-2 border-border/30 bg-background/90 px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm backdrop-blur-md transition-[background,box-shadow] duration-200 hover:bg-background/95 hover:shadow-cartoon-sm-hover"
+                class="lookup-popover fixed z-popover rounded-full glass-medium px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm transition-[background,box-shadow] duration-fast hover:bg-background/95 hover:shadow-cartoon-sm-hover"
                 :style="pillStyle"
                 @mousedown.prevent.stop="onPillClick"
             >
@@ -18,7 +18,7 @@
             <div
                 v-if="isPopoverVisible"
                 data-word-lookup-popover
-                class="lookup-popover paper-texture-overlay fixed z-popover w-64 rounded-xl border-2 border-border/30 bg-background/90 p-3 shadow-cartoon-sm backdrop-blur-md"
+                class="lookup-popover paper-texture-overlay fixed z-popover w-64 rounded-xl glass-medium p-3 shadow-cartoon-sm"
                 :style="popoverStyle"
             >
                 <!-- Loading state -->
@@ -71,7 +71,7 @@
                             class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleLookup"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-fast group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                             Look up
                         </button>
                         <span class="mx-0.5 h-4 w-px bg-border/40" />
@@ -79,7 +79,7 @@
                             class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleAddToWordlist"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-fast group-hover:scale-110"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                             Wordlist
                         </button>
                     </div>
@@ -102,7 +102,7 @@
                             class="group flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground/70 hover-lift-md hover:bg-muted/30 hover:text-foreground active:scale-95"
                             @click="handleLookup"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200 group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-fast group-hover:scale-110"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                             Look up &amp; synthesize
                         </button>
                     </div>

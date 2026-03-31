@@ -208,6 +208,6 @@ const shouldShowProgressiveSidebar = computed(() => {
 }
 
 .animate-card-fade-in {
-    animation: cardFadeIn 0.4s var(--ease-apple-default) forwards;
+    animation: cardFadeIn 0.4s ease forwards;
 }
 </style>

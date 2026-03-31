@@ -6,10 +6,10 @@
                 :data-toc-id="`${clusterId}-${partOfSpeech.type}`"
                 :data-sidebar-pos="`${clusterId}-${partOfSpeech.type}`"
                 :class="[
-                    'group flex h-8 w-full cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5 transition-[background-color,border-color,color,box-shadow,transform] duration-250 ease-apple-spring transform-gpu',
+                    'group flex h-8 w-full cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5 transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu',
                     isActive
-                        ? 'border-primary/30 bg-primary/10 text-foreground shadow-sm dark:bg-primary/20'
-                        : 'border-border/40 bg-background/96 text-foreground/70 hover:border-border/60 hover:bg-background hover:text-foreground/90 hover:shadow-sm dark:bg-background/80 dark:hover:bg-background/85'
+                        ? 'border-primary/30 bg-primary/10 text-foreground shadow-cartoon-sm dark:bg-primary/20'
+                        : 'border-border/40 bg-background/96 text-foreground/70 hover:border-border/60 hover:bg-background hover:text-foreground/90 hover:shadow-cartoon-sm dark:bg-background/80 dark:hover:bg-background/85'
                 ]"
             >
                 <span class="text-xs font-medium uppercase tracking-wider">{{ partOfSpeech.type }}</span>
@@ -17,7 +17,7 @@
                     <span class="text-xs opacity-70">{{ partOfSpeech.count }}</span>
                     <div
                         v-if="isActive"
-                        class="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-primary transition-[transform,opacity] duration-300 ease-apple-smooth"
+                        class="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-primary transition-[transform,opacity] duration-normal ease-spring-smooth"
                     />
                 </div>
             </button>
