@@ -1,7 +1,8 @@
 """Multi-provider AI connector with structured outputs, validation retry, and caching.
 
-Supports OpenAI (GPT-5 series) and Anthropic (Claude 4.5/4.6) with task-based
-model selection, semaphore rate limiting, and budget tracking.
+Supports OpenAI (GPT-5 series), Anthropic (Claude 4.5/4.6), and local models
+(any OpenAI-compatible server: ollama, vLLM, llama.cpp) with task-based model
+selection, semaphore rate limiting, and budget tracking.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import anthropic
+import httpx
 from openai import (
     APIConnectionError,
     APITimeoutError,
@@ -244,7 +246,7 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         model_tier: ModelTier,
         max_tokens: int,
     ) -> tuple[T, dict[str, int]]:
-        """OpenAI structured outputs via beta.chat.completions.parse.
+        """OpenAI structured outputs via chat.completions.parse (GA in SDK v2+).
 
         GPT-5 series API (March 2026):
         - All GPT-5 models use "developer" role (not "system")
@@ -258,10 +260,16 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
                 f"OpenAI call requires AsyncOpenAI client, got {type(self.client).__name__}"
             )
 
+        is_local = self.provider == Provider.LOCAL
+
         messages: list[dict[str, str]] = []
         if system_prompt:
-            # GPT-5 and o-series use "developer" role; GPT-4 uses "system"
-            role = "developer" if model_tier.uses_developer_role else "system"
+            # Local models always use "system"; GPT-5/o-series use "developer"; GPT-4 uses "system"
+            role = (
+                "system"
+                if is_local
+                else ("developer" if model_tier.uses_developer_role else "system")
+            )
             messages.append({"role": role, "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
@@ -271,23 +279,23 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
             "response_format": response_model,
         }
 
-        # Token parameter: GPT-5 and o-series use max_completion_tokens
-        if model_tier.uses_completion_tokens:
+        # Token parameter: local models and GPT-4 use max_tokens; GPT-5/o-series use max_completion_tokens
+        if not is_local and model_tier.uses_completion_tokens:
             request_params["max_completion_tokens"] = max_tokens
         else:
             request_params["max_tokens"] = max_tokens
 
-        # Temperature: GPT-5 models only support temperature=1 (default) when
-        # reasoning is active. GPT-4 series supports arbitrary temperature.
-        # o-series never supports temperature.
-        if temperature is not None and not model_tier.is_o_series and not model_tier.is_gpt5:
-            request_params["temperature"] = temperature
+        # Temperature: always supported on local; GPT-5 only when effort=none;
+        # o-series never supports it
+        if temperature is not None:
+            if is_local or (not model_tier.is_o_series and not model_tier.is_gpt5):
+                request_params["temperature"] = temperature
 
         # Retry on transient API errors
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = await self.client.beta.chat.completions.parse(**request_params)
+                response = await self.client.chat.completions.parse(**request_params)
                 break
             except RateLimitError:
                 if attempt < max_retries - 1:
@@ -377,12 +385,12 @@ class AIConnector(SynthesisMixin, GenerationMixin, AssessmentMixin, SuggestionsM
         # Extract structured output from response content
         result = None
         for block in response.content:
-            if hasattr(block, "parsed"):
+            if block.type == "tool_use" and block.parsed is not None:
                 result = block.parsed
                 break
 
         if result is None:
-            # Fallback: try to parse from text content
+            # Parse from text content
             for block in response.content:
                 if block.type == "text":
                     result = response_model.model_validate_json(block.text)
@@ -440,30 +448,28 @@ def get_ai_connector(
         config = Config.from_file(config_path)
 
         # Determine provider and effort from config
-        ai_section = getattr(config, "ai", None)
-        provider_str = (
-            ai_section.provider if ai_section and hasattr(ai_section, "provider") else "openai"
-        )
+        ai_section = config.ai
+        provider_str = ai_section.provider if ai_section is not None else "openai"
         provider = Provider(provider_str) if isinstance(provider_str, str) else provider_str
 
-        effort_str = ai_section.effort if ai_section and hasattr(ai_section, "effort") else "medium"
+        effort_str = ai_section.effort if ai_section is not None else "medium"
         effort = OpenAIEffort(effort_str) if isinstance(effort_str, str) else effort_str
 
-        max_concurrent = (
-            ai_section.max_concurrent_requests
-            if ai_section and hasattr(ai_section, "max_concurrent_requests")
-            else 10
-        )
+        max_concurrent = ai_section.max_concurrent_requests if ai_section is not None else 10
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        if provider == Provider.ANTHROPIC and hasattr(config, "anthropic") and config.anthropic:
+        if provider == Provider.ANTHROPIC and config.anthropic is not None:
             anthropic_config = config.anthropic
             logger.info(f"Anthropic model: {anthropic_config.model}")
 
-            client = anthropic.AsyncAnthropic(
-                api_key=anthropic_config.api_key,
-                timeout=DEFAULT_TIMEOUT,
-            )
+            anthropic_kwargs: dict[str, Any] = {
+                "api_key": anthropic_config.api_key,
+                "timeout": DEFAULT_TIMEOUT,
+            }
+            if anthropic_config.base_url is not None:
+                anthropic_kwargs["base_url"] = anthropic_config.base_url
+
+            client = anthropic.AsyncAnthropic(**anthropic_kwargs)
             _ai_connector = AIConnector(
                 provider=Provider.ANTHROPIC,
                 client=client,
@@ -472,16 +478,39 @@ def get_ai_connector(
                 effort=effort,
                 max_tokens=anthropic_config.max_tokens,
             )
+
+        elif provider == Provider.LOCAL and config.local is not None:
+            # Local: OpenAI-compatible server (ollama, vLLM, llama.cpp)
+            local_config = config.local.resolve("high")  # Default to HIGH tier model
+            logger.info(f"Local model: {local_config.model} at {local_config.base_url}")
+
+            client = AsyncOpenAI(
+                api_key=local_config.api_key,
+                base_url=local_config.base_url,
+                timeout=httpx.Timeout(local_config.timeout, connect=30.0),
+            )
+            _ai_connector = AIConnector(
+                provider=Provider.LOCAL,
+                client=client,
+                model=local_config.model,
+                semaphore=semaphore,
+                effort=effort,
+            )
+
         else:
             # Default to OpenAI
             api_key = config.openai.api_key
             model_name = config.openai.model
             logger.info(f"OpenAI model: {model_name}")
 
-            client = AsyncOpenAI(
-                api_key=api_key,
-                timeout=DEFAULT_TIMEOUT,
-            )
+            openai_kwargs: dict[str, Any] = {
+                "api_key": api_key,
+                "timeout": DEFAULT_TIMEOUT,
+            }
+            if config.openai.base_url is not None:
+                openai_kwargs["base_url"] = config.openai.base_url
+
+            client = AsyncOpenAI(**openai_kwargs)
             _ai_connector = AIConnector(
                 provider=Provider.OPENAI,
                 client=client,

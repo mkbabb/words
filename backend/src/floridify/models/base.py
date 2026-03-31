@@ -49,26 +49,23 @@ class BaseMetadata(BaseModel):
 
 
 class AccessTrackingMixin(BaseModel):
-    """Mixin for entities that need access tracking functionality."""
+    """Mixin providing access tracking data fields."""
 
-    # Access tracking
     last_accessed: datetime | None = Field(
         default=None,
         description="Last time accessed",
     )
     access_count: int = Field(default=0, ge=0, description="Number of times accessed")
 
-    def mark_accessed(self) -> None:
-        """Mark entity as accessed."""
-        self.last_accessed = datetime.now(UTC)
-        self.access_count += 1
-        # Also mark as updated if this entity has that method (mixin may be used standalone)
-        if hasattr(self, "mark_updated"):
-            self.mark_updated()
-
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
     """Base metadata with access tracking for entities that need both."""
+
+    def mark_accessed(self) -> None:
+        """Mark entity as accessed and updated."""
+        self.last_accessed = datetime.now(UTC)
+        self.access_count += 1
+        self.mark_updated()
 
 
 class AIResponseBase(BaseModel):

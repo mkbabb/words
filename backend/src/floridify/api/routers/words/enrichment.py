@@ -76,8 +76,7 @@ async def generate_synonym_chooser(
     entry.synonym_chooser = SynonymChooser(
         essay=result.essay,
         synonyms_compared=[
-            {"word": s.word, "distinction": s.distinction}
-            for s in result.synonyms_compared
+            {"word": s.word, "distinction": s.distinction} for s in result.synonyms_compared
         ],
         model_info=ai.last_model_info,
     )
@@ -100,8 +99,14 @@ async def generate_phrases(
     language = "English"
     if word_obj.languages:
         lang = word_obj.languages[0]
-        lang_str = lang.value if hasattr(lang, "value") else str(lang)
-        language_map = {"en": "English", "fr": "French", "es": "Spanish", "de": "German", "it": "Italian"}
+        lang_str = lang.value
+        language_map = {
+            "en": "English",
+            "fr": "French",
+            "es": "Spanish",
+            "de": "German",
+            "it": "Italian",
+        }
         language = language_map.get(lang_str, "English")
 
     ai = get_ai_connector()

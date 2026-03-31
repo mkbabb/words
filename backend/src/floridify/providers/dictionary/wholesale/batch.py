@@ -119,15 +119,15 @@ async def flush_batch_insert(
                 continue
             def_docs.extend(defs_for_entry)
 
-            pron = entry.get("pronunciation")
+            pron: Pronunciation | None = entry.get("pronunciation")
             pron_doc = None
-            if pron and hasattr(pron, "phonetic"):
+            if pron is not None:
                 pron_doc = Pronunciation(
                     id=PydanticObjectId(),
                     word_id=word_obj.id,
                     phonetic=pron.phonetic,
                     ipa=pron.ipa,
-                    syllables=getattr(pron, "syllables", []),
+                    syllables=pron.syllables,
                 )
                 pron_docs.append(pron_doc)
 
@@ -218,14 +218,14 @@ async def flush_batch_upsert(
                 continue
 
             # Pronunciation
-            pron = entry.get("pronunciation")
+            pron: Pronunciation | None = entry.get("pronunciation")
             pron_doc = None
-            if pron and hasattr(pron, "phonetic"):
+            if pron is not None:
                 pron_doc = Pronunciation(
                     word_id=word_obj.id,
                     phonetic=pron.phonetic,
                     ipa=pron.ipa,
-                    syllables=getattr(pron, "syllables", []),
+                    syllables=pron.syllables,
                 )
                 await pron_doc.save()
 
@@ -272,8 +272,4 @@ async def find_complete_entries(word_index: dict[str, Word]) -> set[str]:
         complete_word_ids.add(entry.word_id)
 
     word_id_to_text = {w.id: text for text, w in word_index.items()}
-    return {
-        word_id_to_text[wid]
-        for wid in complete_word_ids
-        if wid in word_id_to_text
-    }
+    return {word_id_to_text[wid] for wid in complete_word_ids if wid in word_id_to_text}

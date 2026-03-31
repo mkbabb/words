@@ -95,20 +95,21 @@ class KokoroSynthesizer:
                     "Install with: uv sync --extra kokoro-tts"
                 ) from e
 
-            # Patch phonemizer-fork compat: set_data_path was removed in 3.3.2,
-            # replaced by a property setter. Kokoro 0.5.0 still calls the old method.
-            try:
-                # Compat shim: phonemizer-fork 3.3.2+ replaced set_data_path() with
-                # a property setter, but kokoro 0.5.0 still calls the old method.
-                # Pinned to phonemizer-fork; remove when kokoro updates.
-                from phonemizer.backend.espeak.wrapper import EspeakWrapper
+            # phonemizer-fork 3.3.2 replaced set_data_path() with a property setter,
+            # but kokoro 0.5.0 still calls the old classmethod. Add it back.
+            # Remove this shim when kokoro drops the set_data_path() call.
+            import importlib.metadata
 
-                if not hasattr(EspeakWrapper, "set_data_path"):
-                    EspeakWrapper.set_data_path = classmethod(  # type: ignore[attr-defined]
-                        lambda cls, path: setattr(cls, "data_path", path)
-                    )
-            except ImportError:
-                logger.warning("phonemizer-fork not available — Kokoro non-English TTS may fail")
+            from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+            _pfork_version = importlib.metadata.version("phonemizer-fork")
+            if tuple(int(x) for x in _pfork_version.split(".")[:3]) >= (3, 3, 2):
+
+                @classmethod  # type: ignore[misc]
+                def _set_data_path(cls: type, path: str) -> None:
+                    cls.data_path = path  # type: ignore[attr-defined]
+
+                EspeakWrapper.set_data_path = _set_data_path  # type: ignore[attr-defined]
 
             # Prefer system espeak-ng over bundled espeakng-loader (the bundled lib
             # has hardcoded CI paths that fail on ARM/Docker). Setting the env var
@@ -138,7 +139,9 @@ class KokoroSynthesizer:
 
     def _generate_cache_key(self, text: str, voice: str, lang_code: str) -> str:
         """Generate MD5 cache key."""
-        content = f"kokoro:v{self._CACHE_VERSION}:{text}:{voice}:{lang_code}:{self.config.speaking_rate}"
+        content = (
+            f"kokoro:v{self._CACHE_VERSION}:{text}:{voice}:{lang_code}:{self.config.speaking_rate}"
+        )
         return hashlib.md5(content.encode()).hexdigest()
 
     def _get_cache_path(self, cache_key: str) -> Path:

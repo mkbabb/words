@@ -150,3 +150,46 @@ def get_temperature_for_model(model: ModelTier, task_name: str | None = None) ->
             return 0.3
 
     return 0.7
+
+
+def resolve_model_for_provider(
+    task_name: str,
+    provider: str,
+    config: object,
+) -> tuple[str, str | None]:
+    """Resolve task → (model_name, base_url) for any provider.
+
+    Uses TASK_COMPLEXITY_MAP to determine capability level, then maps
+    to the provider's model via config. Returns the model name and
+    optional base_url (None for default cloud endpoints).
+
+    Args:
+        task_name: AI task name (e.g., "synthesize_definitions")
+        provider: Provider string ("openai", "anthropic", "local")
+        config: Config object with provider-specific settings
+
+    Returns:
+        (model_name, base_url_or_None)
+    """
+    complexity = TASK_COMPLEXITY_MAP.get(task_name, ModelComplexity.MEDIUM)
+
+    if provider == "local":
+        local_cfg = config.local  # type: ignore[union-attr]
+        if local_cfg is None:
+            raise ValueError("Local provider configured but no [local] section in config")
+        resolved = local_cfg.resolve(complexity.value)
+        return resolved.model, resolved.base_url
+
+    elif provider == "anthropic":
+        anthropic_cfg = config.anthropic  # type: ignore[union-attr]
+        base_url = anthropic_cfg.base_url if anthropic_cfg is not None else None
+        model = anthropic_cfg.model if anthropic_cfg is not None else "claude-sonnet-4-6"
+        return model, base_url
+
+    else:
+        # OpenAI: use tier-specific model names from the existing mapping
+        openai_cfg = config.openai  # type: ignore[union-attr]
+        tier = COMPLEXITY_TO_MODEL[complexity]
+        model = tier.value  # e.g., "gpt-5.4", "gpt-5-mini", "gpt-5-nano"
+        base_url = openai_cfg.base_url if openai_cfg is not None else None
+        return model, base_url
