@@ -8,9 +8,9 @@
                     :disabled="!interactive"
                     @click="$emit('select-source', 'synthesis')"
                     :class="[
-                        'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring',
+                        'flex h-10 w-10 items-center justify-center rounded-full border shadow-cartoon-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy',
                         activeSource === 'synthesis'
-                            ? 'border-amber-500/40 bg-amber-500/12 text-amber-600 dark:border-amber-400/40 dark:text-amber-400 ring-2 ring-amber-500/20'
+                            ? 'border-[var(--color-gold)]/40 bg-[var(--color-gold)]/12 text-[var(--color-gold)] ring-2 ring-[var(--color-gold)]/20'
                             : interactive
                               ? 'border-border/40 bg-background/96 text-muted-foreground/80 opacity-70 hover:border-border/60 hover:bg-background hover:opacity-100 hover:-translate-y-0.5 hover:scale-105'
                               : 'cursor-default border-border/50 bg-background text-muted-foreground/50 opacity-60',
@@ -31,8 +31,8 @@
                     :disabled="!interactive"
                     @click="$emit('select-source', provider)"
                     :class="[
-                        'flex h-10 w-10 items-center justify-center rounded-full border bg-background/96 shadow-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring',
-                        interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:scale-105 hover:bg-background hover:shadow-md' : 'cursor-default',
+                        'flex h-10 w-10 items-center justify-center rounded-full border bg-background/96 shadow-cartoon-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy',
+                        interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:scale-105 hover:bg-background hover:shadow-cartoon-md' : 'cursor-default',
                         activeSource === provider
                             ? 'border-primary/40 ring-2 ring-primary/20 bg-primary/10'
                             : 'border-border/30',
@@ -54,16 +54,17 @@
         <Popover v-if="providers.length > 1" v-model:open="popoverOpen">
             <PopoverTrigger as-child>
                 <button
-                    class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/40 transition-[background-color,color,transform] duration-200 ease-apple-smooth hover:bg-background/90 hover:text-muted-foreground hover:scale-105"
+                    class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/40 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-background/90 hover:text-muted-foreground hover:scale-105"
                 >
                     <Info :size="12" />
                 </button>
             </PopoverTrigger>
-            <InlinePopoverContent
+            <PopoverContent
+                :portal="false"
                 side="left"
                 align="start"
                 :side-offset="12"
-                class="w-64 rounded-xl border border-border/40 bg-background/96 p-1.5 shadow-cartoon-lg backdrop-blur-xl"
+                class="w-64 p-1.5 shadow-cartoon-lg"
             >
                 <ProviderMetadataCard
                     v-for="src in sortedDropdownEntries"
@@ -78,7 +79,7 @@
                     :fetched-at="providerMetadata.get(getId(src))?.fetched_at ?? null"
                     @click="handleDropdownSelect(getId(src))"
                 />
-            </InlinePopoverContent>
+            </PopoverContent>
         </Popover>
     </div>
 
@@ -92,9 +93,9 @@
                         :disabled="!interactive"
                         @click.stop="$emit('select-source', 'synthesis')"
                         :class="[
-                            'flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring',
+                            'flex h-10 w-10 items-center justify-center rounded-full border shadow-cartoon-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy',
                             activeSource === 'synthesis'
-                                ? 'border-amber-500/40 bg-amber-500/12 text-amber-600 dark:border-amber-400/40 dark:text-amber-400 ring-2 ring-amber-500/20'
+                                ? 'border-[var(--color-gold)]/40 bg-[var(--color-gold)]/12 text-[var(--color-gold)] ring-2 ring-[var(--color-gold)]/20'
                                 : interactive
                                   ? 'border-border/30 bg-background/96 text-muted-foreground/80 opacity-70 hover:border-border/50 hover:bg-background hover:opacity-100'
                                   : 'cursor-default border-border/20 bg-muted/80 text-muted-foreground/50 opacity-60',
@@ -114,56 +115,62 @@
                 class="mx-1.5 h-7 w-px bg-border/40"
             />
 
-            <!-- Provider icons — each individually clickable to switch, expand on hover -->
-            <div
+            <!-- Provider icons — stacked, expand on hover -->
+            <StackedIconGroup
                 v-if="providers.length > 0"
-                class="group/stack relative isolate flex items-center"
+                :items="orderedProviders"
+                :max-visible="3"
+                size="lg"
+                :key-fn="(p: string) => p"
             >
-                <!-- Info button — top-left of first provider icon -->
-                <PopoverTrigger as-child>
-                    <button
-                    class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-sm transition-[background-color,color,opacity,transform] duration-200 ease-apple-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground hover:scale-105 z-controls"
-                    >
-                        <Info :size="14" />
-                    </button>
-                </PopoverTrigger>
+                <template #icon="{ item: provider }">
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <button
+                                :disabled="!interactive"
+                                @click="$emit('select-source', provider)"
+                                :class="[
+                                    'flex h-10 w-10 items-center justify-center rounded-full border bg-background/96 shadow-cartoon-sm',
+                                    'transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy',
+                                    interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:bg-background hover:border-border/50 hover:shadow-cartoon-md' : 'cursor-default',
+                                    activeSource === provider
+                                        ? 'border-primary/40 ring-2 ring-primary/20 bg-primary/10'
+                                        : 'border-border/30',
+                                ]"
+                            >
+                                <component
+                                    :is="getProviderIcon(provider)"
+                                    :size="20"
+                                    class="text-muted-foreground"
+                                />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="6">
+                            {{ getProviderDisplayName(provider) }}
+                        </TooltipContent>
+                    </Tooltip>
+                </template>
 
-                <Tooltip v-for="(provider, i) in orderedProviders" :key="provider">
-                    <TooltipTrigger as-child>
+                <template #info>
+                    <PopoverTrigger as-child>
                         <button
-                            :disabled="!interactive"
-                        @click="$emit('select-source', provider)"
-                        :class="[
-                            'flex h-10 w-10 items-center justify-center rounded-full border bg-background/96 shadow-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring',
-                            interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:bg-background hover:border-border/50 hover:shadow-md' : 'cursor-default',
-                            i > 0 ? '-ml-3 group-hover/stack:translate-x-2 group-hover/stack:scale-105' : '',
-                            activeSource === provider
-                                ? 'border-primary/40 ring-2 ring-primary/20 bg-primary/10'
-                                : 'border-border/30',
-                            ]"
-                            :style="{ zIndex: orderedProviders.length - i }"
+                            class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-cartoon-sm transition-[background-color,color,opacity,transform] duration-fast ease-spring-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground hover:scale-105 z-controls"
                         >
-                            <component
-                                :is="getProviderIcon(provider)"
-                                :size="20"
-                                class="text-muted-foreground"
-                            />
+                            <Info :size="14" />
                         </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" :side-offset="6">
-                        {{ getProviderDisplayName(provider) }}
-                    </TooltipContent>
-                </Tooltip>
-            </div>
+                    </PopoverTrigger>
+                </template>
+            </StackedIconGroup>
         </div>
 
         <!-- Provider metadata dropdown -->
-        <InlinePopoverContent
+        <PopoverContent
+            :portal="false"
             side="bottom"
             align="end"
             :side-offset="12"
             :collision-padding="16"
-            class="z-popover w-64 rounded-xl border border-border/40 bg-popover p-1.5 shadow-xl backdrop-blur-xl"
+            class="w-64 p-1.5 shadow-cartoon-lg"
         >
             <ProviderMetadataCard
                 v-for="src in sortedDropdownEntries"
@@ -178,22 +185,20 @@
                 :fetched-at="providerMetadata.get(getId(src))?.fetched_at ?? null"
                 @click="handleDropdownSelect(getId(src))"
             />
-        </InlinePopoverContent>
+        </PopoverContent>
     </Popover>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Wand2, Info } from 'lucide-vue-next';
-import { Popover, PopoverTrigger, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
-import {
-    PopoverContent as InlinePopoverContent,
-} from 'reka-ui';
+import { Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import {
     getProviderIcon,
     getProviderDisplayName,
 } from '../../utils/providers';
 import ProviderMetadataCard from './ProviderMetadataCard.vue';
+import StackedIconGroup from '@/components/custom/common/StackedIconGroup.vue';
 import { providersApi, type ProviderEntry } from '@/api/providers';
 import type { SourceReference } from '@/types/api';
 

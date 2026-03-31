@@ -21,7 +21,7 @@
                     <HoverCardTrigger as-child>
                         <button
                             @click="showAddToWordlistModal = true"
-                            class="group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/96 shadow-sm opacity-80 transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-250 ease-apple-spring hover:-translate-y-0.5 hover:border-border/60 hover:bg-background hover:opacity-100 hover:shadow-md"
+                            class="group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/96 shadow-cartoon-sm opacity-80 transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy hover:-translate-y-0.5 hover:border-border/60 hover:bg-background hover:opacity-100 hover:shadow-cartoon-md"
                         >
                             <Plus
                                 :size="16"
@@ -60,15 +60,15 @@
 
         <!-- Row 2: Language badges + Pronunciation pill -->
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
-            <!-- Language badges — h-10 w-10, big and beautiful -->
+            <!-- Language badges -->
             <template v-if="languages?.length">
                 <!-- Single language: tooltip only -->
                 <Tooltip v-if="languages.length === 1">
                     <TooltipTrigger as-child>
                         <span
                             :class="[
-                                'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase text-muted-foreground shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow,opacity] duration-250 ease-apple-spring',
-                                languages[0].length > 2 ? 'text-[10px]' : 'text-xs',
+                                'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase text-muted-foreground shadow-cartoon-sm',
+                                languages[0].length > 2 ? 'text-2xs' : 'text-xs',
                             ]"
                         >
                             {{ languages[0] }}
@@ -81,54 +81,50 @@
                 <!-- Multiple languages: stacked badges, click stack opens dropdown -->
                 <Popover v-else>
                     <PopoverTrigger as-child>
-                        <button class="group/lang flex items-center cursor-pointer">
-                            <span
-                                v-for="(lang, i) in orderedLanguages.slice(0, 2)"
-                                :key="lang"
-                                :class="[
-                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow,opacity] duration-250 ease-apple-spring',
-                                    lang.length > 2 ? 'text-[10px]' : 'text-xs',
-                                    i > 0 ? '-ml-2 group-hover/lang:translate-x-2 group-hover/lang:scale-105' : '',
-                                    lang === audioLanguage ? 'ring-2 ring-primary/30 bg-primary/10' : '',
-                                ]"
-                                :style="{ zIndex: orderedLanguages.length - i }"
-                            >
-                                <span :class="lang === audioLanguage ? 'text-primary' : 'text-muted-foreground'">
-                                    {{ lang }}
+                        <StackedIconGroup
+                            :items="orderedLanguages"
+                            :max-visible="2"
+                            size="lg"
+                            as="button"
+                            class="cursor-pointer"
+                            :key-fn="(lang: string) => lang"
+                        >
+                            <template #icon="{ item: lang }">
+                                <span
+                                    :class="[
+                                        'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase shadow-cartoon-sm',
+                                        lang.length > 2 ? 'text-2xs' : 'text-xs',
+                                        lang === audioLanguage ? 'ring-2 ring-primary/30 bg-primary/10' : '',
+                                    ]"
+                                >
+                                    <span :class="lang === audioLanguage ? 'text-primary' : 'text-muted-foreground'">
+                                        {{ lang }}
+                                    </span>
                                 </span>
-                            </span>
-                            <!-- Overflow count for 3+ languages -->
-                            <span
-                                v-if="orderedLanguages.length > 2"
-                                :class="[
-                                    'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 text-xs font-semibold text-muted-foreground/60 shadow-sm transform-gpu transition-[background-color,color,transform,box-shadow] duration-250 ease-apple-spring hover:bg-background hover:text-muted-foreground hover:shadow-md',
-                                    '-ml-2 group-hover/lang:translate-x-2 group-hover/lang:scale-105',
-                                ]"
-                            >
-                                +{{ orderedLanguages.length - 2 }}
-                            </span>
-                        </button>
+                            </template>
+                        </StackedIconGroup>
                     </PopoverTrigger>
-                    <InlinePopoverContent
+                    <PopoverContent
+                        :portal="false"
                         side="bottom"
                         align="start"
                         :side-offset="12"
-                        class="z-popover w-44 rounded-xl border border-border/40 bg-background/96 p-1.5 shadow-cartoon-lg backdrop-blur-xl"
+                        class="w-44 p-1.5 shadow-cartoon-lg"
                     >
                         <div
                             v-for="lang in languages"
                             :key="lang"
                             :class="[
-                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-[background-color,color,box-shadow,transform] duration-200 ease-apple-smooth',
+                                'flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-[background-color,color,box-shadow,transform] duration-fast ease-spring-smooth',
                                 lang === audioLanguage
-                                    ? 'bg-primary/10 font-medium text-foreground hover:bg-primary/15 hover:shadow-sm'
-                                    : 'bg-background/96 text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-sm',
+                                    ? 'bg-primary/10 font-medium text-foreground hover:bg-primary/15 hover:shadow-cartoon-sm'
+                                    : 'bg-background/96 text-foreground/80 hover:bg-background hover:text-foreground hover:shadow-cartoon-sm',
                             ]"
                             @click="selectAudioLanguage(lang)"
                         >
                             <span
                                 :class="[
-                                    'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold uppercase shadow-sm',
+                                    'flex h-6 w-6 items-center justify-center rounded-full text-2xs font-semibold uppercase shadow-cartoon-sm',
                                     lang === audioLanguage
                                         ? 'bg-primary/15 text-primary'
                                         : 'bg-background/95 text-muted-foreground',
@@ -140,7 +136,7 @@
                                 class="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"
                             />
                         </div>
-                    </InlinePopoverContent>
+                    </PopoverContent>
                 </Popover>
             </template>
 
@@ -149,7 +145,7 @@
                 <Popover>
                     <PopoverTrigger as-child>
                         <button
-                        class="group/pron flex items-center gap-1.5 rounded-full border border-border/40 bg-background/96 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-apple-smooth hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:border-border/60 hover:shadow-md cursor-pointer min-w-0"
+                        class="group/pron flex items-center gap-1.5 rounded-full border border-border/40 bg-background/96 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-smooth hover:-translate-y-0.5 hover:bg-background hover:text-foreground hover:border-border/60 hover:shadow-cartoon-md cursor-pointer min-w-0"
                         >
                             <span class="font-mono text-sm max-w-[120px] sm:max-w-[200px] truncate">{{ displayPronunciation }}</span>
                             <span
@@ -170,19 +166,19 @@
                         <!-- IPA section -->
                         <div v-if="pronunciation.ipa && pronunciation.ipa !== 'unknown'" class="mb-1">
                             <div class="flex items-center gap-2 px-2 py-1">
-                                <span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">IPA</span>
+                                <span class="section-label text-muted-foreground/60">IPA</span>
                                 <button
                                     v-if="pronunciationMode !== 'ipa'"
                                     @click="$emit('toggle-pronunciation')"
-                                    class="text-[10px] text-primary/70 hover:text-primary font-medium cursor-pointer"
+                                    class="text-2xs text-primary/70 hover:text-primary font-medium cursor-pointer"
                                 >use</button>
                             </div>
                             <div
                                 v-for="(variant, vi) in splitVariants(pronunciation.ipa)"
                                 :key="'ipa-' + vi"
                                 :class="[
-                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-200 ease-apple-smooth',
-                                    pronunciationMode === 'ipa' ? 'bg-primary/5 text-foreground shadow-sm' : 'bg-background/96 text-foreground/70',
+                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-fast ease-spring-smooth',
+                                    pronunciationMode === 'ipa' ? 'bg-primary/5 text-foreground shadow-cartoon-sm' : 'bg-background/96 text-foreground/70',
                                 ]"
                             >
                                 <span class="flex-1">{{ variant }}</span>
@@ -191,19 +187,19 @@
                         <!-- Phonetic section -->
                         <div v-if="pronunciation.phonetic && pronunciation.phonetic !== 'unknown'">
                             <div class="flex items-center gap-2 px-2 py-1" :class="pronunciation.ipa && pronunciation.ipa !== 'unknown' ? 'border-t border-border/30 mt-1 pt-2' : ''">
-                                <span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">Phonetic</span>
+                                <span class="section-label text-muted-foreground/60">Phonetic</span>
                                 <button
                                     v-if="pronunciationMode !== 'phonetic'"
                                     @click="$emit('toggle-pronunciation')"
-                                    class="text-[10px] text-primary/70 hover:text-primary font-medium cursor-pointer"
+                                    class="text-2xs text-primary/70 hover:text-primary font-medium cursor-pointer"
                                 >use</button>
                             </div>
                             <div
                                 v-for="(variant, vi) in splitVariants(pronunciation.phonetic)"
                                 :key="'ph-' + vi"
                                 :class="[
-                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-200 ease-apple-smooth',
-                                    pronunciationMode === 'phonetic' ? 'bg-primary/5 text-foreground shadow-sm' : 'bg-background/96 text-foreground/70',
+                                    'flex items-center gap-2 rounded-lg px-2.5 py-2 font-mono text-sm transition-[background-color,color,box-shadow] duration-fast ease-spring-smooth',
+                                    pronunciationMode === 'phonetic' ? 'bg-primary/5 text-foreground shadow-cartoon-sm' : 'bg-background/96 text-foreground/70',
                                 ]"
                             >
                                 <span class="flex-1">{{ variant }}</span>
@@ -227,14 +223,12 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
 import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
-import {
-    PopoverContent as InlinePopoverContent,
-} from 'reka-ui';
 import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './media/AudioPlaybackButton.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
 import ProviderIcons from './metadata/ProviderIcons.vue';
+import StackedIconGroup from '@/components/custom/common/StackedIconGroup.vue';
 import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
 import type { AudioFile, SourceReference } from '@/types/api';
