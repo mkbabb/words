@@ -12,6 +12,7 @@ from typing import Any
 
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
+from ..corpus.manager import get_tree_corpus_manager
 from ..text import normalize
 from ..utils.logging import get_logger
 from .cache import get_cached_search, put_cached_search
@@ -112,8 +113,6 @@ class Search:
 
         """
         # Get corpus
-        from ..corpus.manager import get_tree_corpus_manager
-
         manager = get_tree_corpus_manager()
         corpus = await manager.get_corpus(
             corpus_name=corpus_name,
@@ -188,8 +187,6 @@ class Search:
 
         # Load corpus if not already loaded - use corpus_uuid for lookup
         if not self.corpus:
-            from ..corpus.manager import get_tree_corpus_manager
-
             manager = get_tree_corpus_manager()
             self.corpus = await manager.get_corpus(
                 corpus_uuid=self.index.corpus_uuid,
@@ -433,8 +430,6 @@ class Search:
 
         try:
             # Try with corpus_uuid first, fallback to corpus_name
-            from ..corpus.manager import get_tree_corpus_manager  # Lazy: heavyweight module
-
             manager = get_tree_corpus_manager()
             corpus = await manager.get_corpus(
                 corpus_uuid=self.index.corpus_uuid,
@@ -464,8 +459,6 @@ class Search:
         )
 
         # Get updated corpus - use corpus_uuid and corpus_name
-        from ..corpus.manager import get_tree_corpus_manager
-
         manager = get_tree_corpus_manager()
         updated_corpus = await manager.get_corpus(
             corpus_uuid=self.index.corpus_uuid,
@@ -615,16 +608,14 @@ class Search:
                 if not self.semantic_search and self._semantic_init_task:
                     try:
                         await self._semantic_init_task
-                    except Exception:
-                        pass  # Fall through to smart mode on failure
-                if self.semantic_search:
-                    # Route through search_semantic() which applies strict floor
-                    # thresholds and lexical sanity gating
-                    effective_min_score = min_score if min_score is not None else DEFAULT_MIN_SCORE
-                    return await self.search_semantic(
-                        normalized_query, max_results, effective_min_score
-                    )
-                # Semantic unavailable — fall through to smart mode
+                    except Exception as e:
+                        raise SearchError(f"Semantic search initialization failed: {e}") from e
+                if not self.semantic_search:
+                    raise SearchError("Semantic search unavailable")
+                effective_min_score = min_score if min_score is not None else DEFAULT_MIN_SCORE
+                return await self.search_semantic(
+                    normalized_query, max_results, effective_min_score
+                )
 
         # Otherwise use smart mode (pass already-normalized query)
         return await self.search_with_mode(

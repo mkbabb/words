@@ -42,8 +42,7 @@ from .constants import (
     MATRYOSHKA_MODELS,
     MODEL_DIMENSIONS,
 )
-
-# from .storage import get_wotd_storage  # Import lazily to avoid circular imports
+from .storage import get_wotd_storage
 
 logger = get_logger(__name__)
 
@@ -100,18 +99,10 @@ class Embedder:
 
         # Smart device selection
         if device == "cpu" or not torch.cuda.is_available():
-            # On Apple Silicon, check for MPS availability
-            mps_available = False
-            if platform.machine() == "arm64":
-                try:
-                    mps_available = torch.backends.mps.is_available()
-                except AttributeError:
-                    # MPS not available on this PyTorch version
-                    pass
-
+            mps_available = platform.machine() == "arm64" and torch.backends.mps.is_available()
             if mps_available:
-                self.device = "mps"  # Use Metal Performance Shaders on Apple Silicon
-                logger.info("🍎 Using Apple Silicon MPS acceleration")
+                self.device = "mps"
+                logger.info("Using Apple Silicon MPS acceleration")
             else:
                 self.device = "cpu"
         else:
@@ -438,8 +429,6 @@ class Embedder:
 
         Checks cache first, computes if needed, stores result.
         """
-        from .storage import get_wotd_storage
-
         storage = await get_wotd_storage()
 
         # Check cache
