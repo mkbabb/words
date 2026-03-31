@@ -30,6 +30,7 @@ class OpenAIConfig(BaseModel):
 
     api_key: str
     model: str = "gpt-5-mini"
+    base_url: str | None = None  # None = api.openai.com; set for proxies
     embedding_model: str = "text-embedding-3-large"
 
 
@@ -40,7 +41,45 @@ class AnthropicConfig(BaseModel):
 
     api_key: str
     model: str = "claude-sonnet-4-6"
+    base_url: str | None = None  # None = api.anthropic.com
     max_tokens: int = 64000
+
+
+class LocalModelConfig(BaseModel):
+    """Configuration for a single local model endpoint (ollama, vLLM, llama.cpp, etc.)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str  # e.g., "qwen3:32b", "qwen3:8b"
+    base_url: str = "http://localhost:11434/v1"  # ollama default
+    api_key: str = "not-needed"
+    max_tokens: int = 8192
+    supports_structured_output: bool = True  # ollama v0.5+, vLLM w/ outlines
+    timeout: int = 300
+
+
+class LocalConfig(BaseModel):
+    """Local model configuration with per-tier model routing.
+
+    Allows different models for different capability tiers:
+    e.g., Qwen3 32B for HIGH tasks, Qwen3 8B for LOW tasks.
+    If medium/low are omitted, they fall back to the next higher tier.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    high: LocalModelConfig
+    medium: LocalModelConfig | None = None
+    low: LocalModelConfig | None = None
+
+    def resolve(self, capability: str) -> LocalModelConfig:
+        """Get the model config for a capability level, with fallback chain."""
+        if capability == "high":
+            return self.high
+        elif capability == "medium":
+            return self.medium or self.high
+        else:
+            return self.low or self.medium or self.high
 
 
 class OxfordConfig(BaseModel):
@@ -71,14 +110,10 @@ class RateLimits(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    """Database configuration with strict target URLs.
+    """Database configuration.
 
-    In production (Docker), containers talk directly to MongoDB via the Docker
-    network using ``runtime_url`` / ``test_url``.
-
-    For local development, an optional ``tunnel_url`` / ``tunnel_test_url`` can
-    point at an SSH-tunnelled port (e.g. ``localhost:27018``).  When present
-    **and** not running inside Docker, the tunnel URLs take precedence.
+    Docker containers connect to MongoDB via ``MONGODB_URL`` env var.
+    The config file provides ``runtime_url`` and ``test_url`` as fallbacks.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -89,8 +124,6 @@ class DatabaseConfig(BaseModel):
     name: str = "floridify"
     timeout: int = 120
     max_pool_size: int = 100
-    tunnel_url: str | None = None
-    tunnel_test_url: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -104,6 +137,8 @@ class DatabaseConfig(BaseModel):
             "docker_development_url",
             "local_mongodb_url",
             "native_local_url",
+            "tunnel_url",
+            "tunnel_test_url",
         ]
         present_legacy = [key for key in legacy_keys if key in data]
         if present_legacy:
@@ -120,98 +155,34 @@ class DatabaseConfig(BaseModel):
     def get_url(self, target: str = "runtime") -> str:
         """Return the best URL for a target database.
 
-        Priority: MONGODB_URL env var > tunnel URL (outside Docker) > config file URL.
-
-        Tunnel URLs have their port dynamically resolved from MONGO_TUNNEL_PORT
-        env var or by detecting the running SSH tunnel process.
+        Priority: MONGODB_URL env var > config file URL.
         """
         env_url = os.environ.get("MONGODB_URL")
         if env_url and target == "runtime":
             return env_url
 
         if env_url and target == "test":
-            # Inside Docker, MONGODB_URL points to the tunnel.
-            # Derive the test URL by swapping the database name.
+            # Derive the test URL from MONGODB_URL by swapping the database name.
             from urllib.parse import urlsplit, urlunsplit
 
             parts = urlsplit(env_url)
             test_db = self.test_url and urlsplit(self.test_url).path
             if test_db:
                 test_parts = parts._replace(path=test_db)
-                # Preserve authSource and other query params from test_url
                 test_query = urlsplit(self.test_url).query if self.test_url else parts.query
                 if test_query:
                     test_parts = test_parts._replace(query=test_query)
                 return urlunsplit(test_parts)
 
         if target == "runtime":
-            if self.tunnel_url and not self._in_docker():
-                return self._resolve_tunnel_port(self.tunnel_url)
             url = self.runtime_url
         elif target == "test":
-            if self.tunnel_test_url and not self._in_docker():
-                return self._resolve_tunnel_port(self.tunnel_test_url)
             url = self.test_url
         else:
             raise ValueError(f"Unsupported database target: {target}")
 
         if not url:
             raise ValueError(f"Database URL for target '{target}' is empty")
-        return url
-
-    @staticmethod
-    def _resolve_tunnel_port(url: str) -> str:
-        """Replace the port in a tunnel URL with the actual running tunnel port.
-
-        Checks MONGO_TUNNEL_PORT env var first (set by dev.sh), then probes
-        for a running SSH tunnel process forwarding to MongoDB.
-        """
-        import re
-        import subprocess
-
-        # 1. Env var from dev.sh
-        tunnel_port = os.environ.get("MONGO_TUNNEL_PORT")
-
-        # 2. Detect from running SSH tunnel process
-        if not tunnel_port:
-            try:
-                result = subprocess.run(
-                    ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-Fn"],
-                    capture_output=True,
-                    text=True,
-                    timeout=3,
-                )
-                # Find SSH processes listening on ports in the tunnel range
-                ssh_pids: set[str] = set()
-                current_pid = ""
-                for line in result.stdout.splitlines():
-                    if line.startswith("p"):
-                        current_pid = line[1:]
-                    elif line.startswith("n") and current_pid:
-                        # Check if this pid is an ssh process
-                        try:
-                            ps_result = subprocess.run(
-                                ["ps", "-p", current_pid, "-o", "command="],
-                                capture_output=True,
-                                text=True,
-                                timeout=2,
-                            )
-                            if "ssh" in ps_result.stdout and "27017" in ps_result.stdout:
-                                # Extract the local port from the -L flag
-                                match = re.search(r"-L\s*(\d+):localhost:27017", ps_result.stdout)
-                                if match:
-                                    tunnel_port = match.group(1)
-                                    break
-                        except (subprocess.TimeoutExpired, OSError):
-                            continue
-            except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-                pass
-
-        if tunnel_port:
-            # Replace port in URL
-            return re.sub(r"localhost:\d+", f"localhost:{tunnel_port}", url)
-
-        # Fall back to the URL as-is
         return url
 
     @staticmethod
@@ -272,11 +243,8 @@ class DatabaseConfig(BaseModel):
     def cert_path(self) -> Path | None:
         """Optional CA certificate path for TLS connections."""
         project_root = get_project_root()
-        preferred = project_root / "auth" / "mongodb-ca.pem"
-        if preferred.exists():
-            return preferred
-        legacy = project_root / "auth" / "rds-ca-2019-root.pem"
-        return legacy if legacy.exists() else None
+        cert = project_root / "auth" / "mongodb-ca.pem"
+        return cert if cert.exists() else None
 
 
 class ProcessingConfig(BaseModel):
@@ -314,6 +282,7 @@ class Config(BaseModel):
     processing: ProcessingConfig
     ai: AIGlobalConfig | None = None
     anthropic: AnthropicConfig | None = None
+    local: LocalConfig | None = None
     merriam_webster: MerriamWebsterConfig | None = None
     semantic_search: SemanticSearchConfig | None = None
 
@@ -400,7 +369,7 @@ class Config(BaseModel):
         )
 
         # Strip whitespace from URL fields
-        for key in ("runtime_url", "test_url", "tunnel_url", "tunnel_test_url"):
+        for key in ("runtime_url", "test_url"):
             if key in db_data and db_data[key]:
                 db_data[key] = str(db_data[key]).strip()
 

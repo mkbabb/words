@@ -105,9 +105,7 @@ async def search_all_wordlists(
             )
             if not response.results:
                 return []
-            enriched = await enrich_search_results_with_wordlist_data(
-                response.results, wl.id
-            )
+            enriched = await enrich_search_results_with_wordlist_data(response.results, wl.id)
             # Tag each result with wordlist info
             for item in enriched:
                 item["wordlist_id"] = str(wl.id)
@@ -143,8 +141,8 @@ async def search_wordlist_words(
         - All standard wordlist filters and sorting options
         - Standard pagination parameters
     """
-    # Get the wordlist
-    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    # Verify wordlist exists
+    await repo.get(wordlist_id, raise_on_missing=True)
 
     # Step 1: Apply search filter with multi-method match collection
     search_response = await search_words_in_wordlist(
@@ -171,9 +169,7 @@ async def search_wordlist_words(
         result.metadata = {**(result.metadata or {}), **search_metadata}
 
     # Enrich with wordlist item data (mastery, temperature, review_data, etc.)
-    all_items = await enrich_search_results_with_wordlist_data(
-        search_response.results, wordlist_id
-    )
+    all_items = await enrich_search_results_with_wordlist_data(search_response.results, wordlist_id)
 
     # Apply post-search filters (mastery, temperature, due status)
     all_items = await post_filter_search_results(
@@ -219,7 +215,6 @@ async def search_wordlists(
         query=query,
         _repo=repo,
         max_results=limit,
-        min_score=0.3,  # Allow broader matches for name search
     )
 
     # Convert to expected format

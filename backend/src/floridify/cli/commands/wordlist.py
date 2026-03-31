@@ -59,11 +59,11 @@ async def _create_async(
     # Parse the word list
     parsed = parse_file(input_file)
 
-    console.print(f"Parsed {len(parsed.words)} words from {input_file.name}")
+    console.print(f"Parsed {len(parsed.word_texts)} words from {input_file.name}")
 
     # Generate name if not provided
     if not name:
-        name = generate_wordlist_name(parsed.words)
+        name = generate_wordlist_name(parsed.word_texts)
         console.print(f"Generated name: [cyan]{name}[/cyan]")
 
     # Initialize database and repository
@@ -80,7 +80,7 @@ async def _create_async(
     else:
         word_list = WordList(
             name=name,
-            hash_id=generate_wordlist_hash(parsed.words),
+            hash_id=generate_wordlist_hash(parsed.word_texts),
             metadata=parsed.metadata,
         )
 
@@ -88,7 +88,7 @@ async def _create_async(
     await word_list.save()
 
     # Convert words to ObjectIds and bulk-insert as separate docs
-    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.words)
+    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.word_texts)
     items = [WordListItemDoc(wordlist_id=word_list.id, word_id=wid) for wid in word_ids]
     if items:
         await WordListItemDoc.insert_many(items)
@@ -105,7 +105,7 @@ async def _create_async(
 
     # Process words with dictionary lookup in batches
     # Use the original parsed words since WordListItem doesn't have text field
-    await _process_words_batch(parsed.words)
+    await _process_words_batch(parsed.word_texts)
 
     console.print("Dictionary lookup processing completed!")
 
@@ -144,9 +144,12 @@ async def _show_async(name: str, num: int | None) -> None:
     # Show most frequent words with heat mapping
     # Query items from the separate collection, sorted by frequency
     display_limit = num if num is not None and num > 0 else word_list.unique_words
-    most_frequent = await WordListItemDoc.find(
-        {"wordlist_id": word_list.id}
-    ).sort([("frequency", -1)]).limit(display_limit).to_list()
+    most_frequent = (
+        await WordListItemDoc.find({"wordlist_id": word_list.id})
+        .sort([("frequency", -1)])
+        .limit(display_limit)
+        .to_list()
+    )
     num = len(most_frequent)
 
     console.print(f"\nMost frequent words (showing {num}):")
@@ -243,12 +246,12 @@ async def _update_async(name: str, input_file: Path) -> None:
     # Parse new words
     parsed = parse_file(input_file)
 
-    console.print(f"Adding {len(parsed.words)} words to '[cyan]{name}[/cyan]'")
+    console.print(f"Adding {len(parsed.word_texts)} words to '[cyan]{name}[/cyan]'")
 
     old_count = word_list.unique_words
 
     # Convert words to ObjectIds and upsert into items collection
-    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.words)
+    word_ids = await wordlist_repo.batch_get_or_create_words(parsed.word_texts)
     for wid in word_ids:
         existing = await WordListItemDoc.find_one({"wordlist_id": word_list.id, "word_id": wid})
         if existing:
@@ -262,7 +265,7 @@ async def _update_async(name: str, input_file: Path) -> None:
     await word_list.sync()
 
     # Process new words with dictionary lookup
-    new_words_to_process = parsed.words
+    new_words_to_process = parsed.word_texts
     await _process_words_batch(new_words_to_process)
 
     new_words = word_list.unique_words - old_count

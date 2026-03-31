@@ -34,8 +34,8 @@ class ParsedWordList(BaseModel):
     source_file: str | None = Field(default=None, description="Source file path")
 
     @property
-    def words(self) -> list[str]:
-        """Compatibility helper for legacy callers that only need text."""
+    def word_texts(self) -> list[str]:
+        """Get list of word texts from parsed entries."""
         return [entry.source_text for entry in self.entries]
 
 
@@ -472,7 +472,9 @@ def parse_json_file(path: Path) -> ParsedWordList:
                         ParsedWordEntry(
                             source_text=word,
                             frequency=_coerce_frequency(item.get("frequency", 1)),
-                            notes=str(notes_value).strip() or None if notes_value is not None else None,
+                            notes=str(notes_value).strip() or None
+                            if notes_value is not None
+                            else None,
                         )
                     )
     elif isinstance(data, dict):
@@ -546,10 +548,6 @@ PARSERS: dict[str, Callable[[Path], ParsedWordList]] = {
     ".markdown": parse_markdown_file,
     ".json": parse_json_file,
     ".jsonl": parse_json_file,
-    ".xlsx": parse_excel_file,
-    ".xls": parse_excel_file,
-    ".docx": parse_word_file,
-    ".doc": parse_word_file,
 }
 
 
@@ -566,7 +564,7 @@ def parse_file(file_path: Path) -> ParsedWordList:
 
     try:
         result = parser(file_path)
-        logger.info(f"✅ Successfully parsed {len(result.words)} words")
+        logger.info(f"✅ Successfully parsed {len(result.word_texts)} words")
 
         # Add parse timestamp
         result.metadata["parse_date"] = datetime.now(UTC).isoformat() + "Z"

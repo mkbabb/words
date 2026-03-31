@@ -20,12 +20,12 @@ from ....models import Word
 from ....models.dictionary import Definition
 from ....models.user import UserRole
 from ....wordlist.models import WordList, WordListItemDoc
+from ....wordlist.parser import parse_file
 from ....wordlist.reconcile import (
     ReconcilePreviewRequest,
     ReconcilePreviewResponse,
     build_reconcile_preview,
 )
-from ....wordlist.parser import parse_file
 from ....wordlist.utils import generate_wordlist_name
 from ...core import (
     CurrentUserDep,
@@ -38,8 +38,8 @@ from ...core import (
 )
 from ...repositories import (
     WordListCreate,
-    WordListFilter,
     WordListEntryInput,
+    WordListFilter,
     WordListRepository,
     WordListUpdate,
 )
@@ -519,7 +519,7 @@ async def upload_wordlist(
             parsed = parse_file(tmp_path)
 
             if not name:
-                name = generate_wordlist_name(parsed.words)
+                name = generate_wordlist_name(parsed.word_texts)
 
             data = WordListCreate(
                 name=name,
@@ -611,7 +611,7 @@ async def upload_wordlist_stream(
 
                 final_name = name
                 if not final_name:
-                    final_name = generate_wordlist_name(parsed.words)
+                    final_name = generate_wordlist_name(parsed.word_texts)
 
                 await state_tracker.update_stage(Stages.UPLOAD_PROCESSING)
                 await state_tracker.update(
