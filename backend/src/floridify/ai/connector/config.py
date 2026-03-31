@@ -17,6 +17,7 @@ class Provider(str, Enum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    LOCAL = "local"  # Any OpenAI-compatible local server (ollama, vLLM, llama.cpp)
 
     def __str__(self) -> str:
         return self.value

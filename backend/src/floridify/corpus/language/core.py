@@ -314,9 +314,7 @@ class LanguageCorpus(Corpus):
                 if child.corpus_uuid:
                     child_uuids.append(child.corpus_uuid)
                     aggregated_vocab.update(child.vocabulary)
-                    logger.info(
-                        f"Created child '{source.name}': {len(child.vocabulary):,} words"
-                    )
+                    logger.info(f"Created child '{source.name}': {len(child.vocabulary):,} words")
             except Exception as e:
                 logger.error(f"Failed to add source {source.name}: {e}")
 

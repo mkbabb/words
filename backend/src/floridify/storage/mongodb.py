@@ -102,7 +102,6 @@ class MongoDBStorage:
 
         uri_tls = self._parse_tls_from_uri(self.connection_string)
         # URI TLS setting takes precedence over config — the URI is more specific
-        # (e.g. Docker env var may set tls=true while config has tls_required=false for tunnel dev)
         effective_tls = uri_tls if uri_tls is not None else self.tls_required
         if effective_tls is True:
             connection_kwargs["tls"] = True  # type: ignore[assignment]

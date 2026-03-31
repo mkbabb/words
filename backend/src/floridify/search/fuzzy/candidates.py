@@ -133,14 +133,22 @@ def build_candidate_index(
             if not unique_mask.all():
                 # Merge duplicate entries by OR-ing masks
                 merged: list[tuple[int, int, int]] = []
-                cur_idx, cur_loc, cur_nxt = int(arr[0]["idx"]), int(arr[0]["loc"]), int(arr[0]["nxt"])
+                cur_idx, cur_loc, cur_nxt = (
+                    int(arr[0]["idx"]),
+                    int(arr[0]["loc"]),
+                    int(arr[0]["nxt"]),
+                )
                 for k in range(1, len(arr)):
                     if arr[k]["idx"] == cur_idx:
                         cur_loc |= int(arr[k]["loc"])
                         cur_nxt |= int(arr[k]["nxt"])
                     else:
                         merged.append((cur_idx, cur_loc, cur_nxt))
-                        cur_idx, cur_loc, cur_nxt = int(arr[k]["idx"]), int(arr[k]["loc"]), int(arr[k]["nxt"])
+                        cur_idx, cur_loc, cur_nxt = (
+                            int(arr[k]["idx"]),
+                            int(arr[k]["loc"]),
+                            int(arr[k]["nxt"]),
+                        )
                 merged.append((cur_idx, cur_loc, cur_nxt))
                 arr = np.array(merged, dtype=POSTING_DTYPE)
         trigram_index[tg] = arr

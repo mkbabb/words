@@ -14,32 +14,80 @@ RegisterType = Literal["formal", "informal", "neutral", "slang", "technical"]
 
 # Keyword sets for register detection — ordered by specificity
 _REGISTER_PATTERNS: list[tuple[RegisterType, list[str]]] = [
-    ("slang", [
-        "slang", "vulgar", "profanity", "taboo", "offensive",
-        "derogatory", "pejorative", "crude",
-    ]),
-    ("informal", [
-        "informal", "colloquial", "casual", "conversational",
-        "everyday", "nonstandard", "non-standard", "humorous",
-        "jocular", "playful",
-    ]),
-    ("formal", [
-        "formal", "literary", "poetic", "elevated",
-        "rhetorical", "academic",
-    ]),
-    ("technical", [
-        "technical", "specialized", "scientific", "medical",
-        "legal", "computing", "mathematics", "chemistry",
-        "biology", "physics", "engineering", "nautical",
-        "military", "architecture", "botany", "zoology",
-        "astronomy", "geology", "philosophy", "theology",
-        "linguistics", "music theory",
-    ]),
+    (
+        "slang",
+        [
+            "slang",
+            "vulgar",
+            "profanity",
+            "taboo",
+            "offensive",
+            "derogatory",
+            "pejorative",
+            "crude",
+        ],
+    ),
+    (
+        "informal",
+        [
+            "informal",
+            "colloquial",
+            "casual",
+            "conversational",
+            "everyday",
+            "nonstandard",
+            "non-standard",
+            "humorous",
+            "jocular",
+            "playful",
+        ],
+    ),
+    (
+        "formal",
+        [
+            "formal",
+            "literary",
+            "poetic",
+            "elevated",
+            "rhetorical",
+            "academic",
+        ],
+    ),
+    (
+        "technical",
+        [
+            "technical",
+            "specialized",
+            "scientific",
+            "medical",
+            "legal",
+            "computing",
+            "mathematics",
+            "chemistry",
+            "biology",
+            "physics",
+            "engineering",
+            "nautical",
+            "military",
+            "architecture",
+            "botany",
+            "zoology",
+            "astronomy",
+            "geology",
+            "philosophy",
+            "theology",
+            "linguistics",
+            "music theory",
+        ],
+    ),
 ]
 
 # Compiled regex for efficiency
 _REGISTER_REGEXES: list[tuple[RegisterType, re.Pattern[str]]] = [
-    (register, re.compile(r"\b(" + "|".join(re.escape(kw) for kw in keywords) + r")\b", re.IGNORECASE))
+    (
+        register,
+        re.compile(r"\b(" + "|".join(re.escape(kw) for kw in keywords) + r")\b", re.IGNORECASE),
+    )
     for register, keywords in _REGISTER_PATTERNS
 ]
 

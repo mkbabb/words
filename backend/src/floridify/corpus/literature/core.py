@@ -218,9 +218,7 @@ class LiteratureCorpus(Corpus):
 
             try:
                 # aggregate=False: skip per-source aggregation, do it once at the end
-                child_id = await self.add_literature_source(
-                    source, connector, aggregate=False
-                )
+                child_id = await self.add_literature_source(source, connector, aggregate=False)
                 if child_id:
                     child_ids.append(child_id)
             except Exception as e:

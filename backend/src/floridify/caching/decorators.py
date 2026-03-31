@@ -327,7 +327,9 @@ def deduplicated(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable
         async with _active_calls_lock:
             if cache_key in _active_calls:
                 existing_future = _active_calls[cache_key]
-                logger.debug(f"🔄 Deduplicating call to {func.__name__} - waiting for existing call")
+                logger.debug(
+                    f"🔄 Deduplicating call to {func.__name__} - waiting for existing call"
+                )
             else:
                 existing_future = None
                 future: asyncio.Future[Any] = asyncio.Future()

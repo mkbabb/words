@@ -6,6 +6,7 @@ Contains the actual vocabulary processing and storage logic and base corpus sour
 from __future__ import annotations
 
 import time
+import unicodedata
 from datetime import datetime
 from typing import Any, ClassVar
 
@@ -22,19 +23,15 @@ from ..caching.models import (
     ResourceType,
     VersionInfo,
 )
-import unicodedata
-
 from ..models.base import Language
-from ..text.normalize import batch_normalize
-from ..utils.logging import get_logger
 from ..search.fuzzy.candidates import (
-    LengthBuckets,
-    TrigramIndex,
     build_candidate_index,
     get_candidates,
     get_substring_candidates,
     word_trigrams,
 )
+from ..text.normalize import batch_normalize
+from ..utils.logging import get_logger
 from .models import CorpusType
 from .utils import get_vocabulary_hash
 from .vocabulary import (
@@ -441,7 +438,9 @@ class Corpus(BaseModel):
         """Get multiple words by their indices."""
         return [word for idx in indices if (word := self.get_word_by_index(int(idx))) is not None]
 
-    def get_original_words_by_indices(self, normalized_indices: list[int] | np.ndarray) -> list[str]:
+    def get_original_words_by_indices(
+        self, normalized_indices: list[int] | np.ndarray
+    ) -> list[str]:
         """Get original forms of words by their normalized indices."""
         return [
             word

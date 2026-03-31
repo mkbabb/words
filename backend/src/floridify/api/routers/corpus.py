@@ -586,9 +586,7 @@ async def rebuild_corpus(
             raise HTTPException(status_code=400, detail="Invalid corpus ID format")
 
         manager = get_tree_corpus_manager()
-        corpus = await manager.get_corpus(
-            corpus_id=obj_id, config=VersionConfig(use_cache=False)
-        )
+        corpus = await manager.get_corpus(corpus_id=obj_id, config=VersionConfig(use_cache=False))
         if not corpus:
             raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
 

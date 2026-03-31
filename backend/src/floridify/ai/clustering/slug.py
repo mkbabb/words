@@ -91,10 +91,7 @@ def generate_cluster_slug(
 
     # Collect texts for this cluster and all clusters
     cluster_texts = [definitions[i].text for i in cluster_indices]
-    all_cluster_texts = [
-        [definitions[i].text for i in c]
-        for c in all_clusters
-    ]
+    all_cluster_texts = [[definitions[i].text for i in c] for c in all_clusters]
 
     salient = _tfidf_salient_word(cluster_texts, all_cluster_texts)
     slug = f"{word}_{pos_slug}_{salient}"

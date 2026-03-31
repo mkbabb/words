@@ -216,27 +216,29 @@ def build_multi_version_payloads(num_versions: int = 10) -> list[dict[str, objec
     """Generate a chain of dictionary-entry payloads with incremental mutations."""
     payloads: list[dict[str, object]] = []
     for v in range(num_versions):
-        payloads.append({
-            "word": "audittrail",
-            "definitions": [
-                {
-                    "part_of_speech": "noun",
-                    "text": f"Definition text revision {v}.",
-                    "examples": [f"Example {i}" for i in range(v % 4 + 1)],
-                },
-                {
-                    "part_of_speech": "verb",
-                    "text": f"To audit-trail something ({v}).",
-                    "examples": [f"Verb example {v}"],
-                },
-                *(
-                    [{"part_of_speech": "adjective", "text": f"Audit-trailed ({v})."}]
-                    if v >= 5
-                    else []
-                ),
-            ],
-            "etymology": {"text": f"From audit + trail, revision {v}."},
-            "pronunciation": {"ipa": "/ˈɔː.dɪt.treɪl/"},
-            "metadata": {"revision": v, "tags": ["audit", "history"]},
-        })
+        payloads.append(
+            {
+                "word": "audittrail",
+                "definitions": [
+                    {
+                        "part_of_speech": "noun",
+                        "text": f"Definition text revision {v}.",
+                        "examples": [f"Example {i}" for i in range(v % 4 + 1)],
+                    },
+                    {
+                        "part_of_speech": "verb",
+                        "text": f"To audit-trail something ({v}).",
+                        "examples": [f"Verb example {v}"],
+                    },
+                    *(
+                        [{"part_of_speech": "adjective", "text": f"Audit-trailed ({v})."}]
+                        if v >= 5
+                        else []
+                    ),
+                ],
+                "etymology": {"text": f"From audit + trail, revision {v}."},
+                "pronunciation": {"ipa": "/ˈɔː.dɪt.treɪl/"},
+                "metadata": {"revision": v, "tags": ["audit", "history"]},
+            }
+        )
     return payloads

@@ -37,9 +37,7 @@ async def recompute_stats(wordlist_id: PydanticObjectId) -> None:
                 "_id": None,
                 "unique_words": {"$sum": 1},
                 "total_words": {"$sum": "$frequency"},
-                "words_mastered": {
-                    "$sum": {"$cond": [{"$eq": ["$mastery_level", "gold"]}, 1, 0]}
-                },
+                "words_mastered": {"$sum": {"$cond": [{"$eq": ["$mastery_level", "gold"]}, 1, 0]}},
                 "avg_ease": {"$avg": "$review_data.ease_factor"},
                 "total_reps": {"$sum": "$review_data.repetitions"},
                 "total_lapses": {"$sum": "$review_data.lapse_count"},

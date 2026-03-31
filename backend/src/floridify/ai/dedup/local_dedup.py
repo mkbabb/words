@@ -70,7 +70,9 @@ def _tier2_fuzzy(
     definitions within the same POS and sharing at least one content word.
     """
     # Build representative text for each group
-    group_reps: list[tuple[int, str, str, set[str]]] = []  # (group_idx, pos, canonical, content_words)
+    group_reps: list[
+        tuple[int, str, str, set[str]]
+    ] = []  # (group_idx, pos, canonical, content_words)
     for g_idx, indices in enumerate(groups):
         primary = definitions[indices[0]]
         canonical = canonicalize(primary.text)
@@ -256,7 +258,9 @@ async def local_deduplicate_definitions(
     all_merge_records.extend(records)
     tier1_removed = original_count - len(groups)
     if tier1_removed > 0:
-        logger.info(f"Tier 1 (exact): {original_count} → {len(groups)} groups ({tier1_removed} merged)")
+        logger.info(
+            f"Tier 1 (exact): {original_count} → {len(groups)} groups ({tier1_removed} merged)"
+        )
 
     # Tier 2: Fuzzy token match
     groups, records = _tier2_fuzzy(definitions, groups, threshold=fuzzy_threshold)

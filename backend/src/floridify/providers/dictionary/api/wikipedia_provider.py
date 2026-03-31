@@ -125,11 +125,7 @@ class WikipediaConnector(DictionaryConnector):
             pages = data.get("query", {}).get("pages", {})
             for page in pages.values():
                 cats = page.get("categories", [])
-                return [
-                    c["title"].replace("Category:", "")
-                    for c in cats
-                    if "title" in c
-                ]
+                return [c["title"].replace("Category:", "") for c in cats if "title" in c]
         except Exception as e:
             logger.debug(f"Failed to fetch Wikipedia categories: {e}")
 

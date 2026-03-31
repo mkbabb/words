@@ -1,71 +1,102 @@
 # ai/
 
-OpenAI integration. AIConnector with mixin-based methods, synthesis pipeline, 3-tier model selection, batch processing.
+Multi-provider AI connector + hybrid synthesis pipeline. Supports OpenAI, Anthropic, and local models (ollama, vLLM, llama.cpp). Local-first where quality matches or exceeds AI.
 
 ```
 ai/
-├── connector/                  # AIConnector: async interface to OpenAI
-│   ├── __init__.py
-│   ├── base.py                 # AIConnector class (mixes in all method groups)
-│   ├── config.py               # Provider enum, effort settings
-│   ├── synthesis.py            # Synthesis-specific methods
-│   ├── generation.py           # Content generation methods
-│   ├── assessment.py           # Classification/assessment methods
+├── connector/                  # AIConnector: async multi-provider interface
+│   ├── base.py                 # Core: structured outputs, retry, caching, provider dispatch
+│   ├── config.py               # Provider enum (OPENAI, ANTHROPIC, LOCAL), effort levels
+│   ├── synthesis.py            # Synthesis methods (dedup, clustering, etymology)
+│   ├── generation.py           # Content generation (examples, facts, word forms)
+│   ├── assessment.py           # Classification (CEFR, frequency, register, domain)
 │   └── suggestions.py          # Word suggestion methods
-├── synthesis/                  # Synthesis pipeline functions
-│   ├── __init__.py
-│   ├── orchestration.py        # Parallel enhancement, clustering
+│
+├── synthesis/                  # Pipeline functions
+│   ├── orchestration.py        # Parallel enhancement, clustering, entry enhancement
 │   ├── word_level.py           # Pronunciation, etymology, word forms, facts
-│   └── definition_level.py     # 11 per-definition enhancement functions
-├── synthesizer.py              # DefinitionSynthesizer: dedup→cluster→enhance
-├── models.py                   # AI response/request Pydantic models
-├── model_selection.py          # 3-tier routing: ModelComplexity → ModelTier
-├── batch_processor.py          # OpenAI Batch API via context manager
+│   ├── definition_level.py     # Per-definition: synonyms, antonyms, examples, assessments
+│   ├── hybrid.py               # Wiktionary + WordNet → AI delta (synonyms, antonyms)
+│   ├── language_filter.py      # ISO code normalization, primary language filtering
+│   └── postprocess.py          # Domain-in-text strip, definition text cleanup
+│
+├── assessment/                 # Local-first assessment (replaces AI for most tasks)
+│   ├── frequency.py            # wordfreq Zipf + WordNet SemCor sense counts
+│   ├── cefr.py                 # Frequency-based CEFR with sense adjustment
+│   ├── domain.py               # WordNet lexname + hypernym chain taxonomy
+│   ├── register.py             # Keyword-based register classification
+│   └── regional.py             # Keyword-based regional variant detection
+│
+├── clustering/                 # Local sense clustering
+│   ├── local_clustering.py     # Agglomerative + silhouette gating + WordNet priors
+│   └── slug.py                 # TF-IDF deterministic slug + name generation
+│
+├── dedup/                      # Local 3-tier deduplication
+│   ├── local_dedup.py          # Exact → fuzzy → semantic (Qwen3-0.6B)
+│   └── canonicalize.py         # Text canonicalization, content word extraction
+│
+├── embedding_utils.py          # Shared encoder: encode_texts(), best_synset_by_embedding()
+├── synthesizer.py              # DefinitionSynthesizer: dedup→cluster→enhance orchestrator
+├── model_selection.py          # Task→model routing, resolve_model_for_provider()
+├── constants.py                # SynthesisComponent enum, default component sets
+├── batch_processor.py          # OpenAI Batch API (JSONL, 50% cost reduction)
 ├── prompt_manager.py           # Jinja2 template loading
-├── constants.py                # SynthesisComponent enum (17 values), defaults
-├── adaptive_counts.py          # Dynamic enhancement counts
+├── adaptive_counts.py          # Dynamic enhancement counts by language
 ├── tournament.py               # Tournament-style word ranking
-└── prompts/                    # Markdown templates
-    ├── assess/                 # cefr, collocations, domain, frequency, grammar_patterns, regional_variants, register
+└── prompts/                    # Markdown Jinja2 templates
+    ├── assess/                 # cefr, frequency, register, domain, grammar, regional
     ├── generate/               # examples, facts, word_forms
-    ├── synthesize/             # antonyms, deduplicate, definitions, etymology, pronunciation, synonyms
-    ├── misc/                   # anki_best_describes, anki_fill_blank, lookup, meaning_extraction, query_validation, rank_candidates, suggestions, usage_note_generation, word_suggestion
-    ├── shared/                 # Shared prompt components
-    └── wotd/                   # literature_analysis, synthetic_corpus, word_of_the_day
+    ├── synthesize/             # definitions, synonyms, antonyms, etymology, pronunciation, dedup
+    └── misc/                   # meaning_extraction (clustering), suggestions, validation
 ```
 
-## SynthesisComponent Enum (17 values)
+## Synthesis Pipeline (actual flow)
 
-Word-level: `PRONUNCIATION`, `ETYMOLOGY`, `WORD_FORMS`, `FACTS`
-Definition-level: `SYNONYMS`, `EXAMPLES`, `ANTONYMS`, `CEFR_LEVEL`, `FREQUENCY_BAND`, `REGISTER`, `DOMAIN`, `GRAMMAR_PATTERNS`, `COLLOCATIONS`, `USAGE_NOTES`, `REGIONAL_VARIANTS`
-Utilities: `DEFINITION_TEXT`, `CLUSTER_DEFINITIONS`
+```
+Provider Fetch (Wiktionary + WordNet + Apple + others, parallel)
+  ↓
+Local 3-Tier Dedup (canonicalized exact → rapidfuzz fuzzy → Qwen3-0.6B semantic)
+  ↓
+Local Pre-Clustering (agglomerative, cosine distance, silhouette quality gating)
+  ↓ if silhouette < 0.4
+AI Clustering Refinement (with local cluster hints)
+  ↓
+Definition Text Synthesis (AI, per cluster)
+  ↓
+Parallel Enhancement:
+  LOCAL:  CEFR, frequency, register, domain, regional, dedup
+  HYBRID: synonyms (Wiktionary+WordNet → AI delta), antonyms (same)
+  AI:     examples, etymology, facts, word_forms, pronunciation
+  ↓
+Post-Processing: domain-in-text strip, language filtering (cognates → separate field)
+  ↓
+Versioned Save (SHA-256 content-addressable, edit metadata, provenance chain)
+```
 
-## 3-Tier Model Selection
+## Provider Support
 
-`model_selection.py` maps task names to `ModelComplexity` (HIGH/MEDIUM/LOW), then to `ModelTier`.
+| Provider | Config Section | Structured Output | Notes |
+|----------|---------------|-------------------|-------|
+| OpenAI | `[openai]` | GA (`chat.completions.parse`, SDK v2+) | Default. GPT-5 series. |
+| Anthropic | `[anthropic]` | GA (`messages.create` + `output_config`) | Claude 4.5/4.6. |
+| Local | `[local.high]`, `[local.medium]`, `[local.low]` | Via OpenAI-compatible API | ollama, vLLM, llama.cpp. Per-tier model routing. |
 
-| Tier | Model | Example Tasks |
-|------|-------|---------------|
-| HIGH | gpt-5.4 | synthesize_definitions, suggest_words, extract_cluster_mapping, generate_synthetic_corpus, literature_analysis |
-| MEDIUM | gpt-5-mini | generate_synonyms, generate_facts, generate_examples, synthesize_etymology, deduplicate_definitions, generate_collocations, generate_word_forms, generate_antonyms, generate_anki_*, generate_suggestions, lookup_word, literature_augmentation, text_generation |
-| LOW | gpt-5-nano | assess_cefr_level, assess_frequency, classify_register, classify_domain, generate_pronunciation, generate_usage_notes, validate_query, identify_grammar_patterns, identify_regional_variants, rank_candidates |
+Set active provider in `[ai] provider = "openai" | "anthropic" | "local"`.
 
-Additional `ModelTier` values: `O3_MINI`, `GPT_4O`, `GPT_4O_MINI` (legacy). GPT-5 models use `max_completion_tokens` instead of `max_tokens` and use `"developer"` role instead of `"system"`. Temperature's only supported when `reasoning.effort=none`.
+## Model Selection
 
-## Synthesis Pipeline
+Tasks route to capability tiers (HIGH/MEDIUM/LOW) via `TASK_COMPLEXITY_MAP`. Each provider resolves tiers to specific models:
 
-Provider data → `deduplicate_definitions()` → `cluster_definitions()` → parallel `asyncio.gather()`:
-- `synthesize_definition_text()`, `synthesize_pronunciation()`, `synthesize_etymology()`, `generate_facts()`
-- `enhance_definitions_parallel()` (sub-tasks: synonyms, examples, antonyms, CEFR, frequency, register, domain, grammar, collocations, usage notes, regional variants, definition text)
+- **OpenAI**: HIGH→gpt-5.4, MEDIUM→gpt-5-mini, LOW→gpt-5-nano
+- **Anthropic**: HIGH→claude-opus-4-6, MEDIUM→claude-sonnet-4-6, LOW→claude-haiku-4-5
+- **Local**: Per-tier model from config (e.g., HIGH→qwen3:32b, MEDIUM→qwen3:8b)
 
-Dedup before cluster reduces token input.
+Many LOW tasks now bypass AI entirely (local assessment via wordfreq, WordNet, keyword classifiers).
+
+## Embedding-Based Synset Matching
+
+`embedding_utils.py` provides `best_synset_by_embedding()` — matches synthesized definition text to WordNet synsets using Qwen3-0.6B sentence embeddings. Shared by domain classification, sense-level frequency, CEFR adjustment, and hybrid synonym/antonym extraction. Falls back to word-overlap matching when encoder unavailable.
 
 ## Batch Processing
 
-`batch_synthesis(connector)` async context manager: patches `_make_structured_request()` to collect requests into `BatchCollector` → JSONL → OpenAI Batch API → poll for completion (max 1h timeout, configurable `check_interval`). `BatchExecutor` handles upload, polling, result download. Futures resolve when batch completes.
-
-Classes: `AIBatchRequest`, `BatchCollector`, `BatchExecutor`, `BatchContext`.
-
-## Structured Outputs
-
-All API calls use Pydantic `response_format` for type-safe structured outputs. `AIResponseBase` is the common base class for AI responses.
+`batch_processor.py`: OpenAI Batch API via async context manager. Patches `_make_structured_request()` to collect requests into JSONL → submit → poll (max 1h) → download results. 50% cost reduction vs real-time API.

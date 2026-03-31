@@ -128,9 +128,7 @@ class DefinitionLoader(DataLoader):
         # Load images (batch query)
         if include_images and definition.image_ids:
             images = await DataLoader.load_by_ids(ImageMedia, definition.image_ids)
-            def_dict["images"] = [
-                img.model_dump(mode="json", exclude={"data"}) for img in images
-            ]
+            def_dict["images"] = [img.model_dump(mode="json", exclude={"data"}) for img in images]
         else:
             def_dict["images"] = []
 

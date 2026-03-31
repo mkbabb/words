@@ -9,35 +9,81 @@ import re
 
 # Regional variant patterns — (region_code, keywords)
 _REGIONAL_PATTERNS: list[tuple[str, list[str]]] = [
-    ("US", [
-        "american", "us english", "north american",
-        "united states", "chiefly us", "chiefly american",
-    ]),
-    ("UK", [
-        "british", "uk english", "chiefly british",
-        "chiefly uk", "england", "commonwealth",
-    ]),
-    ("AU", [
-        "australian", "chiefly australian", "australia",
-    ]),
-    ("CA", [
-        "canadian", "chiefly canadian", "canada",
-    ]),
-    ("IE", [
-        "irish", "ireland", "hiberno-english",
-    ]),
-    ("SC", [
-        "scottish", "scots", "scotland",
-    ]),
-    ("NZ", [
-        "new zealand", "kiwi",
-    ]),
-    ("SA", [
-        "south african", "south africa",
-    ]),
-    ("IN", [
-        "indian english", "india",
-    ]),
+    (
+        "US",
+        [
+            "american",
+            "us english",
+            "north american",
+            "united states",
+            "chiefly us",
+            "chiefly american",
+        ],
+    ),
+    (
+        "UK",
+        [
+            "british",
+            "uk english",
+            "chiefly british",
+            "chiefly uk",
+            "england",
+            "commonwealth",
+        ],
+    ),
+    (
+        "AU",
+        [
+            "australian",
+            "chiefly australian",
+            "australia",
+        ],
+    ),
+    (
+        "CA",
+        [
+            "canadian",
+            "chiefly canadian",
+            "canada",
+        ],
+    ),
+    (
+        "IE",
+        [
+            "irish",
+            "ireland",
+            "hiberno-english",
+        ],
+    ),
+    (
+        "SC",
+        [
+            "scottish",
+            "scots",
+            "scotland",
+        ],
+    ),
+    (
+        "NZ",
+        [
+            "new zealand",
+            "kiwi",
+        ],
+    ),
+    (
+        "SA",
+        [
+            "south african",
+            "south africa",
+        ],
+    ),
+    (
+        "IN",
+        [
+            "indian english",
+            "india",
+        ],
+    ),
 ]
 
 _COMPILED_REGIONS: list[tuple[str, re.Pattern[str]]] = [

@@ -134,9 +134,7 @@ def _build_edit_metadata_summary(raw: dict[str, Any] | None) -> EditMetadataSumm
     """Convert raw edit_metadata dict from VersionInfo into a typed summary."""
     if not raw:
         return None
-    field_changes = [
-        FieldChangeSummary(**fc) for fc in (raw.get("field_changes") or [])
-    ]
+    field_changes = [FieldChangeSummary(**fc) for fc in (raw.get("field_changes") or [])]
     return EditMetadataSummary(
         user_id=raw.get("user_id"),
         username=raw.get("username"),

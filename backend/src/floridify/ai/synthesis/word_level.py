@@ -15,10 +15,10 @@ from ...models.dictionary import (
     Word,
 )
 from ...models.relationships import WordForm
+from ...storage.dictionary import save_fact_versioned, save_pronunciation_versioned
 from ...utils.language_precedence import (
     language_code,
 )
-from ...storage.dictionary import save_fact_versioned, save_pronunciation_versioned
 from ...utils.logging import get_logger
 from ..connector import AIConnector
 

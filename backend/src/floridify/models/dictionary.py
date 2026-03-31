@@ -228,7 +228,9 @@ class Definition(Document, BaseMetadata):
     )  # FK to Example documents
     synonyms: list[str] = Field(default_factory=list, max_length=50)
     antonyms: list[str] = Field(default_factory=list, max_length=50)
-    cognates: list[str] = Field(default_factory=list, max_length=20)  # Cross-language enrichment terms
+    cognates: list[str] = Field(
+        default_factory=list, max_length=20
+    )  # Cross-language enrichment terms
 
     # Usage and context
     language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
@@ -315,7 +317,9 @@ class DictionaryEntry(Document, BaseMetadata):
         seen_providers: set[str] = set()
 
         for ref in self.source_entries:
-            provider = DictionaryProvider(ref.provider) if isinstance(ref.provider, str) else ref.provider
+            provider = (
+                DictionaryProvider(ref.provider) if isinstance(ref.provider, str) else ref.provider
+            )
             license_id = ref.license or provider.license
             if license_id in attribution_sources and provider.value not in seen_providers:
                 seen_providers.add(provider.value)

@@ -44,7 +44,11 @@ async def encode_texts(texts: list[str]) -> np.ndarray | None:
         from ..search.semantic.encoder import SemanticEncoder
 
         # DEFAULT_SENTENCE_MODEL may be a string or an object with .name
-        model_name = DEFAULT_SENTENCE_MODEL if isinstance(DEFAULT_SENTENCE_MODEL, str) else DEFAULT_SENTENCE_MODEL.name
+        model_name = (
+            DEFAULT_SENTENCE_MODEL
+            if isinstance(DEFAULT_SENTENCE_MODEL, str)
+            else DEFAULT_SENTENCE_MODEL.name
+        )
 
         if _encoder_instance is None:
             _encoder_instance = SemanticEncoder()

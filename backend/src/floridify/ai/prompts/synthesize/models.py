@@ -172,7 +172,9 @@ class PhraseEntry(BaseModel):
 
     phrase: str = Field(description="The phrase or idiom (e.g., 'by heart', 'heart of gold')")
     meaning: str = Field(max_length=300, description="Meaning of the phrase")
-    example: str | None = Field(None, max_length=500, description="Example sentence using the phrase")
+    example: str | None = Field(
+        None, max_length=500, description="Example sentence using the phrase"
+    )
     register: str | None = Field(
         None, description="Usage register: formal, informal, literary, archaic"
     )

@@ -10,13 +10,13 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
+from ..api.repositories.wordlist_repository import WordListEntryInput, WordListRepository
 from ..models import Word
 from ..models.base import Language
 from ..search.constants import SearchMode
 from ..search.language import get_language_search
 from ..text import normalize
 from ..utils.logging import get_logger
-from ..api.repositories.wordlist_repository import WordListEntryInput, WordListRepository
 from .models import WordListItemDoc
 
 logger = get_logger(__name__)
@@ -199,7 +199,9 @@ async def build_reconcile_preview(
         candidates = [
             ReconcileCandidate(
                 word=result.word,
-                word_id=str(text_to_doc[result.word].id) if result.word in text_to_doc and text_to_doc[result.word].id else None,
+                word_id=str(text_to_doc[result.word].id)
+                if result.word in text_to_doc and text_to_doc[result.word].id
+                else None,
                 score=result.score,
                 method=result.method.value,
                 lemmatized_word=result.lemmatized_word,

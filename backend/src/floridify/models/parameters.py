@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from ..search.constants import DEFAULT_MIN_SCORE
+from ..search.constants import DEFAULT_MIN_SCORE, SearchMode
 from .base import Language
 from .dictionary import DictionaryProvider
 
@@ -114,8 +114,8 @@ class SearchParams(BaseModel):
         le=1.0,
         description="Minimum relevance score threshold",
     )
-    mode: str = Field(
-        default="smart",
+    mode: SearchMode = Field(
+        default=SearchMode.SMART,
         description="Search mode: smart (cascade), exact, fuzzy, semantic",
     )
     force_rebuild: bool = Field(
@@ -157,18 +157,16 @@ class SearchParams(BaseModel):
 
     @field_validator("mode", mode="before")
     @classmethod
-    def parse_mode(cls, v: Any) -> str:
-        """Parse mode string - validates it's a valid search mode."""
+    def parse_mode(cls, v: Any) -> SearchMode:
+        """Parse mode string to SearchMode enum."""
+        if isinstance(v, SearchMode):
+            return v
         if isinstance(v, str):
-            mode = v.lower()
-            if mode in ("smart", "exact", "fuzzy", "semantic"):
-                return mode
-            return "smart"
-        # Handle enum if passed
-        try:
-            return str(v.value)
-        except AttributeError:
-            return "smart"
+            try:
+                return SearchMode(v.lower())
+            except ValueError:
+                return SearchMode.SMART
+        return SearchMode.SMART
 
 
 class WordlistCreateParams(BaseModel):

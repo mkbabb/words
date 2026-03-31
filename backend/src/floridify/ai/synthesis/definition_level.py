@@ -75,6 +75,7 @@ async def synthesize_synonyms(
 
         # Map ISO code to display name for prompt
         from ...models.base import Language as LangEnum
+
         lang_display = {v.value: v.name.title() for v in LangEnum}.get(language, "English")
 
         response = await ai.synthesize_synonyms(
@@ -105,7 +106,8 @@ async def synthesize_synonyms(
         # Store cognates on the definition
         seen_cog: set[str] = set()
         definition.cognates = [
-            c for c in cognates
+            c
+            for c in cognates
             if c.lower() not in seen_cog and not seen_cog.add(c.lower())  # type: ignore[func-returns-value]
         ][:20]
 
@@ -158,6 +160,7 @@ async def synthesize_antonyms(
             )
 
         from ...models.base import Language as LangEnum
+
         lang_display = {v.value: v.name.title() for v in LangEnum}.get(language, "English")
 
         response = await ai.synthesize_antonyms(
@@ -239,7 +242,9 @@ async def assess_definition_cefr(
         part_of_speech=definition.part_of_speech,
     )
     if local_result is not None:
-        logger.debug(f"CEFR for '{word}' ({definition.part_of_speech}): {local_result} (local, sense-adjusted)")
+        logger.debug(
+            f"CEFR for '{word}' ({definition.part_of_speech}): {local_result} (local, sense-adjusted)"
+        )
         return local_result
 
     # Fall back to AI
@@ -334,7 +339,9 @@ async def assess_definition_domain(
     word: str = "",
 ) -> str | None:
     """Identify domain for a definition. Local-first via WordNet taxonomy, AI fallback."""
-    local_result = await classify_domain_local(definition.text, word=word, part_of_speech=definition.part_of_speech)
+    local_result = await classify_domain_local(
+        definition.text, word=word, part_of_speech=definition.part_of_speech
+    )
     if local_result is not None:
         logger.debug(f"Domain: {local_result} (local)")
         return local_result

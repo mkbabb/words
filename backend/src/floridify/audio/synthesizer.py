@@ -72,7 +72,9 @@ class AudioSynthesizer:
 
         if KokoroSynthesizer.supports_language(kokoro_lang):
             backend = self._get_kokoro()
-            return await backend.synthesize_word(word, language=kokoro_lang, voice_gender=voice_gender)  # type: ignore[union-attr]
+            return await backend.synthesize_word(
+                word, language=kokoro_lang, voice_gender=voice_gender
+            )  # type: ignore[union-attr]
 
         logger.debug(f"No TTS backend for language '{language}'")
         return None

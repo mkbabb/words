@@ -126,7 +126,10 @@ def adaptive_max_distance(query_length: int) -> int:
 
     Formula: max_k = min(5, max(2, ceil(query_length * 0.35)))
     """
-    return min(EDIT_DISTANCE_MAX, max(EDIT_DISTANCE_MIN, math.ceil(query_length * EDIT_DISTANCE_LENGTH_MULTIPLIER)))
+    return min(
+        EDIT_DISTANCE_MAX,
+        max(EDIT_DISTANCE_MIN, math.ceil(query_length * EDIT_DISTANCE_LENGTH_MULTIPLIER)),
+    )
 
 
 def cascading_search(

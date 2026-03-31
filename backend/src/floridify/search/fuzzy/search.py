@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
-
 from rapidfuzz import fuzz, process
 
 from ...corpus.core import Corpus
@@ -23,9 +22,6 @@ from ..config import (
     BKTREE_TIME_BUDGET_LARGE,
     BKTREE_TIME_BUDGET_MEDIUM,
     BKTREE_TIME_BUDGET_SMALL,
-    PERWORD_MIN_WORD_LENGTH,
-    PERWORD_SUFFIX_MIN_STEM_LENGTH,
-    PERWORD_SUFFIX_TRIM_LENGTHS,
     CLOSE_EDIT_DISTANCE_BOOST,
     CORPUS_MEDIUM,
     CORPUS_SMALL,
@@ -36,6 +32,9 @@ from ..config import (
     FUZZY_BUDGET_SMALL,
     FUZZY_BUDGET_XLARGE,
     MULTI_SIGNAL_BOOST,
+    PERWORD_MIN_WORD_LENGTH,
+    PERWORD_SUFFIX_MIN_STEM_LENGTH,
+    PERWORD_SUFFIX_TRIM_LENGTHS,
     PHONETIC_BUDGET_CAP,
     PHONETIC_MATCH_BOOST,
     PRIMARY_PHRASE_CUTOFF_MULTIPLIER,
@@ -173,9 +172,7 @@ class FuzzySearch:
                 signals.phonetic_match = True
 
         # Strategy 3: Enhanced trigram overlap (with probabilistic masks)
-        trigram_indices = corpus.get_candidates(
-            normalized_query, max_results=max_candidates
-        )
+        trigram_indices = corpus.get_candidates(normalized_query, max_results=max_candidates)
         for word_idx in trigram_indices:
             signals = candidates.setdefault(word_idx, CandidateSignals())
             signals.trigram_overlap = True
@@ -193,7 +190,7 @@ class FuzzySearch:
                 if len(word) < PERWORD_SUFFIX_MIN_STEM_LENGTH:
                     continue
                 for trim in PERWORD_SUFFIX_TRIM_LENGTHS:
-                    stem = word[:len(word) - trim] if trim else word
+                    stem = word[: len(word) - trim] if trim else word
                     if len(stem) < PERWORD_SUFFIX_MIN_STEM_LENGTH:
                         continue
                     sa_matches = suffix_array.search(stem, max_results=per_word_budget)
@@ -226,12 +223,14 @@ class FuzzySearch:
             score = min(1.0, score * CLOSE_EDIT_DISTANCE_BOOST)
 
         # Multi-signal bonus: found by 3+ strategies
-        signal_count = sum([
-            signals.edit_distance is not None,
-            signals.phonetic_match,
-            signals.trigram_overlap,
-            signals.substring_match,
-        ])
+        signal_count = sum(
+            [
+                signals.edit_distance is not None,
+                signals.phonetic_match,
+                signals.trigram_overlap,
+                signals.substring_match,
+            ]
+        )
         if signal_count >= 3:
             score = min(1.0, score * MULTI_SIGNAL_BOOST)
 
@@ -303,8 +302,16 @@ class FuzzySearch:
         is_phrase = " " in query
 
         # Primary scorer: WRatio
-        primary_cutoff = min_score_threshold * PRIMARY_PHRASE_CUTOFF_MULTIPLIER if is_phrase else min_score_threshold * PRIMARY_WORD_CUTOFF_MULTIPLIER
-        limit_multiplier = RAPIDFUZZ_LIMIT_MULTIPLIER_LARGE if len(vocabulary) > VOCABULARY_SIZE_LIMIT_THRESHOLD else RAPIDFUZZ_LIMIT_MULTIPLIER_SMALL
+        primary_cutoff = (
+            min_score_threshold * PRIMARY_PHRASE_CUTOFF_MULTIPLIER
+            if is_phrase
+            else min_score_threshold * PRIMARY_WORD_CUTOFF_MULTIPLIER
+        )
+        limit_multiplier = (
+            RAPIDFUZZ_LIMIT_MULTIPLIER_LARGE
+            if len(vocabulary) > VOCABULARY_SIZE_LIMIT_THRESHOLD
+            else RAPIDFUZZ_LIMIT_MULTIPLIER_SMALL
+        )
         primary_results = process.extract(
             normalized_query,
             vocabulary,
@@ -321,14 +328,19 @@ class FuzzySearch:
 
         # Secondary scorer: token_set_ratio for phrase matching
         # Skip for short single-word queries (token_set_ratio adds no value)
-        has_strong_primary = sum(1 for _, s, _ in matches[:STRONG_PRIMARY_COUNT] if s > STRONG_PRIMARY_SCORE) >= STRONG_PRIMARY_COUNT
+        has_strong_primary = (
+            sum(1 for _, s, _ in matches[:STRONG_PRIMARY_COUNT] if s > STRONG_PRIMARY_SCORE)
+            >= STRONG_PRIMARY_COUNT
+        )
         has_any_results = any(s >= min_score_threshold for _, s, _ in matches)
         skip_secondary = has_strong_primary or (
             not is_phrase and (len(query) < 6 or has_any_results)
         )
         if not skip_secondary and (is_phrase or len(query) >= 8):
             secondary_cutoff = (
-                min_score_threshold * SECONDARY_PHRASE_CUTOFF_MULTIPLIER if is_phrase else min_score_threshold * SECONDARY_WORD_CUTOFF_MULTIPLIER
+                min_score_threshold * SECONDARY_PHRASE_CUTOFF_MULTIPLIER
+                if is_phrase
+                else min_score_threshold * SECONDARY_WORD_CUTOFF_MULTIPLIER
             )
             secondary_results = process.extract(
                 normalized_query,
@@ -368,10 +380,7 @@ class FuzzySearch:
                 lemmatized_word = None
                 if word in corpus.vocabulary_to_index:
                     word_idx = corpus.vocabulary_to_index[word]
-                    if (
-                        corpus.word_to_lemma_indices
-                        and word_idx in corpus.word_to_lemma_indices
-                    ):
+                    if corpus.word_to_lemma_indices and word_idx in corpus.word_to_lemma_indices:
                         lemma_idx = corpus.word_to_lemma_indices[word_idx]
                         if lemma_idx < len(corpus.lemmatized_vocabulary):
                             lemmatized_word = corpus.lemmatized_vocabulary[lemma_idx]
@@ -383,9 +392,7 @@ class FuzzySearch:
                         method=SearchMethod.FUZZY,
                         lemmatized_word=lemmatized_word,
                         language=corpus.language,
-                        metadata={"scoring_method": method}
-                        if method == "secondary"
-                        else None,
+                        metadata={"scoring_method": method} if method == "secondary" else None,
                     ),
                 )
 

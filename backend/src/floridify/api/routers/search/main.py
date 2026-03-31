@@ -32,7 +32,9 @@ def parse_search_params(
     languages: list[str] = Query(default=["en"], description="Language codes"),
     max_results: int = Query(default=20, ge=1, le=100, description="Maximum results"),
     min_score: float = Query(default=0.3, ge=0.0, le=1.0, description="Minimum score"),
-    mode: str = Query(default="smart", description="Search mode: smart, exact, fuzzy, semantic"),
+    mode: SearchMode = Query(
+        default=SearchMode.SMART, description="Search mode: smart, exact, fuzzy, semantic"
+    ),
     force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
     corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
     corpus_name: str | None = Query(default=None, description="Specific corpus name"),
@@ -57,7 +59,7 @@ def parse_search_params(
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
     # Support comma-separated modes (e.g., "exact,fuzzy")
-    mode_parts = [m.strip() for m in params.mode.split(",") if m.strip()]
+    mode_parts = [m.strip() for m in params.mode.value.split(",") if m.strip()]
 
     if len(mode_parts) > 1:
         # Multi-mode: run each mode and union results
@@ -98,8 +100,7 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             metadata={"modes": mode_parts},
         )
 
-    # Convert string mode to enum
-    mode_enum = SearchMode(params.mode)
+    mode_enum = params.mode
 
     try:
         # CRITICAL FIX: Check if searching specific corpus by ID or name

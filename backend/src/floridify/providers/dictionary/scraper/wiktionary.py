@@ -33,7 +33,6 @@ from .wiktionary_parser import (
     extract_section_synonyms,
     extract_section_usage_notes,
     find_all_language_sections,
-    find_language_section,
 )
 
 logger = get_logger(__name__)
@@ -268,25 +267,26 @@ class WiktionaryConnector(DictionaryConnector):
                 )
 
                 for definition in definitions:
-                    all_definitions_dicts.append({
-                        "id": str(definition.id),
-                        "part_of_speech": definition.part_of_speech,
-                        "text": definition.text,
-                        "sense_number": definition.sense_number,
-                        "synonyms": definition.synonyms,
-                        "antonyms": definition.antonyms,
-                        "frequency_band": definition.frequency_band,
-                        "collocations": [
-                            {"text": c.text, "type": c.type, "frequency": c.frequency}
-                            for c in definition.collocations
-                        ],
-                        "usage_notes": [
-                            {"type": n.type, "text": n.text}
-                            for n in definition.usage_notes
-                        ],
-                        "example_ids": [str(eid) for eid in definition.example_ids],
-                        "language": lang.value,  # Tag which language this def came from
-                    })
+                    all_definitions_dicts.append(
+                        {
+                            "id": str(definition.id),
+                            "part_of_speech": definition.part_of_speech,
+                            "text": definition.text,
+                            "sense_number": definition.sense_number,
+                            "synonyms": definition.synonyms,
+                            "antonyms": definition.antonyms,
+                            "frequency_band": definition.frequency_band,
+                            "collocations": [
+                                {"text": c.text, "type": c.type, "frequency": c.frequency}
+                                for c in definition.collocations
+                            ],
+                            "usage_notes": [
+                                {"type": n.type, "text": n.text} for n in definition.usage_notes
+                            ],
+                            "example_ids": [str(eid) for eid in definition.example_ids],
+                            "language": lang.value,  # Tag which language this def came from
+                        }
+                    )
 
                 # First section with etymology/pronunciation wins
                 if first_etymology is None:
@@ -310,7 +310,9 @@ class WiktionaryConnector(DictionaryConnector):
             if len(languages_found) > 1:
                 logger.info(
                     "Wiktionary: '%s' parsed from %d language sections: %s",
-                    word_obj.text, len(languages_found), languages_found,
+                    word_obj.text,
+                    len(languages_found),
+                    languages_found,
                 )
 
             return DictionaryProviderEntry(

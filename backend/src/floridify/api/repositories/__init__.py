@@ -27,8 +27,8 @@ from .word_repository import WordCreate, WordFilter, WordRepository, WordUpdate
 from .wordlist_repository import (
     StudySessionRequest,
     WordAddRequest,
-    WordListEntryInput,
     WordListCreate,
+    WordListEntryInput,
     WordListFilter,
     WordListRepository,
     WordListUpdate,

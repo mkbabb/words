@@ -41,7 +41,9 @@ def invalidate_by_corpus(corpus_name: str) -> int:
     for k in keys_to_remove:
         del _search_instance_cache[k]
     if keys_to_remove:
-        logger.debug(f"Evicted {len(keys_to_remove)} cached Search instance(s) for corpus '{corpus_name}'")
+        logger.debug(
+            f"Evicted {len(keys_to_remove)} cached Search instance(s) for corpus '{corpus_name}'"
+        )
     return len(keys_to_remove)
 
 
