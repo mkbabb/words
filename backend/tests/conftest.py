@@ -1,8 +1,21 @@
-"""Main test configuration with MongoDB setup and async fixture handling."""
+"""Main test configuration with MongoDB setup and async fixture handling.
+
+Loads .env automatically via python-dotenv so tests can run with just
+``pytest`` — no manual ``source .env`` or shell wrappers needed.
+"""
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+# Load .env from project root BEFORE anything else reads env vars.
+# This provides MONGO_USERNAME, MONGO_PASSWORD, etc. for the test DB connection.
+from dotenv import load_dotenv
+
+_project_root = Path(__file__).resolve().parent.parent.parent  # backend/tests → backend → words
+load_dotenv(_project_root / ".env", override=False)
+
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -63,9 +76,43 @@ def _validate_test_database_urls(runtime_url: str, test_url: str) -> str:
     return test_db
 
 
+def _build_local_test_url() -> str | None:
+    """Build a test URL for the Docker Mongo container.
+
+    Uses MONGO_USERNAME/MONGO_PASSWORD env vars (from .env) to connect
+    to the local Docker Mongo on the Docker network or localhost.
+    Returns None if the env vars aren't set.
+    """
+    username = os.environ.get("MONGO_USERNAME")
+    password = os.environ.get("MONGO_PASSWORD")
+    if not username or not password:
+        return None
+
+    # Inside Docker: mongo:27017. Outside Docker: try localhost:27017.
+    host = "mongo" if os.path.exists("/.dockerenv") else "localhost"
+    return f"mongodb://{username}:{password}@{host}:27017/test_floridify?authSource=admin"
+
+
 @pytest.fixture(scope="session")
 def mongodb_server() -> str:
-    """Provide a remote MongoDB test URI from strict config."""
+    """Provide a MongoDB test URI.
+
+    Priority:
+      1. MONGODB_TEST_URL env var (explicit override)
+      2. Local Docker Mongo (built from MONGO_USERNAME/MONGO_PASSWORD)
+      3. Config file test_url (remote, may require VPN)
+    """
+    # Explicit test URL override
+    explicit = os.environ.get("MONGODB_TEST_URL")
+    if explicit:
+        return explicit
+
+    # Try local Docker Mongo
+    local_url = _build_local_test_url()
+    if local_url:
+        return local_url
+
+    # Fall back to config file
     config = Config.from_file()
     runtime_url = config.database.get_url("runtime")
     test_url = config.database.get_url("test")
