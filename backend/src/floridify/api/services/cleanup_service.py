@@ -1,15 +1,15 @@
 """Reference cleanup service for maintaining data integrity."""
 
 import asyncio
-import logging
 from typing import Any
 
 from beanie import PydanticObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.dictionary import Definition, DictionaryEntry, Pronunciation
+from ...utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CleanupService:
@@ -32,7 +32,6 @@ class CleanupService:
             Total number of documents modified across all collections
 
         """
-        results = []
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(

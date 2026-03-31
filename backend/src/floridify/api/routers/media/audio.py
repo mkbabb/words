@@ -1,7 +1,6 @@
 """Audio API - Full CRUD operations for audio management."""
 
 import asyncio
-import logging
 import os
 import uuid
 from datetime import datetime
@@ -14,6 +13,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ....models import AudioMedia
+from ....utils.logging import get_logger
 from ....utils.paths import get_project_root
 from ...core import (
     ForbiddenException,
@@ -34,7 +34,7 @@ from ...repositories import (
     AudioUpdate,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 MAX_AUDIO_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 

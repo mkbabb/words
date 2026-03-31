@@ -1,15 +1,15 @@
 """WOTD ML Pipeline - Core business logic for Word of the Day machine learning system."""
 
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
+from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory
 from ..wotd import WOTDPipeline
 from ..wotd.inference import create_pipeline
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Global pipeline instance cache
 _pipeline_cache: WOTDPipeline | None = None
