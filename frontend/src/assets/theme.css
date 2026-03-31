@@ -11,6 +11,11 @@
   --ai-accent: #fbbf24;
   --error-accent: #f87171;
 
+  /* Semantic color tokens */
+  --color-gold: hsl(43 90% 55%);
+  --color-success: hsl(152 60% 42%);
+  --color-info: hsl(215 75% 55%);
+
   /* Mastery level palette */
   --mastery-default: hsl(0 0% 60%);
   --mastery-bronze: hsl(25 85% 55%);
@@ -52,27 +57,27 @@
 
 /* Warm paper color palette (was in glass-ui presets/words.css) */
 :root {
-  --background: 48 15% 98%;
-  --foreground: 0 0% 3.9%;
-  --muted: 48 8% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --card: 48 12% 99%;
-  --card-foreground: 0 0% 3.9%;
-  --popover: 48 12% 99%;
-  --popover-foreground: 0 0% 3.9%;
-  --border: 48 5% 89.8%;
-  --input: 48 5% 89.8%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 48 4.8% 95.9%;
-  --secondary-foreground: 0 0% 9%;
-  --accent: 48 4.8% 95.9%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --ring: 0 0% 3.9%;
-  --shadow: 0 0% 0%;
-  --shadow-color: 0 0% 0%;
+  --background: hsl(48 15% 98%);
+  --foreground: hsl(0 0% 3.9%);
+  --muted: hsl(48 8% 96.1%);
+  --muted-foreground: hsl(0 0% 45.1%);
+  --card: hsl(48 12% 99%);
+  --card-foreground: hsl(0 0% 3.9%);
+  --popover: hsl(48 12% 99%);
+  --popover-foreground: hsl(0 0% 3.9%);
+  --border: hsl(48 5% 89.8%);
+  --input: hsl(48 5% 89.8%);
+  --primary: hsl(0 0% 9%);
+  --primary-foreground: hsl(0 0% 98%);
+  --secondary: hsl(48 4.8% 95.9%);
+  --secondary-foreground: hsl(0 0% 9%);
+  --accent: hsl(48 4.8% 95.9%);
+  --accent-foreground: hsl(0 0% 9%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --ring: hsl(0 0% 3.9%);
+  --shadow: hsl(0 0% 0%);
+  --shadow-color: hsl(0 0% 0%);
   --radius: 8px;
 }
 
@@ -86,26 +91,26 @@
 
 /* Dark theme — color palette (was in glass-ui presets/words.css) */
 .dark {
-  --background: 24 8% 6%;
-  --foreground: 48 10% 92%;
-  --muted: 24 5% 15%;
-  --muted-foreground: 48 5% 64%;
-  --card: 24 6% 7%;
-  --card-foreground: 48 10% 92%;
-  --popover: 24 7% 6.5%;
-  --popover-foreground: 48 10% 92%;
-  --border: 24 4% 16%;
-  --input: 24 4% 16%;
-  --primary: 48 10% 92%;
-  --primary-foreground: 0 0% 9%;
-  --secondary: 24 5% 15%;
-  --secondary-foreground: 48 10% 92%;
-  --accent: 24 5% 15%;
-  --accent-foreground: 48 10% 92%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 48 10% 92%;
-  --ring: 48 8% 83%;
-  --shadow: 0 0% 100%;
+  --background: hsl(24 8% 6%);
+  --foreground: hsl(48 10% 92%);
+  --muted: hsl(24 5% 15%);
+  --muted-foreground: hsl(48 5% 64%);
+  --card: hsl(24 6% 7%);
+  --card-foreground: hsl(48 10% 92%);
+  --popover: hsl(24 7% 6.5%);
+  --popover-foreground: hsl(48 10% 92%);
+  --border: hsl(24 4% 16%);
+  --input: hsl(24 4% 16%);
+  --primary: hsl(48 10% 92%);
+  --primary-foreground: hsl(0 0% 9%);
+  --secondary: hsl(24 5% 15%);
+  --secondary-foreground: hsl(48 10% 92%);
+  --accent: hsl(24 5% 15%);
+  --accent-foreground: hsl(48 10% 92%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(48 10% 92%);
+  --ring: hsl(48 8% 83%);
+  --shadow: hsl(0 0% 100%);
 }
 
 /* Dark theme — project-specific token overrides */
@@ -118,6 +123,11 @@
   /* Accent colors for AI and error states (dark variants) */
   --ai-accent: #d97706;
   --error-accent: #dc2626;
+
+  /* Semantic color tokens (dark variants) */
+  --color-gold: hsl(43 80% 50%);
+  --color-success: hsl(152 50% 45%);
+  --color-info: hsl(215 65% 55%);
 
   --mastery-default: hsl(0 0% 50%);
   --mastery-bronze: hsl(25 75% 50%);

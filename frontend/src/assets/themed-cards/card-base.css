@@ -68,13 +68,13 @@
     .themed-card[data-theme='gold'].shadow-cartoon-sm,
     .themed-card[data-theme='gold'].shadow-cartoon-md,
     .themed-card[data-theme='gold'].shadow-cartoon-lg {
-        @apply border-amber-300/30;
+        @apply border-[var(--mastery-gold)]/30;
     }
 
     .themed-card[data-theme='silver'].shadow-cartoon-sm,
     .themed-card[data-theme='silver'].shadow-cartoon-md,
     .themed-card[data-theme='silver'].shadow-cartoon-lg {
-        @apply border-gray-300/30;
+        @apply border-[var(--mastery-silver)]/30;
     }
 
     .themed-card[data-theme='bronze'].shadow-cartoon-sm,
@@ -86,13 +86,13 @@
     .dark .themed-card[data-theme='gold'].shadow-cartoon-sm,
     .dark .themed-card[data-theme='gold'].shadow-cartoon-md,
     .dark .themed-card[data-theme='gold'].shadow-cartoon-lg {
-        @apply border-amber-400/20;
+        @apply border-[var(--mastery-gold)]/20;
     }
 
     .dark .themed-card[data-theme='silver'].shadow-cartoon-sm,
     .dark .themed-card[data-theme='silver'].shadow-cartoon-md,
     .dark .themed-card[data-theme='silver'].shadow-cartoon-lg {
-        @apply border-gray-400/20;
+        @apply border-[var(--mastery-silver)]/20;
     }
 
     .dark .themed-card[data-theme='bronze'].shadow-cartoon-sm,
