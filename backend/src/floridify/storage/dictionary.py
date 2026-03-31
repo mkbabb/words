@@ -14,6 +14,9 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from beanie import PydanticObjectId
+from pydantic import BaseModel
+
 from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..models.base import AudioMedia, ImageMedia
@@ -38,15 +41,16 @@ def _provider_str(provider: Any) -> str:
     return provider.value if isinstance(provider, Enum) else str(provider)
 
 
-async def _resolve_word_text(word_id: Any) -> str:
-    """Resolve word text from a word_id. Returns '<unknown>' on failure."""
-    try:
-        word = await Word.get(word_id)
-        if word:
-            return word.text
-    except Exception:
-        pass
-    return "<unknown>"
+async def _resolve_word_text(word_id: PydanticObjectId) -> str:
+    """Resolve word text from a word_id.
+
+    Raises:
+        ValueError: If word document not found for the given ID.
+    """
+    word = await Word.get(word_id)
+    if word is None:
+        raise ValueError(f"Word not found for id={word_id}")
+    return word.text
 
 
 async def _cleanup_replaced_children(
@@ -103,7 +107,7 @@ async def save_entry_versioned(
     *,
     config: VersionConfig | None = None,
     extra_metadata: dict[str, Any] | None = None,
-    edit_metadata: Any | None = None,
+    edit_metadata: BaseModel | dict[str, Any] | None = None,
 ) -> None:
     """Save DictionaryEntry with version chain + live document upsert.
 
@@ -145,7 +149,7 @@ async def save_entry_versioned(
     if edit_metadata is not None:
         edit_meta_dict = (
             edit_metadata.model_dump(mode="json")
-            if hasattr(edit_metadata, "model_dump")
+            if isinstance(edit_metadata, BaseModel)
             else edit_metadata
         )
         version_config = version_config.model_copy(

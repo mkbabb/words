@@ -12,7 +12,10 @@ from ....models.base import Language
 from ....models.responses import SearchResponse
 from ....search import Search, SearchMethod
 from ....search.result import SearchResult
+from ....utils.logging import get_logger
 from ....wordlist.models import WordList, WordListItemDoc
+
+logger = get_logger(__name__)
 
 # Map mode strings to SearchMethod enum values
 _MODE_TO_METHOD: dict[str, SearchMethod] = {
@@ -71,8 +74,6 @@ async def search_wordlist_names(
     query: str,
     owner_id: str | None = None,
     max_results: int = 20,
-    # TODO[MEDIUM]: Remove compatibility-only `min_score` parameter once callers migrate.
-    min_score: float = 0.6,  # noqa: ARG001 - retained for signature compatibility
     _repo: WordListRepository | None = None,
 ) -> list[dict[str, Any]]:
     """Basic case-insensitive search across wordlist names."""
@@ -225,10 +226,12 @@ async def post_filter_search_results(
                 if not next_review:
                     continue
                 from datetime import UTC, datetime
+
                 try:
                     if datetime.fromisoformat(next_review) > datetime.now(UTC):
                         continue
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Malformed review date '{next_review}': {e}")
                     continue
             filtered.append(result)
         return filtered

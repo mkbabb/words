@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import wikitextparser as wtp  # type: ignore[import-untyped]
+
 from ....models.base import Language, PydanticObjectId
 from ....models.dictionary import (
     DictionaryEntry,
@@ -37,12 +39,6 @@ from ...batch import BatchOperation
 from ...core import ConnectorConfig
 from ...rate_limiting import RateLimitConfig
 from ..core import DictionaryConnector
-from .batch import (
-    ImportMode,
-    find_complete_entries,
-    flush_batch_insert,
-    flush_batch_upsert,
-)
 from ..scraper.wikitext_cleaner import WikitextCleaner
 from ..scraper.wiktionary_parser import (
     POS_MAPPINGS,
@@ -62,11 +58,12 @@ from ..scraper.wiktionary_parser import (
     extract_wikilist_items,
     find_language_section,
 )
-
-try:
-    import wikitextparser as wtp  # type: ignore[import-untyped]
-except ImportError:
-    wtp = None
+from .batch import (
+    ImportMode,
+    find_complete_entries,
+    flush_batch_insert,
+    flush_batch_upsert,
+)
 
 logger = get_logger(__name__)
 
@@ -141,7 +138,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
             )
         super().__init__(provider=DictionaryProvider.WIKTIONARY, config=config)
         self.language = language
-        self.lang_code = language.value if hasattr(language, "value") else str(language)
+        self.lang_code = language.value
         self.data_dir = data_dir or Path("/tmp/floridify/wiktionary_wholesale")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         # Always use English Wiktionary dump — it contains ALL languages.
@@ -236,9 +233,6 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         Returns:
             Number of entries imported.
         """
-        if wtp is None:
-            raise ImportError("wikitextparser is required: pip install wikitextparser")
-
         await get_storage()
 
         data_file = self._resolve_data_file(data_path)
@@ -442,9 +436,10 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         pronunciation = None
         try:
             from bson import ObjectId
+
             pronunciation = extract_pronunciation(language_section, ObjectId())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Pronunciation extraction failed for '{title}': {e}")
 
         # Re-parse to get fresh section objects for template-modifying extractions
         parsed = wtp.parse(content)

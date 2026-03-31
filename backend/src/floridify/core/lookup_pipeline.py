@@ -9,6 +9,7 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis import cluster_definitions
+from ..ai.synthesis.word_level import _generate_audio_files
 from ..api.core.exceptions import (
     NotFoundException,
     ProviderFetchError,
@@ -24,6 +25,7 @@ from ..models.dictionary import (
     Pronunciation,
     Word,
 )
+from ..models.user import UserHistory
 from ..providers.factory import create_connector
 from ..storage.dictionary import save_entry_versioned
 from ..storage.mongodb import get_best_existing_entry, get_storage, get_synthesized_entry
@@ -75,9 +77,6 @@ async def _ensure_primary_audio(entry: DictionaryEntry) -> None:
             return
 
         primary_language = entry.languages[0] if entry.languages else "en"
-
-        from ..ai.synthesis.word_level import _generate_audio_files
-
         await _generate_audio_files(pron, word_obj.text, primary_language)
         logger.info(f"Background audio generated for '{word_obj.text}' ({primary_language})")
     except Exception as e:
@@ -96,16 +95,14 @@ def _resolve_lookup_languages(
 
 
 async def _track_lookup(user_id: str, word: str) -> None:
-    """Track a word lookup in the user's history. Fails silently."""
+    """Track a word lookup in the user's history. Logs on failure."""
     try:
-        from ..models.user import UserHistory
-
         history = await UserHistory.find_one({"clerk_id": user_id})
         if history:
             history.add_lookup(word)
             await history.save()
-    except Exception:
-        pass  # Don't fail lookup on history tracking error
+    except Exception as e:
+        logger.warning(f"History tracking failed for user={user_id}, word={word}: {e}")
 
 
 @log_timing
@@ -120,7 +117,7 @@ async def lookup_word_pipeline(
     skip_search: bool = False,
     state_tracker: StateTracker | None = None,
     user_id: str | None = None,
-) -> DictionaryEntry | None:
+) -> DictionaryEntry:
     """Core lookup pipeline that normalizes, searches, gets provider definitions,
     and optionally synthesizes with AI.
 
@@ -266,13 +263,10 @@ async def lookup_word_pipeline(
         if state_tracker:
             await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-        # TODO[CRITICAL]: Reinstate AI fallback when providers return no data, with
-        # explicit reason codes + structured logs/metrics for every fallback invocation.
-        # Temporary behavior: currently stops on provider miss.
-        # Target behavior: AI fallback should run for provider-no-data cases with explicit logging.
         if not providers_data:
-            logger.warning(f"All providers failed for '{best_match}'")
-            return None
+            raise ProviderFetchError(
+                "all", f"All {len(providers)} providers failed for '{best_match}'"
+            )
 
         # Synthesize with AI if enabled and we have provider data
         if not no_ai and providers_data:
@@ -313,11 +307,11 @@ async def lookup_word_pipeline(
                     if user_id:
                         await _track_lookup(user_id, word)
                     return synthesized_entry
-                logger.error(
-                    f"❌ AI synthesis returned empty result for '{best_match}' "
-                    f"after {ai_duration:.2f}s",
+                raise SynthesisError(
+                    best_match,
+                    "synthesis",
+                    f"AI synthesis returned empty result after {ai_duration:.2f}s",
                 )
-                return None
             except Exception as e:
                 logger.error(f"❌ AI synthesis failed for '{best_match}': {e}")
                 raise SynthesisError(best_match, "synthesis", str(e)) from e
@@ -341,8 +335,9 @@ async def lookup_word_pipeline(
                     if user_id:
                         await _track_lookup(user_id, word)
                 return result
-            logger.warning("No provider data available for non-AI synthesis")
-            return None
+            raise ProviderFetchError(
+                "mapping", f"No provider data available for non-AI synthesis of '{best_match}'"
+            )
 
     except Exception as e:
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")

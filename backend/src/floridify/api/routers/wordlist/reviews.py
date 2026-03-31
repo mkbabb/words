@@ -9,10 +9,13 @@ from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....models.user import User
+from ....utils.logging import get_logger
 from ....wordlist.constants import MasteryLevel
 from ....wordlist.models import WordListItemDoc
 from ...core import CurrentUserDep, ListResponse, ResourceResponse
 from ...repositories import StudySessionRequest, WordListRepository, WordReviewRequest
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -235,8 +238,8 @@ async def submit_review(
                     0, user.global_learning_stats.words_mastered - 1
                 )
             await user.save()
-    except Exception:
-        pass  # Don't fail review on global stats update
+    except Exception as e:
+        logger.warning(f"Global stats update failed for user={user_id}: {e}")
 
     return ResourceResponse(
         data={

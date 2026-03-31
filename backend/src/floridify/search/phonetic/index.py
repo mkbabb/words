@@ -64,7 +64,8 @@ class PhoneticIndex:
                     code = jellyfish.metaphone(word)
                     if code:
                         self._word_index.setdefault(code, []).append(idx)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Phonetic encoding failed for '{word}': {e}")
                     continue
 
         logger.info(
@@ -93,7 +94,11 @@ class PhoneticIndex:
                     results.append(idx)
 
         # Strategy 2: Fuzzy composite match — Levenshtein on Metaphone codes
-        if qkey and len(results) < max_results and len(self._composite_index) < PHONETIC_FUZZY_COMPOSITE_LIMIT:
+        if (
+            qkey
+            and len(results) < max_results
+            and len(self._composite_index) < PHONETIC_FUZZY_COMPOSITE_LIMIT
+        ):
             from rapidfuzz.distance import Levenshtein
 
             max_code_dist = max(1, len(qkey) // 4)
@@ -122,7 +127,8 @@ class PhoneticIndex:
                         code = jellyfish.metaphone(word)
                         if code and code in self._word_index:
                             per_word_candidates.append(set(self._word_index[code]))
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Phonetic encoding failed for query word '{word}': {e}")
                         continue
 
                 if per_word_candidates:

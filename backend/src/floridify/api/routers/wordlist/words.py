@@ -72,12 +72,16 @@ def get_wordlist_repo() -> WordListRepository:
 
 
 def _decode_cursor(cursor: str) -> dict[str, Any]:
-    """Decode a base64-encoded JSON cursor."""
+    """Decode a base64-encoded JSON cursor.
+
+    Raises:
+        ValueError: If cursor is malformed or not valid base64-encoded JSON.
+    """
     try:
         decoded = base64.b64decode(cursor).decode("utf-8")
         return json.loads(decoded)
-    except Exception:
-        return {}
+    except (ValueError, UnicodeDecodeError) as e:
+        raise ValueError(f"Malformed cursor: {e}") from e
 
 
 def _encode_cursor(data: dict[str, Any]) -> str:
@@ -98,7 +102,7 @@ async def list_words(
     When `cursor` is provided, it takes precedence over `offset`.
     """
     # Verify wordlist exists
-    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    await repo.get(wordlist_id, raise_on_missing=True)
 
     # Build MongoDB query
     query: dict[str, Any] = {"wordlist_id": wordlist_id}
@@ -143,7 +147,10 @@ async def list_words(
 
     # Apply cursor-based pagination if cursor is provided
     if cursor:
-        cursor_data = _decode_cursor(cursor)
+        try:
+            cursor_data = _decode_cursor(cursor)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid pagination cursor")
         if cursor_data and mapped_sort_fields:
             # Build cursor condition using the primary sort field
             primary_field, primary_dir = mapped_sort_fields[0]
@@ -250,6 +257,7 @@ async def add_word(
 
     updated_list = await repo.add_word(wordlist_id, request)
     from .search import invalidate_wordlist_corpus
+
     await invalidate_wordlist_corpus(wordlist_id)
 
     collapsed_added = repo._collapse_entries(request.words)
@@ -339,6 +347,7 @@ async def remove_word(
     assert word_doc.id is not None
     await repo.remove_word(wordlist_id, word_doc.id, version=version)
     from .search import invalidate_wordlist_corpus
+
     await invalidate_wordlist_corpus(wordlist_id)
 
 
@@ -378,6 +387,7 @@ async def bulk_delete_words(
     # Recompute denormalized stats via aggregation pipeline
     await repo.recompute_stats(wordlist_id)
     from .search import invalidate_wordlist_corpus
+
     await invalidate_wordlist_corpus(wordlist_id)
 
     return ResourceResponse(
