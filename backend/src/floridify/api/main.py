@@ -1,6 +1,5 @@
 """FastAPI application for Floridify dictionary service."""
 
-import asyncio
 import os
 from contextlib import asynccontextmanager
 from typing import Any
@@ -9,7 +8,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..ai import get_ai_connector, get_definition_synthesizer
-from ..audio import get_audio_synthesizer
 from ..caching.core import get_global_cache, shutdown_global_cache
 from ..core.search_pipeline import get_search_engine_manager
 from ..storage.mongodb import get_storage
@@ -80,10 +78,14 @@ async def lifespan(app: FastAPI) -> Any:
         # handle thread-safe initialization with caching.
         print("✅ TTS backends registered (lazy init on first audio request)")
 
-        # Start search engine initialization in background (non-blocking)
-        manager = get_search_engine_manager()
-        await manager.start_background_init()
-        print("🔍 Search engine initialization started in background")
+        # Start search engine initialization in background (non-blocking).
+        # Skipped when a dedicated search service handles it (SEARCH_SERVICE_URL set).
+        if not os.environ.get("SEARCH_SERVICE_URL"):
+            manager = get_search_engine_manager()
+            await manager.start_background_init()
+            print("🔍 Search engine initialization started in background")
+        else:
+            print(f"🔍 Search delegated to external service: {os.environ['SEARCH_SERVICE_URL']}")
 
     except Exception as e:
         print(f"❌ Application initialization failed: {e}")
@@ -148,7 +150,10 @@ API_V1_PREFIX = "/api/v1"
 
 # Include routers with versioned API prefix
 app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
-app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
+# When an external search service handles search, skip mounting the search router
+# so requests route directly to the search container via nginx/proxy.
+if not os.environ.get("SEARCH_SERVICE_URL"):
+    app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
 # Note: Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
 app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
 app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])

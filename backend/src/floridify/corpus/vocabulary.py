@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
-from .utils import get_vocabulary_hash
 
 logger = get_logger(__name__)
 
@@ -84,9 +83,7 @@ def rebuild_original_indices(
     # Sort: diacritics-preferred first
     for _sorted_idx, orig_indices in normalized_to_original_indices.items():
         if len(orig_indices) > 1:
-            orig_indices.sort(
-                key=lambda idx: (not has_diacritics(original_vocabulary[idx]), idx)
-            )
+            orig_indices.sort(key=lambda idx: (not has_diacritics(original_vocabulary[idx]), idx))
 
     return normalized_to_original_indices
 
@@ -129,8 +126,7 @@ def create_lemmatization_maps(
         lemma_to_word_indices[lemma_idx].append(word_idx)
 
     logger.info(
-        f"Created lemmatization maps: {len(unique_lemmas)} lemmas "
-        f"from {len(vocabulary)} words",
+        f"Created lemmatization maps: {len(unique_lemmas)} lemmas from {len(vocabulary)} words",
     )
 
     return unique_lemmas, lemma_text_to_index, word_to_lemma_indices, lemma_to_word_indices

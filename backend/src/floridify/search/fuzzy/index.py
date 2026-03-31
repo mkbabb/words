@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import pickle
 import time
-from typing import Annotated, Any, ClassVar
+from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field, field_serializer, field_validator
@@ -124,8 +124,8 @@ class FuzzyIndex(BaseModel):
         Builds BK-tree, phonetic index, and suffix array, then
         serializes them to bytes for storage.
         """
-        from .bk_tree import BKTree
         from ..phonetic.index import PhoneticIndex
+        from .bk_tree import BKTree
         from .suffix_array import SuffixArray
 
         if not corpus.corpus_uuid:
@@ -176,15 +176,9 @@ class FuzzyIndex(BaseModel):
         """
         bk_tree = pickle.loads(self.bk_tree_bytes) if self.bk_tree_bytes else None
         phonetic_index = (
-            pickle.loads(self.phonetic_index_bytes)
-            if self.phonetic_index_bytes
-            else None
+            pickle.loads(self.phonetic_index_bytes) if self.phonetic_index_bytes else None
         )
-        suffix_array = (
-            pickle.loads(self.suffix_array_bytes)
-            if self.suffix_array_bytes
-            else None
-        )
+        suffix_array = pickle.loads(self.suffix_array_bytes) if self.suffix_array_bytes else None
         return bk_tree, phonetic_index, suffix_array
 
     @classmethod
@@ -201,9 +195,7 @@ class FuzzyIndex(BaseModel):
         if corpus.corpus_uuid:
             existing = await cls.get(corpus.corpus_uuid, config)
             if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
-                logger.debug(
-                    f"Using cached fuzzy index for '{corpus.corpus_name}'"
-                )
+                logger.debug(f"Using cached fuzzy index for '{corpus.corpus_name}'")
                 return existing
 
         logger.info(f"Building new fuzzy index for '{corpus.corpus_name}'")

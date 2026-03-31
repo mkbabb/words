@@ -17,7 +17,6 @@ from ...text import normalize
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel
 from ...wordlist.models import WordList, WordListItemDoc
-from ...wordlist.stats import LearningStats
 from ...wordlist.utils import generate_wordlist_hash
 from ..core.base import BaseRepository
 from ..core.exceptions import VersionConflictException
@@ -268,9 +267,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Add words as separate documents if provided
         if collapsed_entries:
-            entry_texts = [
-                entry.resolved_text or entry.source_text for entry in collapsed_entries
-            ]
+            entry_texts = [entry.resolved_text or entry.source_text for entry in collapsed_entries]
             word_ids = await self.batch_get_or_create_words(entry_texts)
             items = [
                 WordListItemDoc(
@@ -406,9 +403,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
                 if entry.notes and not existing_item.notes:
                     existing_item.notes = entry.notes
                 if entry.tags:
-                    existing_item.tags = list(
-                        dict.fromkeys([*existing_item.tags, *entry.tags])
-                    )
+                    existing_item.tags = list(dict.fromkeys([*existing_item.tags, *entry.tags]))
                 await existing_item.save()
             else:
                 new_item = WordListItemDoc(
