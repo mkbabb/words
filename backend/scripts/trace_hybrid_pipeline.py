@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from pathlib import Path
 
 # macOS safety
 import os
@@ -228,21 +229,25 @@ if __name__ == "__main__":
         )
         from floridify.caching.models import BaseVersionedData
 
-        # Connect to local MongoDB (tunnel or local)
-        for url in ["mongodb://localhost:27018", "mongodb://localhost:27017"]:
-            try:
-                client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=2000)
-                await client.admin.command("ping")
-                await init_beanie(
-                    database=client.get_database("floridify"),
-                    document_models=[Definition, Word, DictionaryEntry,
-                                    Example, Fact, Pronunciation, BaseVersionedData],
-                )
-                break
-            except Exception:
-                continue
-        else:
-            print("ERROR: No MongoDB available. Start tunnel or local mongo.")
+        # Connect to local Docker Mongo (exposed on localhost:27017)
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=False)
+
+        username = os.environ.get("MONGO_USERNAME", "admin")
+        password = os.environ.get("MONGO_PASSWORD", "")
+        url = f"mongodb://{username}:{password}@localhost:27017/floridify?authSource=admin"
+
+        try:
+            client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=3000)
+            await client.admin.command("ping")
+            await init_beanie(
+                database=client.get_database("floridify"),
+                document_models=[Definition, Word, DictionaryEntry,
+                                Example, Fact, Pronunciation, BaseVersionedData],
+            )
+        except Exception as e:
+            print(f"ERROR: Cannot connect to MongoDB at localhost:27017: {e}")
+            print("Ensure Docker Mongo is running: docker compose up -d mongo")
             return
 
         await trace_pipeline(word)
