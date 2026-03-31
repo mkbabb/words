@@ -10,11 +10,9 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, Field
-
-T = TypeVar("T")
 
 
 def now_stamp() -> str:
@@ -107,7 +105,7 @@ def summarize_samples(
     )
 
 
-def benchmark_sync(
+def benchmark_sync[T](
     name: str,
     category: str,
     func: Callable[[], T],
@@ -149,7 +147,7 @@ def benchmark_sync(
     return case, results
 
 
-async def benchmark_async(
+async def benchmark_async[T](
     name: str,
     category: str,
     func: Callable[[], Awaitable[T]],

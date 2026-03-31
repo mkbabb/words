@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from nltk.corpus import stopwords as _nltk_stopwords
+
 # Basic text patterns
 WHITESPACE_PATTERN = re.compile(r"\s+")
 PUNCTUATION_PATTERN = re.compile(r"[^\w\s\'-]", re.UNICODE)
@@ -135,7 +137,4 @@ DIACRITIC_MAPPINGS = {
 
 # ── Stopwords ─────────────────────────────────────────────────────────
 # NLTK's curated stopword corpus (198 English words).
-
-from nltk.corpus import stopwords as _nltk_stopwords
-
 ENGLISH_STOPWORDS: frozenset[str] = frozenset(_nltk_stopwords.words("english"))

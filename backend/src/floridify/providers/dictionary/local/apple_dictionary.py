@@ -18,10 +18,10 @@ logger = get_logger(__name__)
 
 try:
     from CoreServices import (
-        DCSCopyTextDefinition as CORE_SERVICES_COPY_TEXT_DEFINITION,  # type: ignore[import-untyped]
+        DCSCopyTextDefinition,  # type: ignore[import-untyped]
     )
 except ImportError:
-    CORE_SERVICES_COPY_TEXT_DEFINITION = None
+    DCSCopyTextDefinition = None
 
 
 # Part-of-speech labels recognized by Apple Dictionary
@@ -100,7 +100,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             self._dictionary_service = None
             return
 
-        if CORE_SERVICES_COPY_TEXT_DEFINITION is None:
+        if DCSCopyTextDefinition is None:
             from ....api.core.exceptions import ServiceUnavailableException
 
             raise ServiceUnavailableException(
@@ -109,7 +109,7 @@ class AppleDictionaryConnector(DictionaryConnector):
                 "Install PyObjC with: pip install pyobjc-framework-CoreServices",
             )
 
-        self._dictionary_service = CORE_SERVICES_COPY_TEXT_DEFINITION
+        self._dictionary_service = DCSCopyTextDefinition
         logger.info("Apple Dictionary Services initialized successfully")
 
     def _is_available(self) -> bool:
@@ -228,7 +228,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         text = definition_text
 
         # Remove quoted examples (curly and straight quotes)
-        text = re.sub(r'\u201c[^\u201d]*\u201d', "", text)
+        text = re.sub(r"\u201c[^\u201d]*\u201d", "", text)
         text = re.sub(r'"[^"]*"', "", text)
 
         # Remove inline example after colon (takes everything after last colon)
@@ -270,9 +270,7 @@ class AppleDictionaryConnector(DictionaryConnector):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _split_block_into_senses(
-        self, block: str, pos: str
-    ) -> list[dict[str, Any]]:
+    def _split_block_into_senses(self, block: str, pos: str) -> list[dict[str, Any]]:
         """Split a POS block into individual sense definitions.
 
         Handles numbered definitions (1, 2, 3...) and bullet sub-senses (•).

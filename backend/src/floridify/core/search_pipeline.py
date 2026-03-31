@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from typing import Any
 
@@ -132,7 +133,7 @@ class SearchEngineManager:
         """Background task: build corpus + search engine."""
         try:
             logger.info(
-                f"Background search init starting (languages={[l.value for l in languages]}, semantic={semantic})"
+                f"Background search init starting (languages={[lang.value for lang in languages]}, semantic={semantic})"
             )
             engine = await get_language_search(languages, semantic=semantic)
             fingerprint = await self._capture_fingerprint(languages)
@@ -460,19 +461,13 @@ async def find_best_match(
 ) -> SearchResult | None:
     """Find the single best match for a word.
 
-    Convenience function that wraps search_word_pipeline and returns
-    only the top result, or None if no results found.
-
-    Args:
-        word: Word to search for
-        languages: Languages to search in
-        semantic: Enable semantic search
-
-    Returns:
-        Best matching search result or None
-
+    Routes to external search service when SEARCH_SERVICE_URL is set,
+    otherwise uses the local search pipeline.
     """
-    # Map semantic parameter to SearchMode
+    search_service_url = os.environ.get("SEARCH_SERVICE_URL")
+    if search_service_url:
+        return await _find_best_match_remote(word, languages, semantic, search_service_url)
+
     mode = SearchMode.SMART if semantic else SearchMode.EXACT
 
     results = await search_word_pipeline(
@@ -489,6 +484,55 @@ async def find_best_match(
         )
         return best
     logger.debug(f"❌ No match found for '{word}'")
+    return None
+
+
+async def _find_best_match_remote(
+    word: str,
+    languages: list[Language] | None,
+    semantic: bool,
+    service_url: str,
+) -> SearchResult | None:
+    """Proxy search to the external search service via httpx."""
+    import httpx
+
+    params: dict[str, Any] = {
+        "q": word,
+        "mode": "smart" if semantic else "exact",
+        "max_results": 1,
+    }
+    if languages:
+        params["languages"] = [lang.value for lang in languages]
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{service_url}/api/v1/search", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        results = data.get("results", [])
+        if results:
+            r = results[0]
+            best = SearchResult(
+                word=r["word"],
+                score=r.get("score", 1.0),
+                method=r.get("method", "exact"),
+                language=r.get("language"),
+            )
+            logger.debug(
+                f"✅ Remote best match for '{word}': '{best.word}' (score: {best.score:.3f})"
+            )
+            return best
+    except Exception as e:
+        logger.warning(f"Remote search failed for '{word}': {e} — falling back to local")
+        # Fallback to local search if remote fails
+        mode = SearchMode.SMART if semantic else SearchMode.EXACT
+        results = await search_word_pipeline(
+            word=word, languages=languages, mode=mode, max_results=1
+        )
+        if results:
+            return results[0]
+
     return None
 
 

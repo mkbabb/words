@@ -404,20 +404,42 @@ def _extract_words_from_templates(parsed: wtp.WikiText) -> list[str]:
     All share the same structure: arg 1 = language code, remaining = words.
     """
     # Template names that contain word lists (arg 1 = lang, rest = words)
-    WORD_LIST_TEMPLATES = {
-        "l", "link", "m", "mention",
-        "syn", "synonym", "synonyms",
-        "ant", "antonym", "antonyms",
-        "col", "col1", "col2", "col3", "col4", "col5",
-        "col-auto", "der2", "der3", "der4", "der5",
-        "rel2", "rel3", "rel4", "rel5",
-        "hyp2", "hyp3", "hyp4", "hyp5",
+    word_list_templates = {
+        "l",
+        "link",
+        "m",
+        "mention",
+        "syn",
+        "synonym",
+        "synonyms",
+        "ant",
+        "antonym",
+        "antonyms",
+        "col",
+        "col1",
+        "col2",
+        "col3",
+        "col4",
+        "col5",
+        "col-auto",
+        "der2",
+        "der3",
+        "der4",
+        "der5",
+        "rel2",
+        "rel3",
+        "rel4",
+        "rel5",
+        "hyp2",
+        "hyp3",
+        "hyp4",
+        "hyp5",
     }
 
     words: list[str] = []
     for template in parsed.templates:
         template_name = template.name.strip().lower()
-        if template_name not in WORD_LIST_TEMPLATES:
+        if template_name not in word_list_templates:
             continue
         for arg in template.arguments:
             if arg.name == "1":
@@ -583,7 +605,9 @@ def extract_section_usage_notes(section: wtp.Section) -> list[UsageNote]:
     return notes[:5]
 
 
-def _classify_usage_note(text: str) -> Literal[
+def _classify_usage_note(
+    text: str,
+) -> Literal[
     "grammar",
     "confusion",
     "regional",
@@ -594,26 +618,58 @@ def _classify_usage_note(text: str) -> Literal[
     lower = text.lower()
 
     # Grammar patterns
-    if any(kw in lower for kw in ["plural", "singular", "countable", "uncountable",
-                                    "transitive", "intransitive", "conjugat",
-                                    "inflect", "participle", "tense"]):
+    if any(
+        kw in lower
+        for kw in [
+            "plural",
+            "singular",
+            "countable",
+            "uncountable",
+            "transitive",
+            "intransitive",
+            "conjugat",
+            "inflect",
+            "participle",
+            "tense",
+        ]
+    ):
         return "grammar"
 
     # Confusion patterns
-    if any(kw in lower for kw in ["confused with", "not to be confused",
-                                    "distinguish", "compare", "versus",
-                                    "as opposed to", "different from"]):
+    if any(
+        kw in lower
+        for kw in [
+            "confused with",
+            "not to be confused",
+            "distinguish",
+            "compare",
+            "versus",
+            "as opposed to",
+            "different from",
+        ]
+    ):
         return "confusion"
 
     # Regional patterns
-    if any(kw in lower for kw in ["british", "american", "australian",
-                                    "canadian", "irish", "scottish",
-                                    "regional", "dialect"]):
+    if any(
+        kw in lower
+        for kw in [
+            "british",
+            "american",
+            "australian",
+            "canadian",
+            "irish",
+            "scottish",
+            "regional",
+            "dialect",
+        ]
+    ):
         return "regional"
 
     # Error patterns
-    if any(kw in lower for kw in ["incorrect", "error", "wrong", "avoid",
-                                    "nonstandard", "proscribed"]):
+    if any(
+        kw in lower for kw in ["incorrect", "error", "wrong", "avoid", "nonstandard", "proscribed"]
+    ):
         return "error"
 
     # Default to register
@@ -667,26 +723,71 @@ def clean_etymology_text(text: str) -> str:
         return ""
 
     lang_map = {
-        "enm": "Middle English", "ang": "Old English", "fro": "Old French",
-        "frm": "Middle French", "fr": "French", "la": "Latin",
-        "la-lat": "Late Latin", "la-med": "Medieval Latin",
-        "grc": "Ancient Greek", "el": "Greek",
-        "de": "German", "gmh": "Middle High German", "goh": "Old High German",
-        "es": "Spanish", "it": "Italian", "pt": "Portuguese",
-        "nl": "Dutch", "dum": "Middle Dutch",
-        "non": "Old Norse", "da": "Danish", "sv": "Swedish", "no": "Norwegian",
-        "ar": "Arabic", "fa": "Persian", "sa": "Sanskrit", "hi": "Hindi",
-        "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
-        "ru": "Russian", "pl": "Polish", "cy": "Welsh", "ga": "Irish",
-        "sga": "Old Irish", "cel-pro": "Proto-Celtic",
-        "gem-pro": "Proto-Germanic", "ine-pro": "Proto-Indo-European",
+        "enm": "Middle English",
+        "ang": "Old English",
+        "fro": "Old French",
+        "frm": "Middle French",
+        "fr": "French",
+        "la": "Latin",
+        "la-lat": "Late Latin",
+        "la-med": "Medieval Latin",
+        "grc": "Ancient Greek",
+        "el": "Greek",
+        "de": "German",
+        "gmh": "Middle High German",
+        "goh": "Old High German",
+        "es": "Spanish",
+        "it": "Italian",
+        "pt": "Portuguese",
+        "nl": "Dutch",
+        "dum": "Middle Dutch",
+        "non": "Old Norse",
+        "da": "Danish",
+        "sv": "Swedish",
+        "no": "Norwegian",
+        "ar": "Arabic",
+        "fa": "Persian",
+        "sa": "Sanskrit",
+        "hi": "Hindi",
+        "zh": "Chinese",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "ru": "Russian",
+        "pl": "Polish",
+        "cy": "Welsh",
+        "ga": "Irish",
+        "sga": "Old Irish",
+        "cel-pro": "Proto-Celtic",
+        "gem-pro": "Proto-Germanic",
+        "ine-pro": "Proto-Indo-European",
     }
 
     # Etymology templates: arg structure is {{name|source_lang|target_lang|word|t=gloss}}
-    ETYM_TEMPLATES = {"der", "inh", "bor", "cog", "m", "mention", "l", "lang",
-                      "inherited", "derived", "borrowed", "cognate", "noncog",
-                      "uder", "ubor", "lbor", "slbor", "psm", "calque", "cal",
-                      "semi-calque", "learned borrowing", "orthographic borrowing"}
+    etym_templates = {
+        "der",
+        "inh",
+        "bor",
+        "cog",
+        "m",
+        "mention",
+        "l",
+        "lang",
+        "inherited",
+        "derived",
+        "borrowed",
+        "cognate",
+        "noncog",
+        "uder",
+        "ubor",
+        "lbor",
+        "slbor",
+        "psm",
+        "calque",
+        "cal",
+        "semi-calque",
+        "learned borrowing",
+        "orthographic borrowing",
+    }
 
     # Collect (span, replacement) pairs from wtp, then apply to raw text
     replacements: list[tuple[tuple[int, int], str]] = []
@@ -698,7 +799,7 @@ def clean_etymology_text(text: str) -> str:
             tname = template.name.strip().lower()
             span = template.span
 
-            if tname in ETYM_TEMPLATES:
+            if tname in etym_templates:
                 args = [str(a.value).strip() for a in template.arguments]
                 # Find the word and language code
                 # Patterns: {{m|la|word}}, {{der|en|la|word}}, {{inh|en|enm|word|t=gloss}}
@@ -711,8 +812,11 @@ def clean_etymology_text(text: str) -> str:
                     if aname in ("t", "gloss", "tr"):
                         gloss = aval
                 # Find lang + word from positional args
-                positional = [str(a.value).strip() for a in template.arguments
-                              if not a.name or a.name.isdigit()]
+                positional = [
+                    str(a.value).strip()
+                    for a in template.arguments
+                    if not a.name or a.name.isdigit()
+                ]
                 if len(positional) >= 3:
                     lang_code = positional[1]
                     word = positional[2]
@@ -741,13 +845,25 @@ def clean_etymology_text(text: str) -> str:
 
             elif tname in ("suffix", "prefix", "af", "affix", "confix"):
                 # {{suffix|en|perspicac|ious}} → "perspicac- + -ious"
-                parts = [str(a.value).strip() for a in template.arguments
-                         if not a.name or a.name.isdigit()]
+                parts = [
+                    str(a.value).strip()
+                    for a in template.arguments
+                    if not a.name or a.name.isdigit()
+                ]
                 parts = [p for p in parts if p and p not in ("en", "eng") and len(p) > 0]
                 replacements.append((span, " + ".join(parts) if parts else ""))
 
-            elif tname in ("w", "wikipedia", "wp", "pedialite", "root",
-                          "senseid", "anchor", "rfe", "etystub"):
+            elif tname in (
+                "w",
+                "wikipedia",
+                "wp",
+                "pedialite",
+                "root",
+                "senseid",
+                "anchor",
+                "rfe",
+                "etystub",
+            ):
                 replacements.append((span, ""))
 
             elif tname == "circa" or tname == "c." or tname == "circa2":
@@ -772,17 +888,19 @@ def clean_etymology_text(text: str) -> str:
     except Exception as e:
         logger.debug(f"Etymology parsing error: {e}")
         cleaned = text
+
         # Regex fallback for etymology templates
         def _etym_template_replace(m: re.Match[str]) -> str:
             inner = m.group(1)
             parts = inner.split("|")
             tname = parts[0].strip().lower()
-            if tname in ETYM_TEMPLATES and len(parts) >= 4:
+            if tname in etym_templates and len(parts) >= 4:
                 lang_code = parts[2].strip()
                 word = parts[3].strip()
                 lang_name = lang_map.get(lang_code, "")
                 return f"{lang_name} {word}" if lang_name else word
             return ""
+
         cleaned = re.sub(r"\{\{([^}]+)\}\}", _etym_template_replace, cleaned)
         cleaned = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", cleaned)
 

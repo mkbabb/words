@@ -8,8 +8,8 @@ from fastapi import APIRouter, HTTPException
 from ....caching.core import CacheNamespace, get_global_cache
 from ....caching.gridfs import gridfs_cleanup_stale
 from ....caching.models import VersionConfig
-from ....corpus.manager import get_tree_corpus_manager
 from ....core.search_pipeline import get_search_engine_manager
+from ....corpus.manager import get_tree_corpus_manager
 from ....search.cache import reset_search_cache
 from ....search.engine import Search
 from ....search.index import SearchIndex
@@ -105,9 +105,7 @@ async def _rebuild_corpus(
         if existing:
             await existing.delete()
 
-        index = await SearchIndex.get_or_create(
-            corpus=corpus, semantic=True, config=force_config
-        )
+        index = await SearchIndex.get_or_create(corpus=corpus, semantic=True, config=force_config)
         search = Search(index=index, corpus=corpus)
         await search.initialize()
         await search.await_semantic_ready()
@@ -115,7 +113,6 @@ async def _rebuild_corpus(
 
     elif "semantic" in components:
         # Rebuild semantic only
-        from ....search.semantic.search import SemanticSearch
         from ....search.semantic.index import SemanticIndex as SemanticIndexModel
 
         # Delete existing semantic index
@@ -134,9 +131,7 @@ async def _rebuild_corpus(
             await existing_search.save()
 
         # Rebuild via Search (which handles semantic init)
-        index = await SearchIndex.get_or_create(
-            corpus=corpus, semantic=True, config=force_config
-        )
+        index = await SearchIndex.get_or_create(corpus=corpus, semantic=True, config=force_config)
         search = Search(index=index, corpus=corpus)
         await search.initialize()
         await search.await_semantic_ready()
@@ -220,10 +215,12 @@ async def _rebuild_language(
     sem = get_search_engine_manager()
     await sem.reset()
     rebuild_semantic = "semantic" in components or "all" in components
-    engine = await sem.get_engine(languages=languages, force_rebuild=True, semantic=rebuild_semantic)
+    engine = await sem.get_engine(
+        languages=languages, force_rebuild=True, semantic=rebuild_semantic
+    )
 
     stats = engine.get_stats()
-    corpus_name = stats.get("corpus_name", f"language_{'_'.join(l.value for l in languages)}")
+    corpus_name = stats.get("corpus_name", f"language_{'_'.join(lang.value for lang in languages)}")
 
     components_rebuilt = ["trie"]
     if rebuild_semantic:
@@ -239,7 +236,7 @@ async def _rebuild_language(
 
     return RebuildIndexResponse(
         status="success",
-        message=f"Rebuilt language search for {[l.value for l in languages]} in {elapsed:.2f}s",
+        message=f"Rebuilt language search for {[lang.value for lang in languages]} in {elapsed:.2f}s",
         corpus_name=corpus_name,
         components_rebuilt=components_rebuilt,
         vocabulary_size=stats.get("vocabulary_size", 0),
