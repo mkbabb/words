@@ -2,6 +2,35 @@
 # For development: docker compose up
 # For production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 services:
+  # Search service — lightweight container for the search cascade only.
+  # Same codebase as backend, different entry point (no AI, no TTS, no CRUD).
+  search:
+    build:
+      context: ./backend
+      target: ${BUILD_TARGET:-development}
+    container_name: floridify-search
+    restart: unless-stopped
+    command: ["uvicorn", "floridify.search_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FLORIDIFY_CACHE_DIR: /app/cache
+      OMP_NUM_THREADS: 4
+      MKL_NUM_THREADS: 4
+      NUMEXPR_NUM_THREADS: 4
+      OPENBLAS_NUM_THREADS: 4
+      TOKENIZERS_PARALLELISM: "true"
+      MULTIPROCESSING_START_METHOD: "spawn"
+      SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
+      MONGODB_URL: ${MONGODB_URL:-mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE:-floridify}?authSource=admin}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - ./backend/src:/app/src
+      - ./auth:/app/auth:ro
+
   backend:
     build:
       context: ./backend
@@ -9,6 +38,8 @@ services:
     container_name: floridify-backend
     restart: unless-stopped
     depends_on:
+      search:
+        condition: service_started
       mongo:
         condition: service_healthy
     ports:
@@ -26,7 +57,9 @@ services:
       TOKENIZERS_PARALLELISM: "true"
       MULTIPROCESSING_START_METHOD: "spawn"
       SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
-      MONGODB_URL: ${MONGODB_URL:-}
+      MONGODB_URL: ${MONGODB_URL:-mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE:-floridify}?authSource=admin}
+      # Delegate search to the search service container
+      SEARCH_SERVICE_URL: "http://search:8000"
       CLERK_DOMAIN: ${CLERK_DOMAIN:-}
       CLERK_SUPER_ADMINS: ${CLERK_SUPER_ADMINS:-}
     extra_hosts:
@@ -43,6 +76,9 @@ services:
     build:
       context: ./frontend
       target: ${BUILD_TARGET:-development}
+      additional_contexts:
+        glass-ui: ../glass-ui
+        latex-paper: ../latex-paper
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8003}
         VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
@@ -56,6 +92,7 @@ services:
     environment:
       VITE_PORT: ${FRONTEND_PORT:-3004}
       VITE_API_URL: ${VITE_API_URL:-http://backend:8000}
+      VITE_SEARCH_URL: ${VITE_SEARCH_URL:-http://search:8000}
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
       VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
@@ -70,7 +107,8 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
       - ./frontend/components.json:/app/components.json
-      - ./frontend/glass-ui:/app/glass-ui
+      - ../glass-ui:/app/glass-ui
+      - ../latex-paper:/app/latex-paper
       - /app/node_modules
     networks:
       - app-network
@@ -90,7 +128,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:notifications@floridify.com}
-      MONGO_URI: ${MONGO_URI:?MONGO_URI must point to remote MongoDB}
+      MONGO_URI: ${MONGO_URI:-}
       DB_NAME: ${MONGO_DATABASE:-floridify}
       API_URL: ${API_URL:-http://backend:8000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3004,http://frontend:3004}
@@ -116,6 +154,8 @@ services:
   mongo:
     image: mongo:8.0
     container_name: floridify-mongodb
+    ports:
+      - "127.0.0.1:27017:27017"  # Exposed to host for local test runs
     volumes:
       - floridify_mongo_data:/data/db
     environment:
@@ -141,5 +181,3 @@ volumes:
   notification_logs:
     driver: local
   floridify_mongo_data:
-    external: true
-    name: floridify_mongo_data

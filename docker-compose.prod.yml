@@ -5,6 +5,9 @@ services:
     build:
       target: production
     image: floridify-backend:latest
+    depends_on:
+      mongo:
+        condition: service_healthy
     command: ["uvicorn", "floridify.api.main:app",
               "--host", "0.0.0.0",
               "--port", "8000",
@@ -111,3 +114,6 @@ services:
 volumes:
   notification_logs:
     driver: local
+  floridify_mongo_data:
+    external: true
+    name: floridify_mongo_data
