@@ -3321,7 +3321,7 @@ export interface components {
             /** Text */
             text: string;
             /** Frequency */
-            frequency?: string | null;
+            frequency?: number | string | null;
             /** Type */
             type?: string | null;
         };
@@ -3694,6 +3694,8 @@ export interface components {
             synonyms?: string[];
             /** Antonyms */
             antonyms?: string[];
+            /** Cognates */
+            cognates?: string[];
             /** Language Register */
             language_register?: ("formal" | "informal" | "neutral" | "slang" | "technical") | null;
             /** Domain */
@@ -3755,6 +3757,8 @@ export interface components {
             synonyms?: string[];
             /** Antonyms */
             antonyms?: string[];
+            /** Cognates */
+            cognates?: string[];
             /** Language Register */
             language_register?: ("formal" | "informal" | "neutral" | "slang" | "technical") | null;
             /** Domain */
@@ -4022,7 +4026,7 @@ export interface components {
          * @description Dictionary and data providers supported by the system.
          * @enum {string}
          */
-        DictionaryProvider: "wiktionary" | "oxford" | "apple_dictionary" | "merriam_webster" | "free_dictionary" | "wordhippo" | "ai_fallback" | "synthesis";
+        DictionaryProvider: "wiktionary" | "oxford" | "apple_dictionary" | "merriam_webster" | "free_dictionary" | "wordhippo" | "wordnet" | "gcide" | "wikipedia" | "moby_thesaurus" | "ai_fallback" | "synthesis";
         /**
          * DiskUsageResponse
          * @description Response for disk usage endpoint.
@@ -5170,6 +5174,12 @@ export interface components {
             languages?: string[] | null;
         };
         /**
+         * SearchMode
+         * @description Search modes for API and direct method routing.
+         * @enum {string}
+         */
+        SearchMode: "smart" | "exact" | "fuzzy" | "semantic";
+        /**
          * SearchResponse
          * @description Response for search operations.
          *
@@ -5283,6 +5293,8 @@ export interface components {
             entry_version: string;
             /** Definition Ids */
             definition_ids?: components["schemas"]["PydanticObjectId"][];
+            /** License */
+            license?: string | null;
         };
         /**
          * SourceVersionSpec
@@ -6483,7 +6495,7 @@ export interface operations {
                 /** @description Minimum score */
                 min_score?: number;
                 /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: string;
+                mode?: components["schemas"]["SearchMode"];
                 /** @description Force rebuild indices */
                 force_rebuild?: boolean;
                 /** @description Specific corpus ID */
@@ -6529,7 +6541,7 @@ export interface operations {
                 /** @description Minimum score */
                 min_score?: number;
                 /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: string;
+                mode?: components["schemas"]["SearchMode"];
                 /** @description Force rebuild indices */
                 force_rebuild?: boolean;
                 /** @description Specific corpus ID */
@@ -6579,7 +6591,7 @@ export interface operations {
                 /** @description Minimum score */
                 min_score?: number;
                 /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: string;
+                mode?: components["schemas"]["SearchMode"];
                 /** @description Force rebuild indices */
                 force_rebuild?: boolean;
                 /** @description Specific corpus ID */
