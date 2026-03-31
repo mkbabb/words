@@ -24,9 +24,7 @@ export const Language = {
     ITALIAN: 'it',
 } as const satisfies Record<string, Language>;
 
-// Extend the generated union with new providers until OpenAPI types are regenerated
-export type DictionaryProvider = components['schemas']['DictionaryProvider']
-    | 'wordnet' | 'gcide' | 'wikipedia' | 'moby_thesaurus';
+export type DictionaryProvider = components['schemas']['DictionaryProvider'];
 export const DictionaryProvider = {
     WIKTIONARY: 'wiktionary',
     OXFORD: 'oxford',
@@ -72,6 +70,14 @@ export type CollocationResponse = components['schemas']['CollocationResponse'];
 // ── Search types ────────────────────────────────────────────────────
 // SearchResponse is kept in responses.ts — the generated version types
 // `results` as `unknown[]` which is too weak for consumer use.
+export type SearchMode = components['schemas']['SearchMode'];
+export const SearchMode = {
+    SMART: 'smart',
+    EXACT: 'exact',
+    FUZZY: 'fuzzy',
+    SEMANTIC: 'semantic',
+} as const satisfies Record<string, SearchMode>;
+
 export type SemanticStatusResponse = components['schemas']['SemanticStatusResponse'];
 export type HotReloadStatusResponse = components['schemas']['HotReloadStatusResponse'];
 export type RebuildIndexRequest = components['schemas']['RebuildIndexRequest'];

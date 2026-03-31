@@ -23,7 +23,7 @@ export enum SearchMethod {
     AUTO = 'auto',
 }
 
-export enum SearchMode {
+export enum SearchAlgorithm {
     SMART = 'smart',
     EXACT = 'exact',
     FUZZY = 'fuzzy',
