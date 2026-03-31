@@ -29,7 +29,7 @@ const config: Config = {
         '.animate-show-bounce': { '@apply animate-bounce-in': {} },
         '.animate-hide-bounce': { '@apply animate-bounce-out': {} },
 
-        '.transition-visibility': { '@apply transition-[opacity,transform] duration-350 ease-apple-default': {} },
+        '.transition-visibility': { '@apply transition-[opacity,transform] duration-350 ease': {} },
         '.show':           { '@apply opacity-100 scale-100 translate-y-0': {} },
         '.hide':           { '@apply opacity-0 scale-95 -translate-y-2 pointer-events-none': {} },
         '.show-from-top':  { '@apply opacity-100 scale-y-100 origin-top visible': {} },
@@ -37,11 +37,11 @@ const config: Config = {
 
         // ── Scroll-responsive states ──
         '.scroll-shrunk': {
-          '@apply transform-gpu transition-all duration-350 ease-apple-spring': {},
+          '@apply transform-gpu transition-all duration-350 ease-spring-snappy': {},
           transform: 'scale(0.85)', opacity: '0.9', maxWidth: '18rem',
         },
         '.scroll-normal': {
-          '@apply transform-gpu transition-all duration-350 ease-apple-spring': {},
+          '@apply transform-gpu transition-all duration-350 ease-spring-snappy': {},
           transform: 'scale(1)', opacity: '1', maxWidth: '24rem',
         },
 

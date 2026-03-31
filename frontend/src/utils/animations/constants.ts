@@ -17,19 +17,20 @@ export const DURATION = {
   slow: 700,      // Complex orchestrated animations
 } as const;
 
-// Standard easing functions
+// Standard easing functions — literal values for Web Animations API
+// (WAA doesn't support var() references, so these must be cubic-bezier literals)
 export const EASING = {
-  // Primary easings
-  default: 'cubic-bezier(0.25, 0.1, 0.25, 1)',      // Most animations
-  smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',           // Smooth transitions
-  spring: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Bouncy feel
-  
-  // Directional easings
-  easeIn: 'cubic-bezier(0.42, 0, 1, 1)',            // Enter animations
-  easeOut: 'cubic-bezier(0, 0, 0.58, 1)',           // Exit animations
-  
+  // Primary easings (match glass-ui tokens)
+  default: 'ease',                                     // CSS ease keyword
+  standard: 'cubic-bezier(0.4, 0, 0.2, 1)',           // --ease-standard
+  spring: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',  // Approximation of --spring-bouncy
+
+  // Directional easings (match glass-ui tokens)
+  easeIn: 'cubic-bezier(0.4, 0, 1, 1)',               // --ease-in
+  easeOut: 'cubic-bezier(0, 0, 0.2, 1)',               // --ease-out
+
   // Specialized easings
-  elastic: 'cubic-bezier(0.68, -0.6, 0.32, 1.6)',   // Playful bounces
+  elastic: 'cubic-bezier(0.68, -0.6, 0.32, 1.6)',
   bounceIn: 'cubic-bezier(0.6, -0.28, 0.735, 0.045)',
   bounceOut: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
 } as const;
@@ -77,19 +78,19 @@ export const TRANSITION_CLASSES = {
   // Spring transitions (350ms with bounce)
   spring: {
     enterActive: 'transition-spring',
-    leaveActive: 'transition-[opacity,transform] duration-250 ease-apple-bounce-in',
+    leaveActive: 'transition-[opacity,transform] duration-fast ease-in',
   },
 
   // Smooth transitions (500ms)
   smooth: {
     enterActive: 'transition-smooth',
-    leaveActive: 'transition-[opacity,transform] duration-350 ease-apple-ease-out',
+    leaveActive: 'transition-[opacity,transform] duration-normal ease-out',
   },
 
   // Elastic transitions (350ms with elastic bounce)
   elastic: {
-    enterActive: 'transition-[opacity,transform] duration-350 ease-apple-elastic',
-    leaveActive: 'transition-[opacity,transform] duration-200 ease-apple-bounce-in',
+    enterActive: 'transition-[opacity,transform] duration-normal ease-spring-bouncy',
+    leaveActive: 'transition-[opacity,transform] duration-fast ease-in',
   },
 } as const;
 
