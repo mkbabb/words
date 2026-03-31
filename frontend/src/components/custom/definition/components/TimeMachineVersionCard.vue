@@ -7,7 +7,7 @@
             <div
                 v-if="version"
                 :key="version.version"
-                class="rounded-xl border border-border/30 bg-background/80 p-6 shadow-2xl shadow-cartoon-lg backdrop-blur-xl"
+                class="rounded-xl glass-elevated p-6 shadow-cartoon-lg"
             >
                 <!-- Header -->
                 <div class="flex items-center gap-2">
@@ -108,17 +108,17 @@
                     <!-- Diff summary -->
                     <div
                         v-if="diffFields.size > 0"
-                        class="mt-2 space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-2"
+                        class="mt-2 space-y-1 rounded-lg border border-[var(--color-gold)]/20 bg-[var(--color-gold)]/[0.04] p-2"
                     >
-                        <div class="flex items-center gap-1.5 text-micro font-medium text-amber-600 dark:text-amber-400">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        <div class="flex items-center gap-1.5 text-micro font-medium text-[var(--color-gold)]">
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-gold)]" />
                             {{ diffFields.size }} field{{ diffFields.size !== 1 ? 's' : '' }} changed
                         </div>
                         <div class="flex flex-wrap gap-1">
                             <span
                                 v-for="field in [...diffFields]"
                                 :key="field"
-                                class="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-micro text-amber-600 dark:text-amber-400"
+                                class="rounded bg-[var(--color-gold)]/10 px-1.5 py-0.5 font-mono text-micro text-[var(--color-gold)]"
                             >
                                 {{ field }}
                             </span>
@@ -232,7 +232,7 @@ const FieldWithDiff: FunctionalComponent<
             slots.default?.(),
             changed
                 ? h('div', {
-                      class: 'absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-background',
+                      class: 'absolute -top-1 -right-1 h-2 w-2 rounded-full bg-[var(--color-gold)] ring-2 ring-background',
                       title: `${props.field} changed`,
                   })
                 : null,
@@ -244,10 +244,10 @@ FieldWithDiff.props = ['field', 'diffFields', 'class'];
 
 <style scoped>
 .slide-left-enter-active {
-    transition: all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 400ms var(--spring-bouncy);
 }
 .slide-left-leave-active {
-    transition: all 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045);
+    transition: all 200ms var(--ease-in);
 }
 .slide-left-enter-from {
     opacity: 0;
@@ -259,10 +259,10 @@ FieldWithDiff.props = ['field', 'diffFields', 'class'];
 }
 
 .slide-right-enter-active {
-    transition: all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 400ms var(--spring-bouncy);
 }
 .slide-right-leave-active {
-    transition: all 200ms cubic-bezier(0.6, -0.28, 0.735, 0.045);
+    transition: all 200ms var(--ease-in);
 }
 .slide-right-enter-from {
     opacity: 0;

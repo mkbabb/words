@@ -2,11 +2,11 @@
   <button
     :class="[
       'group relative flex h-10 w-10 items-center justify-center rounded-lg',
-      'transition-[transform,opacity,background-color] duration-200 ease-apple-smooth',
+      'transition-[transform,opacity,background-color] duration-fast ease-spring-smooth',
       'active:scale-95',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
       aiMode
-        ? 'hover:bg-amber-100/60 hover:scale-105 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+        ? 'hover:bg-[var(--color-gold)]/15 hover:scale-105 text-[var(--color-gold)]'
         : 'hover:bg-muted/60 hover:scale-105',
       className
     ]"
@@ -21,7 +21,7 @@
         ]"
         :style="{
           transitionDuration: isOpen ? '650ms' : '550ms',
-          transitionTimingFunction: isOpen ? 'cubic-bezier(0.175, 0.885, 0.32, 1.4)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+          transitionTimingFunction: isOpen ? 'var(--spring-bouncy)' : 'var(--ease-standard)',
           transitionDelay: isOpen ? '0ms' : '100ms'
         }"
       />
@@ -33,7 +33,7 @@
         ]"
         :style="{
           transitionDuration: isOpen ? '400ms' : '550ms',
-          transitionTimingFunction: isOpen ? 'cubic-bezier(0.4, 0, 0.2, 1)' : 'cubic-bezier(0.175, 0.885, 0.32, 1.3)',
+          transitionTimingFunction: isOpen ? 'var(--ease-standard)' : 'var(--spring-bouncy)',
           transitionDelay: isOpen ? '0ms' : '50ms'
         }"
       />
@@ -45,7 +45,7 @@
         ]"
         :style="{
           transitionDuration: isOpen ? '650ms' : '550ms',
-          transitionTimingFunction: isOpen ? 'cubic-bezier(0.175, 0.885, 0.32, 1.4)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
+          transitionTimingFunction: isOpen ? 'var(--spring-bouncy)' : 'var(--ease-standard)',
           transitionDelay: isOpen ? '0ms' : '0ms'
         }"
       />

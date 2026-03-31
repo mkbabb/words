@@ -248,18 +248,18 @@ function overlayEnter(_el: Element, done: () => void) {
         }
 
         // Backdrop fade — fast
-        backdropRef.value.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)';
+        backdropRef.value.style.transition = 'opacity 200ms var(--ease-standard)';
         backdropRef.value.style.opacity = '1';
 
         // Content slide up — no bounce, slightly staggered
         setTimeout(() => {
             if (!contentRef.value) { done(); return; }
-            contentRef.value.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 0.2, 1), transform 250ms cubic-bezier(0.4, 0, 0.2, 1)';
+            contentRef.value.style.transition = 'opacity 250ms var(--ease-standard), transform 250ms var(--ease-standard)';
             contentRef.value.style.opacity = '1';
             contentRef.value.style.transform = 'scale(1) translateY(0)';
 
             if (timelineRef.value) {
-                timelineRef.value.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1) 80ms, transform 200ms cubic-bezier(0.4, 0, 0.2, 1) 80ms';
+                timelineRef.value.style.transition = 'opacity 200ms var(--ease-standard) 80ms, transform 200ms var(--ease-standard) 80ms';
                 timelineRef.value.style.opacity = '1';
                 timelineRef.value.style.transform = 'translateY(0)';
             }
@@ -278,15 +278,15 @@ function overlayLeave(el: Element, done: () => void) {
 
     requestAnimationFrame(() => {
         if (content) {
-            content.style.transition = 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1), transform 150ms cubic-bezier(0.4, 0, 0.2, 1)';
+            content.style.transition = 'opacity 150ms var(--ease-standard), transform 150ms var(--ease-standard)';
             content.style.opacity = '0';
             content.style.transform = 'scale(0.97) translateY(8px)';
         }
         if (timeline) {
-            timeline.style.transition = 'opacity 120ms cubic-bezier(0.4, 0, 0.2, 1)';
+            timeline.style.transition = 'opacity 120ms var(--ease-standard)';
             timeline.style.opacity = '0';
         }
-        backdrop.style.transition = 'opacity 180ms cubic-bezier(0.4, 0, 0.2, 1)';
+        backdrop.style.transition = 'opacity 180ms var(--ease-standard)';
         backdrop.style.opacity = '0';
 
         setTimeout(done, 200);
@@ -297,10 +297,10 @@ function overlayLeave(el: Element, done: () => void) {
 <style scoped>
 /* View switch: compact <-> expanded */
 .view-switch-enter-active {
-    transition: opacity 200ms var(--ease-apple-smooth), transform 200ms var(--ease-apple-smooth);
+    transition: opacity 200ms var(--ease-spring-smooth), transform 200ms var(--ease-spring-smooth);
 }
 .view-switch-leave-active {
-    transition: opacity 120ms var(--ease-apple-default), transform 120ms var(--ease-apple-default);
+    transition: opacity 120ms ease, transform 120ms ease;
 }
 .view-switch-enter-from {
     opacity: 0;
@@ -313,10 +313,10 @@ function overlayLeave(el: Element, done: () => void) {
 
 /* Timeline fade for hide/show */
 .timeline-fade-enter-active {
-    transition: opacity 200ms var(--ease-apple-smooth), transform 200ms var(--ease-apple-smooth);
+    transition: opacity 200ms var(--ease-spring-smooth), transform 200ms var(--ease-spring-smooth);
 }
 .timeline-fade-leave-active {
-    transition: opacity 120ms var(--ease-apple-default);
+    transition: opacity 120ms ease;
 }
 .timeline-fade-enter-from {
     opacity: 0;

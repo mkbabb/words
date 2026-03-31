@@ -119,7 +119,7 @@ export function calculateContainerStyle(
             maxWidth: responsiveMaxWidth,
             transform: 'scale(1)',
             opacity: '1',
-            transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            transition: 'all 0.3s var(--ease-out)',
         };
     }
 
@@ -144,7 +144,7 @@ export function calculateContainerStyle(
         maxWidth: currentMaxWidth,
         transform: `scale(${scale})`,
         opacity: opacity.toString(),
-        transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        transition: 'all 0.2s var(--ease-out)',
     };
 }
 

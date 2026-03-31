@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 import autoprefixer from 'autoprefixer';
 
 const API_TARGET = process.env.VITE_API_URL || 'http://127.0.0.1:8003';
+const SEARCH_TARGET = process.env.VITE_SEARCH_URL || API_TARGET; // Separate search service when split
 const VITE_PORT = Number(process.env.VITE_PORT) || 3004;
 
 // https://vitejs.dev/config/
@@ -16,6 +17,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Resolve latex-paper sub-exports directly (symlink in dev, copy in Docker).
+      // Tailwind CSS v4 doesn't resolve package.json exports maps, so each
+      // sub-path needs an explicit alias. More specific paths must come first.
+      '@mkbabb/latex-paper/theme': path.resolve(__dirname, './latex-paper/src/vue/theme.css'),
+      '@mkbabb/latex-paper/vue': path.resolve(__dirname, './latex-paper/src/vue/index.ts'),
+      '@mkbabb/latex-paper': path.resolve(__dirname, './latex-paper/src/index.ts'),
     },
   },
   publicDir: 'public',
@@ -118,6 +125,13 @@ export default defineConfig({
       'Expires': '0'
     },
     proxy: {
+      // Search routes go to the dedicated search service (when split)
+      '/api/v1/search': {
+        target: SEARCH_TARGET,
+        changeOrigin: true,
+        secure: false,
+        timeout: 30000,
+      },
       '/api': {
         target: API_TARGET,
         changeOrigin: true,

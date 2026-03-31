@@ -11,8 +11,8 @@
       variant === 'ghost'
         ? 'bg-card border border-border/20 text-muted-foreground hover:bg-card/90 hover:text-foreground hover:border-border/40'
         : variant === 'subtle'
-        ? 'bg-card border border-border/25 text-muted-foreground hover:bg-card/90 hover:text-foreground hover:border-border/45 shadow-sm'
-        : 'bg-card border border-border/30 text-foreground hover:bg-card/90 hover:border-border/50 shadow-sm'
+        ? 'bg-card border border-border/25 text-muted-foreground hover:bg-card/90 hover:text-foreground hover:border-border/45 shadow-cartoon-sm'
+        : 'bg-card border border-border/30 text-foreground hover:bg-card/90 hover:border-border/50 shadow-cartoon-sm'
     ]"
     :title="title || 'Refresh'"
   >
@@ -24,7 +24,7 @@
       ]"
       :style="{
         transform: loading ? 'none' : `rotate(${rotation}deg)`,
-        transition: loading ? 'none' : 'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
+        transition: loading ? 'none' : 'transform 700ms var(--spring-bouncy)',
       }"
     />
   </button>
