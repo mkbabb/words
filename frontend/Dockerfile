@@ -9,8 +9,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Copy glass-ui if present (local dev); skipped gracefully if missing (npm install handles it)
-COPY glass-ui/ ./glass-ui/
+# Copy local packages (glass-ui, latex-paper)
+COPY --from=glass-ui / ./glass-ui/
+COPY --from=latex-paper / ./latex-paper/
 
 # Install production dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
@@ -22,7 +23,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY glass-ui/ ./glass-ui/
+COPY --from=glass-ui / ./glass-ui/
+COPY --from=latex-paper / ./latex-paper/
 
 # Install all dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
@@ -35,8 +37,9 @@ WORKDIR /app
 # Copy package.json for npm scripts
 COPY package*.json ./
 
-# Copy glass-ui source
-COPY glass-ui/ ./glass-ui/
+# Copy local packages
+COPY --from=glass-ui / ./glass-ui/
+COPY --from=latex-paper / ./latex-paper/
 
 # Copy dependencies
 COPY --from=dev-dependencies /app/node_modules ./node_modules
