@@ -215,15 +215,13 @@ def get_client_key(request: Request) -> str:
     X-Forwarded-For is only trusted when the direct connection is from a known proxy.
     Uses the rightmost non-trusted IP (not leftmost, which is spoofable).
     """
-    # Try to get authenticated user ID through safe access
-    try:
-        user_id = request.state.auth.user_id
-        if user_id:
-            return f"user:{user_id}"
-    except AttributeError:
-        pass  # Fall through to IP-based identification
+    from .auth_state import AuthState
 
-    # Fall back to IP address with proper CIDR validation
+    auth: AuthState = request.state.auth
+    if auth.user_id:
+        return f"user:{auth.user_id}"
+
+    # IP-based identification
     client_ip = request.client.host if request.client else "unknown"
 
     if _is_trusted_proxy(client_ip):
@@ -312,9 +310,12 @@ def rate_limit(
     return decorator
 
 
-# Tiered rate limiters for middleware
+# Tiered rate limiters for middleware.
+# "search" is generous — typeahead fires per-keystroke against in-memory
+# indices (~5ms/req), so a single user at 120 WPM needs ~600 req/min.
 _tiered_limiters: dict[str, RateLimiter] = {
-    "public": RateLimiter(requests_per_minute=60, requests_per_hour=1000),
+    "search": RateLimiter(requests_per_minute=900, requests_per_hour=15000),
+    "public": RateLimiter(requests_per_minute=120, requests_per_hour=3000),
     "ai": RateLimiter(requests_per_minute=20, requests_per_hour=200),
     "streaming": RateLimiter(requests_per_minute=10, requests_per_hour=100),
     "admin": RateLimiter(requests_per_minute=30, requests_per_hour=300),
@@ -323,6 +324,8 @@ _tiered_limiters: dict[str, RateLimiter] = {
 
 def _classify_endpoint(path: str) -> str:
     """Classify an endpoint path into a rate limit tier."""
+    if path.startswith("/api/v1/search"):
+        return "search"
     if "/ai/" in path or path.endswith("/ai"):
         return "ai"
     if "/stream" in path:

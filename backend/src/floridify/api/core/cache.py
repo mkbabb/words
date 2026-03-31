@@ -30,20 +30,11 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
         sorted_params = sorted(request.query_params.items())
         parts.append(str(sorted_params))
 
-    if config.include_body and request.method in ["POST", "PUT", "PATCH"]:
-        # Include body hash for write operations
-        # Note: Cannot access async body() in sync function
-        # Body hashing handled at async decorator level
-        pass
-
     if config.vary_by_user:
-        # Add user identifier if authentication is implemented
-        # Access state through try/except for safety
-        user_id = "anonymous"
-        try:
-            user_id = request.state.auth.user_id or "anonymous"
-        except AttributeError:
-            pass
+        from ..middleware.auth_state import AuthState
+
+        auth: AuthState = request.state.auth
+        user_id = auth.user_id or "anonymous"
         parts.append(str(user_id))
 
     # Create hash of all parts
