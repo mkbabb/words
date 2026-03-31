@@ -43,3 +43,6 @@ benchmark_results/
 
 # Playwright test results
 frontend/test-results/
+
+glass-ui/
+latex-paper/

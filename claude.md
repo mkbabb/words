@@ -56,12 +56,11 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   └── Dockerfile              # Node multi-stage
 │
 ├── scripts/                    # Development orchestration
-│   ├── dev.sh                  # Docker/native mode launcher, SSH tunnel management
+│   ├── dev.sh                  # Docker/native mode launcher
 │   ├── deploy.sh               # SSH deployment to production server
 │   ├── deploy-pwa.sh           # PWA + notification server deployment
 │   ├── install-floridify       # CLI installer with ZSH autocomplete
-│   ├── backup-mongodb.sh       # MongoDB backup script
-│   └── start-ssh-tunnel.sh     # SSH tunnel for remote MongoDB
+│   └── backup-mongodb.sh       # MongoDB backup script
 │
 ├── nginx/                      # Production reverse proxy
 │   └── user_conf.d/floridify.conf  # SSL, HSTS, proxy routes, CORS
@@ -92,7 +91,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 ## Technology
 
 **Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV
-**AI/ML**: OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, sentence-transformers (Qwen3-0.6B), FAISS
+**AI/ML**: OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, local models (ollama/vLLM), sentence-transformers (Qwen3-0.6B), FAISS, WordNet, wordfreq, sklearn clustering
 **Search**: marisa-trie (exact), BK-tree + phonetic + trigram (fuzzy), suffix array (substring), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
 **Frontend**: Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk
@@ -108,7 +107,7 @@ Search → Cache check → Provider fetch (asyncio.gather) → AI synthesis → 
 Exact (marisa-trie) → Prefix → Substring (suffix array) → Fuzzy (BK-tree + phonetic + trigram) → Semantic (FAISS HNSW)—cascade with early termination. See [docs/search.md](docs/search.md).
 
 **AI Synthesis** ([`ai/synthesizer.py`](backend/src/floridify/ai/synthesizer.py)):
-Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level components) → Save. See [docs/synthesis.md](docs/synthesis.md).
+Local 3-tier dedup (exact→fuzzy→semantic) → Local pre-clustering (agglomerative + silhouette gating) → AI clustering refinement (if needed) → Definition synthesis → Parallel enhance (local-first: CEFR/freq/register/domain via WordNet+wordfreq; hybrid: synonyms/antonyms via WordNet→AI delta; AI-only: examples/etymology/facts) → Post-process → Versioned save. Supports OpenAI, Anthropic, and local models (ollama/vLLM). See [docs/synthesis.md](docs/synthesis.md).
 
 **Caching** ([`caching/`](backend/src/floridify/caching/)):
 L1 memory → L2 disk → L3 versioned MongoDB with SHA-256 dedup and delta compression. See [docs/versioning.md](docs/versioning.md).
@@ -118,7 +117,9 @@ L1 memory → L2 disk → L3 versioned MongoDB with SHA-256 dedup and delta comp
 - **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api/` ↔ `models/`)
 - **Async-first**: All I/O async. Motor, httpx, asyncio.gather
 - **Real integration tests**: Actual MongoDB per test, real FAISS indices. Only external APIs mocked
-- **Dedup before cluster**: Deduplicate provider definitions before AI clustering to reduce token usage
+- **Local-first synthesis**: Dedup (3-tier local), assessments (wordfreq+WordNet), synonyms (WordNet→AI delta). AI only for creative tasks
+- **Embedding synset matching**: Qwen3-0.6B embeddings match definitions to WordNet synsets for domain/CEFR/frequency/synonym accuracy
+- **Multi-provider AI**: OpenAI + Anthropic + local models via per-tier config routing
 - **Mode-based state**: SearchBarStore delegates to mode-specific stores with onEnter/onExit lifecycle
 - **No API calls in stores**: All network operations in composables
 - **UUID-based trees**: Corpus parent-child uses UUIDs, not ObjectIds
@@ -171,7 +172,7 @@ floridify lookup perspicacious
 # Backend
 ruff check --fix && ruff format  # Lint + format
 mypy src/ --strict               # Type check
-pytest tests/ -v                 # Tests
+pytest tests/ -v                 # Tests (.env auto-loaded, Docker Mongo on localhost:27017)
 
 # Frontend
 npm run type-check               # TypeScript strict
