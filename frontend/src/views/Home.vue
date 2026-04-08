@@ -125,12 +125,17 @@ import { computed, defineAsyncComponent } from 'vue';
 import { useStores } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { SearchBar } from '@/components/custom/search';
-import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
 import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
-import { LoadingModal } from '@/components/custom/loading';
 import { useRouteOrchestration } from './composables/useRouteOrchestration';
 
+// Lazy-load heavy content views — only fetched when their v-if condition is met
+const DefinitionDisplay = defineAsyncComponent(
+    () => import('@/components/custom/definition/DefinitionDisplay.vue'),
+);
+const WordSuggestionDisplay = defineAsyncComponent(
+    () => import('@/components/custom/definition/WordSuggestionDisplay.vue'),
+);
 const WordListView = defineAsyncComponent(
     () => import('@/components/custom/wordlist/views/WordListView.vue'),
 );
@@ -139,6 +144,9 @@ const ProgressiveSidebar = defineAsyncComponent(
 );
 const WordlistProgressiveSidebar = defineAsyncComponent(
     () => import('@/components/custom/navigation/WordlistProgressiveSidebar.vue'),
+);
+const LoadingModal = defineAsyncComponent(
+    () => import('@/components/custom/loading/LoadingModal.vue'),
 );
 
 const { searchBar, content, loading } = useStores();
