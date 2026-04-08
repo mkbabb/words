@@ -55,7 +55,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
 import { CSSKeyframesAnimation } from '@mkbabb/keyframes.js';
-import { useKatex } from '@mkbabb/latex-paper/vue';
 import type { LookupMode, ComponentSize } from '@/types';
 
 interface FancyFProps {
@@ -94,14 +93,14 @@ function getTooltipText() {
   }
 }
 
-// KaTeX rendering (replaces the old LaTeX component)
-const { renderInline } = useKatex({
-  '\\ornate': '\\mathfrak',
+// Static Fraktur F rendering — replaces runtime KaTeX (259 KB) with equivalent
+// static HTML. Uses the KaTeX_Fraktur font-face already in katex.min.css.
+const mainHtml = '<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8175em;vertical-align:-0.126em;"></span><span class="mord mathfrak">F</span></span></span></span>';
+
+const subscriptHtml = computed(() => {
+  const sub = getModeSubscript();
+  return `<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4861em;vertical-align:-0.15em;"></span><span class="mord"><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">${sub}</span></span></span></span></span></span><span class="vlist-s">\u200B</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>`;
 });
-const mainHtml = renderInline('\\mathfrak{F}');
-const subscriptHtml = computed(() =>
-  renderInline(`_{\\text{${getModeSubscript()}}}`),
-);
 
 const fancyFButton = ref<HTMLButtonElement>(); void fancyFButton;
 const fancyFMain = ref<HTMLElement>();
