@@ -9,9 +9,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Copy local packages (glass-ui, latex-paper)
+# Copy local packages (glass-ui, latex-paper), stripping host node_modules
+# so they get reinstalled for the container's platform (Linux musl).
 COPY --from=glass-ui / ./glass-ui/
 COPY --from=latex-paper / ./latex-paper/
+RUN rm -rf ./glass-ui/node_modules ./latex-paper/node_modules
 
 # Install production dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
@@ -25,6 +27,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY --from=glass-ui / ./glass-ui/
 COPY --from=latex-paper / ./latex-paper/
+RUN rm -rf ./glass-ui/node_modules ./latex-paper/node_modules
 
 # Install all dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
@@ -60,6 +63,12 @@ WORKDIR /app
 COPY --from=dev-dependencies /app/node_modules ./node_modules
 COPY . .
 
+# Copy local packages (glass-ui, latex-paper) — needed because node_modules
+# contains symlinks to these paths from the file: deps in package.json.
+COPY --from=glass-ui / ./glass-ui/
+COPY --from=latex-paper / ./latex-paper/
+RUN rm -rf ./glass-ui/node_modules ./latex-paper/node_modules
+
 # Build arguments for environment variables
 ARG VITE_API_URL
 ARG VITE_APP_TITLE="Floridify"
@@ -72,8 +81,8 @@ ENV VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 
-# Build the application
-RUN npm run build
+# Build the production bundle (type checking runs separately via npm run type-check)
+RUN npx vite build
 
 # Production stage with nginx
 FROM nginx:alpine AS production
