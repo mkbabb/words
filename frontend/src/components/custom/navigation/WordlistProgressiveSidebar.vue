@@ -57,7 +57,7 @@
                 <div class="border-t border-border/30" />
 
                 <!-- Controls (scrollable) -->
-                <nav class="scrollbar-thin max-h-[calc(100dvh-14rem)] space-y-1 overflow-y-auto">
+                <nav class="scrollbar-thin max-h-[calc(100dvh_-_var(--layout-header-h-tall))] space-y-1 overflow-y-auto">
                     <!-- Filters dropdown -->
                     <div class="px-2 py-1">
                         <Popover>

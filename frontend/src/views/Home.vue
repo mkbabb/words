@@ -21,14 +21,14 @@
             <div class="border-b border-border lg:my-6"></div>
 
             <!-- Content Area with Sidebar -->
-            <div class="container mx-auto mt-5 lg:mt-6 max-w-6xl min-h-[calc(100dvh-8rem)]">
+            <div class="container mx-auto mt-5 lg:mt-6 max-w-6xl min-h-[calc(100dvh_-_var(--layout-header-h))]">
                 <div class="flex relative">
                     <!-- Progressive Sidebar (Sticky) — instant show/hide, no width transition -->
                     <div
                         v-if="shouldShowProgressiveSidebar"
                         class="hidden lg:block w-[14rem] shrink-0 overflow-visible"
                     >
-                        <div class="sticky top-[5.5rem] w-[14rem] max-h-[calc(100dvh-7rem)] overflow-y-auto overflow-x-clip scrollbar-thin px-2 pt-1 pb-4">
+                        <div class="sticky top-[5.5rem] w-[14rem] max-h-[calc(100dvh_-_var(--layout-header-h-compact))] overflow-y-auto overflow-x-clip scrollbar-thin px-2 pt-1 pb-4">
                             <ProgressiveSidebar v-if="searchBar.searchMode === 'lookup'" />
                             <WordlistProgressiveSidebar v-else-if="searchBar.searchMode === 'wordlist'" />
                         </div>

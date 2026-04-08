@@ -4,7 +4,7 @@
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
-        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100dvh-8rem)] space-y-0 overflow-y-auto">
+        <nav ref="navContainer" class="scrollbar-thin max-h-[calc(100dvh_-_var(--layout-header-h))] space-y-0 overflow-y-auto">
             <TransitionGroup name="sidebar-item" tag="div" class="space-y-0.5">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
                 <!-- Special handling for etymology -->

@@ -87,6 +87,13 @@
   --shadow-cartoon-color-soft: rgb(0 0 0 / 0.08);
   --shadow-cartoon-color-hover: rgb(0 0 0 / 0.14);
   --shadow-cartoon-color-hover-soft: rgb(0 0 0 / 0.10);
+
+  /* Layout chrome heights — used in calc(100dvh - var(--layout-header-h))
+     to compose viewport-fitted scroll panes. Keep these in sync with the
+     actual rendered header/footer heights. */
+  --layout-header-h: 8rem;
+  --layout-header-h-compact: 7rem;
+  --layout-header-h-tall: 14rem;
 }
 
 /* Dark theme — color palette (was in glass-ui presets/words.css) */
