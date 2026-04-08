@@ -64,10 +64,10 @@ dependencies = [
     "kittentts>=0.1.0", # English TTS (15M params, local)
     "kokoro-onnx>=0.5.0", # Non-English TTS (82M params, 8 languages)
     "soundfile>=0.12.1", # Audio I/O for TTS
-    "jellyfish>=1.2.1",
-    "pydivsufsort>=0.0.20",
-    "pyicu>=2.16.2",
-    # Hybrid fuzzy search Rust crate (SymSpell + BK-tree + 3.5-gram + Metaphone)
+    "pydivsufsort>=0.0.20", # O(n) suffix array construction for substring search
+    # Hybrid fuzzy search Rust crate: SymSpell + bounded BK-tree + 3.5-gram
+    # trigram + Double Metaphone with cross-linguistic normalization.
+    # Owns the entire fuzzy + phonetic pipeline.
     "ffuzzy>=0.1.0",
 ]
 
