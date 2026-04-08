@@ -183,7 +183,7 @@ export function useSearchBarBindings(options: UseSearchBarBindingsOptions) {
                 '--search-hamburger-width':
                     searchFieldLayout.value.hamburgerWidth,
                 '--search-hamburger-gap': searchFieldLayout.value.hamburgerGap,
-            }) as Record<string, string | undefined>
+            }) as Record<string, string | undefined>,
     );
 
     // ── Mode-switching lifecycle ──────────────────────────────────────

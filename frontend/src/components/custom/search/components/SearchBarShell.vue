@@ -56,14 +56,14 @@
                 :ai-mode="searchBar.isAIQuery"
                 :max-height="searchBar.isAIQuery ? 210 : 200"
                 :text-align="iconOpacity < 0.3 && !searchBar.isAIQuery ? 'center' : 'left'"
-                @enter="$emit('enter')"
-                @tab="$emit('tab')"
-                @space="$emit('space')"
-                @arrow-down="$emit('arrow-down')"
-                @arrow-up="$emit('arrow-up')"
-                @arrow-left="$emit('arrow-left')"
-                @arrow-right="$emit('arrow-right')"
-                @escape="$emit('escape')"
+                @enter="$emit('enter', $event)"
+                @tab="$emit('tab', $event)"
+                @space="$emit('space', $event)"
+                @arrow-down="$emit('arrow-down', $event)"
+                @arrow-up="$emit('arrow-up', $event)"
+                @arrow-left="$emit('arrow-left', $event)"
+                @arrow-right="$emit('arrow-right', $event)"
+                @escape="$emit('escape', $event)"
                 @focus="$emit('focus')"
                 @blur="$emit('blur')"
                 @input-click="$emit('input-click', $event)"
@@ -112,7 +112,7 @@ import SearchInputActions from './SearchInputActions.vue';
 interface Props {
     iconOpacity: number;
     containerHovered: boolean;
-    shellStyle: Record<string, string>;
+    shellStyle: Record<string, string | undefined>;
     canToggleMode: boolean;
     placeholder: string;
     scrollProgress: number;
@@ -123,14 +123,14 @@ defineProps<Props>();
 const query = defineModel<string>('query', { required: true });
 
 defineEmits<{
-    enter: [];
-    tab: [];
-    space: [];
-    'arrow-down': [];
-    'arrow-up': [];
-    'arrow-left': [];
-    'arrow-right': [];
-    escape: [];
+    enter: [event: KeyboardEvent];
+    tab: [event: KeyboardEvent];
+    space: [event: KeyboardEvent];
+    'arrow-down': [event: KeyboardEvent];
+    'arrow-up': [event: KeyboardEvent];
+    'arrow-left': [event: KeyboardEvent];
+    'arrow-right': [event: KeyboardEvent];
+    escape: [event: KeyboardEvent];
     focus: [];
     blur: [];
     'input-click': [event: MouseEvent];
