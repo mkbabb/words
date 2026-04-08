@@ -14,6 +14,7 @@ from ....wordlist.models import WordListItemDoc
 from ...core import CurrentUserDep, ListResponse, OptionalUserRoleDep, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 from .main import verify_wordlist_ownership
+from .responses import WordListItemResponse
 
 router = APIRouter()
 
@@ -89,7 +90,7 @@ def _encode_cursor(data: dict[str, Any]) -> str:
     return base64.b64encode(json.dumps(data).encode("utf-8")).decode("utf-8")
 
 
-@router.get("/{wordlist_id}/words", response_model=ListResponse[dict[str, Any]])
+@router.get("/{wordlist_id}/words", response_model=ListResponse[WordListItemResponse])
 async def list_words(
     wordlist_id: PydanticObjectId,
     cursor: str | None = Query(None, description="Cursor for keyset pagination (base64 JSON)"),

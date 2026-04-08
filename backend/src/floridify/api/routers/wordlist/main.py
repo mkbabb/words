@@ -43,6 +43,7 @@ from ...repositories import (
     WordListRepository,
     WordListUpdate,
 )
+from .responses import WordListResponse
 
 # Safety cap for unbounded list queries (clone, export)
 _MAX_WORDLIST_ITEMS = 10_000
@@ -75,6 +76,26 @@ def get_wordlist_repo() -> WordListRepository:
     return WordListRepository()
 
 
+def _wordlist_to_response(wordlist: WordList) -> WordListResponse:
+    """Convert a persisted WordList document to its API response shape."""
+    return WordListResponse(
+        id=str(wordlist.id) if wordlist.id else "",
+        name=wordlist.name,
+        description=wordlist.description,
+        hash_id=wordlist.hash_id,
+        total_words=wordlist.total_words,
+        unique_words=wordlist.unique_words,
+        learning_stats=wordlist.learning_stats,
+        tags=wordlist.tags,
+        is_public=wordlist.is_public,
+        owner_id=wordlist.owner_id,
+        metadata=wordlist.metadata,
+        last_accessed=wordlist.last_accessed,
+        created_at=wordlist.created_at,
+        updated_at=wordlist.updated_at,
+    )
+
+
 async def verify_wordlist_ownership(
     wordlist: WordList,
     user_id: str,
@@ -101,14 +122,14 @@ class WordListQueryParams(BaseModel):
     created_before: datetime | None = Field(None, description="Created before date")
 
 
-@router.get("", response_model=ListResponse[dict[str, Any]])
+@router.get("", response_model=ListResponse[WordListResponse])
 async def list_wordlists(
     pagination: PaginationDep,
     sort: SortDep,
     user_id: OptionalUserDep = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
     params: WordListQueryParams = Depends(),
-) -> ListResponse[dict[str, Any]]:
+) -> ListResponse[WordListResponse]:
     """List wordlists with filtering and pagination.
 
     Returns metadata only (no embedded words) for performance.
@@ -141,15 +162,8 @@ async def list_wordlists(
         sort=sort,
     )
 
-    # Return metadata only (no word population) for performance
-    items = []
-    for wordlist in wordlists:
-        data = wordlist.model_dump(mode="json")
-        data["word_count"] = wordlist.unique_words
-        items.append(data)
-
     return ListResponse(
-        items=items,
+        items=[_wordlist_to_response(w) for w in wordlists],
         total=total,
         offset=pagination.offset,
         limit=pagination.limit,
