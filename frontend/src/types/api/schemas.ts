@@ -70,7 +70,14 @@ export type CollocationResponse = components['schemas']['CollocationResponse'];
 // ── Search types ────────────────────────────────────────────────────
 // SearchResponse is kept in responses.ts — the generated version types
 // `results` as `unknown[]` which is too weak for consumer use.
-export type SearchMode = components['schemas']['SearchMode'];
+//
+// NOTE: The /search router is excluded from OpenAPI when deployed with
+// SEARCH_SERVICE_URL (search runs as a separate microservice). The types
+// below are kept as local fallbacks isomorphic with backend
+// `floridify.search.constants` and `floridify.api.routers.search` models.
+// Sync manually when those backend models change.
+
+export type SearchMode = 'smart' | 'exact' | 'fuzzy' | 'semantic';
 export const SearchMode = {
     SMART: 'smart',
     EXACT: 'exact',
@@ -78,10 +85,50 @@ export const SearchMode = {
     SEMANTIC: 'semantic',
 } as const satisfies Record<string, SearchMode>;
 
-export type SemanticStatusResponse = components['schemas']['SemanticStatusResponse'];
-export type HotReloadStatusResponse = components['schemas']['HotReloadStatusResponse'];
-export type RebuildIndexRequest = components['schemas']['RebuildIndexRequest'];
-export type RebuildIndexResponse = components['schemas']['RebuildIndexResponse'];
+export interface SemanticStatusResponse {
+    ready: boolean;
+    enabled: boolean;
+    building: boolean;
+    message?: string | null;
+    initialized?: boolean;
+    model_name?: string | null;
+    vocabulary_size?: number;
+    embedding_dimension?: number | null;
+    index_type?: string | null;
+    backend?: string | null;
+    last_built_at?: string | null;
+    error?: string | null;
+}
+
+export interface HotReloadStatusResponse {
+    enabled: boolean;
+    polling_interval_seconds: number;
+    last_check_at: string | null;
+    last_reload_at: string | null;
+    current_vocabulary_hash: string | null;
+}
+
+export interface RebuildIndexRequest {
+    corpus_name?: string;
+    corpus_uuid?: string;
+    languages?: string[];
+    components?: string[];
+    clear_caches?: boolean;
+    clean_gridfs?: boolean;
+}
+
+export interface RebuildIndexResponse {
+    status: string;
+    message: string;
+    corpus_name: string;
+    corpus_uuid?: string;
+    components_rebuilt: string[];
+    vocabulary_size: number;
+    caches_cleared: Record<string, number>;
+    gridfs_cleaned: number;
+    total_time_seconds: number;
+    semantic_info: Record<string, unknown>;
+}
 
 // ── Version types ───────────────────────────────────────────────────
 
@@ -100,6 +147,40 @@ export type CorpusResponse = components['schemas']['CorpusResponse'];
 export type WordListEntryInput = components['schemas']['WordListEntryInput'];
 export type WordListCreate = components['schemas']['WordListCreate'];
 export type WordListUpdate = components['schemas']['WordListUpdate'];
+
+// Response shapes — generated from backend Pydantic models. The frontend
+// `WordListResponse` is metadata-only; items are loaded via /words endpoint.
+export type WordListResponse = components['schemas']['WordListResponse'];
+export type WordListItemResponse = components['schemas']['WordListItemResponse-Output'];
+
+// Sub-models referenced by the responses above
+export type LearningStats = components['schemas']['LearningStats'];
+export type ReviewData = components['schemas']['ReviewData-Output'];
+export type ReviewHistoryItem = components['schemas']['ReviewHistoryItem'];
+
+// Enum-like unions — runtime-accessible via the const objects below
+export type MasteryLevel = components['schemas']['MasteryLevel'];
+export const MasteryLevel = {
+    DEFAULT: 'default',
+    BRONZE: 'bronze',
+    SILVER: 'silver',
+    GOLD: 'gold',
+} as const satisfies Record<string, MasteryLevel>;
+
+export type Temperature = components['schemas']['Temperature'];
+export const Temperature = {
+    HOT: 'hot',
+    COLD: 'cold',
+} as const satisfies Record<string, Temperature>;
+
+export type CardState = components['schemas']['CardState'];
+export const CardState = {
+    NEW: 'new',
+    LEARNING: 'learning',
+    YOUNG: 'young',
+    MATURE: 'mature',
+    RELEARNING: 'relearning',
+} as const satisfies Record<string, CardState>;
 
 // ── Source references ───────────────────────────────────────────────
 

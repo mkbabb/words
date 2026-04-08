@@ -156,166 +156,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search Words Query
-         * @description Search for words using query parameter.
-         */
-        get: operations["search_words_query_api_v1_search_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/{query}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search Words Path
-         * @description Search for words using path parameter.
-         */
-        get: operations["search_words_path_api_v1_search__query__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/{query}/suggestions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Search Suggestions
-         * @description Get search suggestions for autocomplete (lower threshold).
-         */
-        get: operations["get_search_suggestions_api_v1_search__query__suggestions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/semantic/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Semantic Status
-         * @description Get status of semantic search initialization.
-         *
-         *     This endpoint allows clients to check if semantic search is ready to use,
-         *     or if it's still building in the background. Useful for showing loading
-         *     states in the UI. Non-blocking — does not trigger initialization.
-         */
-        get: operations["get_semantic_status_api_v1_search_semantic_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/semantic/status/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stream Semantic Status
-         * @description Stream semantic search status changes via Server-Sent Events.
-         *
-         *     Pushes a ``status`` event whenever the semantic search state changes
-         *     (initializing, building, ready, error).  The stream auto-closes once
-         *     a terminal state is reached (``ready`` or ``!enabled``).
-         *
-         *     Heartbeat pings are sent every 30 s to keep proxies alive.
-         */
-        get: operations["stream_semantic_status_api_v1_search_semantic_status_stream_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/hot-reload/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Hot Reload Status
-         * @description Get the status of the search engine hot-reload mechanism.
-         *
-         *     Shows when the last corpus change check occurred, the check interval,
-         *     and the current corpus fingerprint used for change detection.
-         */
-        get: operations["get_hot_reload_status_api_v1_search_hot_reload_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/search/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rebuild Search Index
-         * @description Rebuild search index — per-corpus or language-level.
-         *
-         *     Per-corpus mode (corpus_name or corpus_uuid specified):
-         *         Targets a specific corpus. Supports component selection (trie, semantic, all).
-         *         Returns semantic_info with dtype for f32 validation.
-         *
-         *     Language mode (no corpus specified):
-         *         Backward-compatible. Resets SearchEngineManager and rebuilds language search.
-         */
-        post: operations["rebuild_search_index_api_v1_search_rebuild_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/suggestions": {
         parameters: {
             query?: never;
@@ -3290,6 +3130,12 @@ export interface components {
             } | null;
         };
         /**
+         * CardState
+         * @description Card state for Anki-grade spaced repetition.
+         * @enum {string}
+         */
+        CardState: "new" | "learning" | "young" | "mature" | "relearning";
+        /**
          * Collocation
          * @description Common word combinations.
          */
@@ -4405,56 +4251,6 @@ export interface components {
             updated_at?: string | null;
         };
         /**
-         * HotReloadStatusResponse
-         * @description Response for hot-reload status.
-         */
-        HotReloadStatusResponse: {
-            /**
-             * Engine Loaded
-             * @description Whether a search engine is currently loaded
-             */
-            engine_loaded: boolean;
-            /**
-             * Initializing
-             * @description Whether background init is in progress
-             * @default false
-             */
-            initializing: boolean;
-            /**
-             * Init Error
-             * @description Error from last init attempt
-             */
-            init_error?: string | null;
-            /**
-             * Semantic Enabled
-             * @description Whether semantic search is enabled
-             * @default true
-             */
-            semantic_enabled: boolean;
-            /**
-             * Last Check Seconds Ago
-             * @description Seconds since last corpus change check
-             */
-            last_check_seconds_ago?: number | null;
-            /**
-             * Check Interval
-             * @description Interval between corpus change checks
-             */
-            check_interval: number;
-            /**
-             * Corpus Fingerprint
-             * @description Current corpus fingerprint (name, hash, version)
-             */
-            corpus_fingerprint?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Languages
-             * @description Currently loaded languages
-             */
-            languages?: string[] | null;
-        };
-        /**
          * ImageResponse
          * @description Serialized image from ImageMedia.model_dump().
          */
@@ -4499,6 +4295,53 @@ export interface components {
          * @enum {string}
          */
         Language: "en" | "fr" | "es" | "de" | "it";
+        /**
+         * LearningStats
+         * @description Learning statistics for a word list.
+         */
+        LearningStats: {
+            /**
+             * Total Reviews
+             * @description Total review sessions
+             * @default 0
+             */
+            total_reviews: number;
+            /**
+             * Words Mastered
+             * @description Words at gold level
+             * @default 0
+             */
+            words_mastered: number;
+            /**
+             * Average Ease Factor
+             * @description Average difficulty
+             * @default 2.5
+             */
+            average_ease_factor: number;
+            /**
+             * Retention Rate
+             * @description Success rate
+             * @default 0
+             */
+            retention_rate: number;
+            /**
+             * Streak Days
+             * @description Consecutive study days
+             * @default 0
+             */
+            streak_days: number;
+            /**
+             * Last Study Date
+             * @description Last study session
+             */
+            last_study_date?: string | null;
+            /**
+             * Study Time Minutes
+             * @description Total study time
+             * @default 0
+             */
+            study_time_minutes: number;
+        };
         /**
          * ListResponse[CorpusResponse]
          * @example {
@@ -4624,6 +4467,38 @@ export interface components {
             /**
              * Has More
              * @description More items available
+             */
+            has_more: boolean;
+        };
+        /** ListResponse[WordListItemResponse] */
+        ListResponse_WordListItemResponse_: {
+            /** Items */
+            items: components["schemas"]["WordListItemResponse-Output"][];
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+        };
+        /** ListResponse[WordListResponse] */
+        ListResponse_WordListResponse_: {
+            /** Items */
+            items: components["schemas"]["WordListResponse"][];
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Has More
+             * @default false
              */
             has_more: boolean;
         };
@@ -4899,86 +4774,6 @@ export interface components {
             query: string;
         };
         /**
-         * RebuildIndexRequest
-         * @description Request for rebuilding search index — per-corpus or language-level.
-         */
-        RebuildIndexRequest: {
-            /**
-             * Corpus Name
-             * @description Target corpus by name (e.g. 'language_english', 'wordlist_69b73006...')
-             */
-            corpus_name?: string | null;
-            /**
-             * Corpus Uuid
-             * @description Target corpus by UUID
-             */
-            corpus_uuid?: string | null;
-            /**
-             * Languages
-             * @description Languages (used when no corpus specified)
-             * @default [
-             *       "en"
-             *     ]
-             */
-            languages: components["schemas"]["Language"][];
-            /**
-             * Components
-             * @description Components to rebuild: 'trie', 'semantic', 'all'
-             * @default [
-             *       "all"
-             *     ]
-             */
-            components: string[];
-            /**
-             * Clear Caches
-             * @description Clear L1/L2/L3 caches for target
-             * @default true
-             */
-            clear_caches: boolean;
-            /**
-             * Clean Gridfs
-             * @description Delete stale GridFS entries
-             * @default false
-             */
-            clean_gridfs: boolean;
-        };
-        /**
-         * RebuildIndexResponse
-         * @description Response for index rebuild operation.
-         */
-        RebuildIndexResponse: {
-            /** Status */
-            status: string;
-            /** Message */
-            message: string;
-            /** Corpus Name */
-            corpus_name: string;
-            /** Corpus Uuid */
-            corpus_uuid?: string | null;
-            /** Components Rebuilt */
-            components_rebuilt: string[];
-            /**
-             * Vocabulary Size
-             * @default 0
-             */
-            vocabulary_size: number;
-            /** Caches Cleared */
-            caches_cleared?: {
-                [key: string]: number;
-            };
-            /**
-             * Gridfs Cleaned
-             * @default 0
-             */
-            gridfs_cleaned: number;
-            /** Total Time Seconds */
-            total_time_seconds: number;
-            /** Semantic Info */
-            semantic_info?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
          * ReconcileCandidate
          * @description A single reconciliation candidate.
          */
@@ -5174,110 +4969,173 @@ export interface components {
             languages?: string[] | null;
         };
         /**
-         * SearchMode
-         * @description Search modes for API and direct method routing.
-         * @enum {string}
+         * ReviewData
+         * @description Spaced repetition data following Anki-grade SM-2 algorithm.
          */
-        SearchMode: "smart" | "exact" | "fuzzy" | "semantic";
-        /**
-         * SearchResponse
-         * @description Response for search operations.
-         *
-         *     Used by:
-         *     - CLI: `floridify search word <query> --json`
-         *     - API: `GET /api/v1/search?q=<query>`
-         * @example {
-         *       "timestamp": "2025-01-15T10:30:00Z",
-         *       "version": "v1"
-         *     }
-         */
-        SearchResponse: {
+        "ReviewData-Input": {
             /**
-             * Timestamp
-             * Format: date-time
-             * @description Response generation time
-             */
-            timestamp?: string;
-            /**
-             * Version
-             * @description API/CLI version
-             * @default v1
-             */
-            version: string;
-            /**
-             * Query
-             * @description Original search query
-             */
-            query: string;
-            /**
-             * Results
-             * @description Search results
-             */
-            results: unknown[];
-            /**
-             * Total Found
-             * @description Total matches
-             */
-            total_found: number;
-            /**
-             * Languages
-             * @description Languages searched
-             */
-            languages: components["schemas"]["Language"][];
-            /**
-             * Mode
-             * @description Search mode used
-             */
-            mode: string;
-            /**
-             * Metadata
-             * @description Search metadata (timing, etc)
-             */
-            metadata?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * SemanticStatusResponse
-         * @description Response model for semantic search status.
-         */
-        SemanticStatusResponse: {
-            /**
-             * Enabled
-             * @description Whether semantic search is enabled
-             */
-            enabled: boolean;
-            /**
-             * Ready
-             * @description Whether semantic search is ready to use
-             */
-            ready: boolean;
-            /**
-             * Building
-             * @description Whether semantic search is currently building
-             */
-            building: boolean;
-            /**
-             * Languages
-             * @description Languages configured
-             */
-            languages: components["schemas"]["Language"][];
-            /**
-             * Model Name
-             * @description Semantic model being used
-             */
-            model_name?: string | null;
-            /**
-             * Vocabulary Size
-             * @description Number of words in vocabulary
+             * Repetitions
+             * @description Successful review count
              * @default 0
              */
-            vocabulary_size: number;
+            repetitions: number;
             /**
-             * Message
-             * @description Human-readable status message
+             * Ease Factor
+             * @description Difficulty multiplier
+             * @default 2.5
              */
-            message: string;
+            ease_factor: number;
+            /**
+             * Interval
+             * @description Current interval in days (can be fractional for sub-day)
+             * @default 0
+             */
+            interval: number;
+            /**
+             * Next Review Date
+             * Format: date-time
+             * @description Next scheduled review (minute-precision for learning steps)
+             */
+            next_review_date?: string;
+            /**
+             * Last Review Date
+             * @description Last review timestamp
+             */
+            last_review_date?: string | null;
+            /**
+             * Lapse Count
+             * @description Total failure count
+             * @default 0
+             */
+            lapse_count: number;
+            /**
+             * Review History
+             * @description Review session history
+             */
+            review_history?: components["schemas"]["ReviewHistoryItem"][];
+            /**
+             * @description Current card state
+             * @default new
+             */
+            card_state: components["schemas"]["CardState"];
+            /**
+             * Learning Step
+             * @description Current step index in LEARNING/RELEARNING
+             * @default 0
+             */
+            learning_step: number;
+            /**
+             * Is Leech
+             * @description Flagged as problematic card
+             * @default false
+             */
+            is_leech: boolean;
+            /**
+             * Graduated Interval
+             * @description Interval before lapse (for relearning graduation)
+             * @default 1
+             */
+            graduated_interval: number;
+        };
+        /**
+         * ReviewData
+         * @description Spaced repetition data following Anki-grade SM-2 algorithm.
+         */
+        "ReviewData-Output": {
+            /**
+             * Repetitions
+             * @description Successful review count
+             * @default 0
+             */
+            repetitions: number;
+            /**
+             * Ease Factor
+             * @description Difficulty multiplier
+             * @default 2.5
+             */
+            ease_factor: number;
+            /**
+             * Interval
+             * @description Current interval in days (can be fractional for sub-day)
+             * @default 0
+             */
+            interval: number;
+            /**
+             * Next Review Date
+             * Format: date-time
+             * @description Next scheduled review (minute-precision for learning steps)
+             */
+            next_review_date?: string;
+            /**
+             * Last Review Date
+             * @description Last review timestamp
+             */
+            last_review_date?: string | null;
+            /**
+             * Lapse Count
+             * @description Total failure count
+             * @default 0
+             */
+            lapse_count: number;
+            /**
+             * Review History
+             * @description Review session history
+             */
+            review_history?: components["schemas"]["ReviewHistoryItem"][];
+            /**
+             * @description Current card state
+             * @default new
+             */
+            card_state: components["schemas"]["CardState"];
+            /**
+             * Learning Step
+             * @description Current step index in LEARNING/RELEARNING
+             * @default 0
+             */
+            learning_step: number;
+            /**
+             * Is Leech
+             * @description Flagged as problematic card
+             * @default false
+             */
+            is_leech: boolean;
+            /**
+             * Graduated Interval
+             * @description Interval before lapse (for relearning graduation)
+             * @default 1
+             */
+            graduated_interval: number;
+        };
+        /**
+         * ReviewHistoryItem
+         * @description Single review session record.
+         */
+        ReviewHistoryItem: {
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+            /**
+             * Quality
+             * @description Review quality (0-5)
+             */
+            quality: number;
+            /**
+             * Interval
+             * @description Interval (days or fraction of day)
+             */
+            interval: number;
+            /**
+             * Ease Factor
+             * @description Difficulty multiplier
+             */
+            ease_factor: number;
+            /**
+             * @description Card state after review
+             * @default new
+             */
+            card_state: components["schemas"]["CardState"];
         };
         /**
          * SourceReference
@@ -5530,6 +5388,12 @@ export interface components {
              */
             language: string;
         };
+        /**
+         * Temperature
+         * @description Learning temperature state.
+         * @enum {string}
+         */
+        Temperature: "hot" | "cold";
         /**
          * UpdatePreferencesRequest
          * @description Full replacement of user preferences.
@@ -6058,6 +5922,203 @@ export interface components {
             tags?: string[];
         };
         /**
+         * WordListItemResponse
+         * @description API response shape for a single wordlist item.
+         *
+         *     Differs from the persisted `WordListItem` model in one key way:
+         *     the `word_id` ObjectId FK is resolved to the canonical `word` text
+         *     string for client convenience.
+         */
+        "WordListItemResponse-Input": {
+            /**
+             * Word
+             * @description Resolved word text (FK resolved from word_id)
+             */
+            word: string;
+            /**
+             * Frequency
+             * @description Number of occurrences in list
+             */
+            frequency: number;
+            /**
+             * Selected Definition Ids
+             * @description Selected Definition document IDs
+             */
+            selected_definition_ids?: string[];
+            /** @description Current mastery level */
+            mastery_level: components["schemas"]["MasteryLevel"];
+            /** @description Learning temperature state */
+            temperature: components["schemas"]["Temperature"];
+            /** @description Spaced repetition data */
+            review_data: components["schemas"]["ReviewData-Input"];
+            /**
+             * Last Visited
+             * @description Last viewed timestamp
+             */
+            last_visited?: string | null;
+            /**
+             * Added Date
+             * Format: date-time
+             * @description When added to list
+             */
+            added_date: string;
+            /**
+             * Suspended
+             * @description Suspended from reviews (leech management)
+             * @default false
+             */
+            suspended: boolean;
+            /**
+             * Notes
+             * @description User notes about the word
+             * @default
+             */
+            notes: string;
+            /**
+             * Tags
+             * @description User-defined tags
+             */
+            tags?: string[];
+        };
+        /**
+         * WordListItemResponse
+         * @description API response shape for a single wordlist item.
+         *
+         *     Differs from the persisted `WordListItem` model in one key way:
+         *     the `word_id` ObjectId FK is resolved to the canonical `word` text
+         *     string for client convenience.
+         */
+        "WordListItemResponse-Output": {
+            /**
+             * Word
+             * @description Resolved word text (FK resolved from word_id)
+             */
+            word: string;
+            /**
+             * Frequency
+             * @description Number of occurrences in list
+             */
+            frequency: number;
+            /**
+             * Selected Definition Ids
+             * @description Selected Definition document IDs
+             */
+            selected_definition_ids?: string[];
+            /** @description Current mastery level */
+            mastery_level: components["schemas"]["MasteryLevel"];
+            /** @description Learning temperature state */
+            temperature: components["schemas"]["Temperature"];
+            /** @description Spaced repetition data */
+            review_data: components["schemas"]["ReviewData-Output"];
+            /**
+             * Last Visited
+             * @description Last viewed timestamp
+             */
+            last_visited?: string | null;
+            /**
+             * Added Date
+             * Format: date-time
+             * @description When added to list
+             */
+            added_date: string;
+            /**
+             * Suspended
+             * @description Suspended from reviews (leech management)
+             * @default false
+             */
+            suspended: boolean;
+            /**
+             * Notes
+             * @description User notes about the word
+             * @default
+             */
+            notes: string;
+            /**
+             * Tags
+             * @description User-defined tags
+             */
+            tags?: string[];
+        };
+        /**
+         * WordListResponse
+         * @description API response shape for a wordlist (metadata, no embedded items).
+         *
+         *     Items are loaded separately via `GET /wordlists/{id}/words`.
+         */
+        WordListResponse: {
+            /**
+             * Id
+             * @description MongoDB document ID
+             */
+            id: string;
+            /**
+             * Name
+             * @description Human-readable list name
+             */
+            name: string;
+            /**
+             * Description
+             * @description List description / purpose
+             * @default
+             */
+            description: string;
+            /**
+             * Hash Id
+             * @description Content-based hash identifier
+             */
+            hash_id: string;
+            /**
+             * Total Words
+             * @description Total word count
+             */
+            total_words: number;
+            /**
+             * Unique Words
+             * @description Unique word count
+             */
+            unique_words: number;
+            /** @description Aggregated learning statistics */
+            learning_stats: components["schemas"]["LearningStats"];
+            /**
+             * Tags
+             * @description List categorization tags
+             */
+            tags?: string[];
+            /**
+             * Is Public
+             * @description Public visibility flag
+             * @default false
+             */
+            is_public: boolean;
+            /**
+             * Owner Id
+             * @description Owner user ID
+             */
+            owner_id?: string | null;
+            /**
+             * Metadata
+             * @description Additional metadata
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Last Accessed
+             * @description Last access timestamp
+             */
+            last_accessed?: string | null;
+            /**
+             * Created At
+             * @description Creation timestamp
+             */
+            created_at?: string | null;
+            /**
+             * Updated At
+             * @description Last update timestamp
+             */
+            updated_at?: string | null;
+        };
+        /**
          * WordListUpdate
          * @description Schema for updating a word list.
          */
@@ -6470,245 +6531,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    search_words_query_api_v1_search_get: {
-        parameters: {
-            query: {
-                /** @description Search query */
-                q: string;
-                /** @description Language codes */
-                languages?: string[];
-                /** @description Maximum results */
-                max_results?: number;
-                /** @description Minimum score */
-                min_score?: number;
-                /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: components["schemas"]["SearchMode"];
-                /** @description Force rebuild indices */
-                force_rebuild?: boolean;
-                /** @description Specific corpus ID */
-                corpus_id?: string | null;
-                /** @description Specific corpus name */
-                corpus_name?: string | null;
-                /** @description Enable semantic search (disable to avoid model load) */
-                semantic?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    search_words_path_api_v1_search__query__get: {
-        parameters: {
-            query?: {
-                /** @description Language codes */
-                languages?: string[];
-                /** @description Maximum results */
-                max_results?: number;
-                /** @description Minimum score */
-                min_score?: number;
-                /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: components["schemas"]["SearchMode"];
-                /** @description Force rebuild indices */
-                force_rebuild?: boolean;
-                /** @description Specific corpus ID */
-                corpus_id?: string | null;
-                /** @description Specific corpus name */
-                corpus_name?: string | null;
-                /** @description Enable semantic search (disable to avoid model load) */
-                semantic?: boolean;
-            };
-            header?: never;
-            path: {
-                query: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_search_suggestions_api_v1_search__query__suggestions_get: {
-        parameters: {
-            query?: {
-                /** @description Maximum suggestions */
-                limit?: number;
-                /** @description Language codes */
-                languages?: string[];
-                /** @description Maximum results */
-                max_results?: number;
-                /** @description Minimum score */
-                min_score?: number;
-                /** @description Search mode: smart, exact, fuzzy, semantic */
-                mode?: components["schemas"]["SearchMode"];
-                /** @description Force rebuild indices */
-                force_rebuild?: boolean;
-                /** @description Specific corpus ID */
-                corpus_id?: string | null;
-                /** @description Specific corpus name */
-                corpus_name?: string | null;
-                /** @description Enable semantic search (disable to avoid model load) */
-                semantic?: boolean;
-            };
-            header?: never;
-            path: {
-                query: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_semantic_status_api_v1_search_semantic_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SemanticStatusResponse"];
-                };
-            };
-        };
-    };
-    stream_semantic_status_api_v1_search_semantic_status_stream_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_hot_reload_status_api_v1_search_hot_reload_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HotReloadStatusResponse"];
-                };
-            };
-        };
-    };
-    rebuild_search_index_api_v1_search_rebuild_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["RebuildIndexRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RebuildIndexResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9090,7 +8912,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListResponse_dict_str__Any__"];
+                    "application/json": components["schemas"]["ListResponse_WordListResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -9527,7 +9349,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListResponse_dict_str__Any__"];
+                    "application/json": components["schemas"]["ListResponse_WordListItemResponse_"];
                 };
             };
             /** @description Validation Error */

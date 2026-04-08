@@ -1,49 +1,42 @@
-export interface WordListItem {
-  word: string; // Always word text from backend
-  frequency: number;
-  selected_definition_ids: string[];
-  mastery_level: MasteryLevel;
-  temperature: Temperature;
-  review_data: ReviewData;
-  last_visited: string | null;
-  added_date: string;
-  notes: string;
-  tags: string[];
-}
+/**
+ * Wordlist types — frontend-only additions on top of OpenAPI-generated types.
+ *
+ * Backend-derived types (WordListItem, WordList, ReviewData, ReviewHistoryItem,
+ * LearningStats, MasteryLevel, Temperature, CardState) are re-exported from
+ * `./api/schemas` where they originate from `./api/generated.ts`. Regenerate
+ * via `npm run generate-api-types`.
+ *
+ * This file only declares: SM-2 quality literals, frontend session/UI state,
+ * filters, parsing helpers, sort criteria, and request body shapes.
+ */
 
-export type CardState = 'new' | 'learning' | 'young' | 'mature' | 'relearning';
+import {
+  CardState,
+  MasteryLevel,
+  Temperature,
+  type LearningStats,
+  type ReviewData,
+  type ReviewHistoryItem,
+  type WordListItemResponse,
+  type WordListResponse,
+} from './api/schemas';
 
-export const CardState = {
-  NEW: 'new' as const,
-  LEARNING: 'learning' as const,
-  YOUNG: 'young' as const,
-  MATURE: 'mature' as const,
-  RELEARNING: 'relearning' as const,
-} as const;
+// Re-export backend types under their canonical names so existing imports
+// (`import type { WordListItem, WordList, MasteryLevel, ... } from '@/types'`)
+// keep working unchanged.
+export {
+  CardState,
+  MasteryLevel,
+  Temperature,
+  type LearningStats,
+  type ReviewData,
+  type ReviewHistoryItem,
+};
 
-export interface ReviewData {
-  repetitions: number;
-  ease_factor: number;
-  interval: number;
-  next_review_date: string;
-  last_review_date: string | null;
-  lapse_count: number;
-  review_history: ReviewHistoryItem[];
-  card_state: CardState;
-  learning_step: number;
-  is_leech: boolean;
-  graduated_interval: number;
-}
+export type WordListItem = WordListItemResponse;
+export type WordList = WordListResponse;
 
-export interface ReviewHistoryItem {
-  date: string;
-  quality: number;
-  interval: number;
-  ease_factor: number;
-  card_state: CardState;
-}
-
-// SM-2 Quality scores
+// SM-2 Quality scores (frontend-only — used for the review session UI buttons)
 export type SM2Quality = 0 | 1 | 2 | 3 | 4 | 5;
 
 export const SM2_LABELS: Record<SM2Quality, { label: string; description: string; color: string }> = {
@@ -102,51 +95,6 @@ export interface DueWordItem {
   predicted_intervals: Record<number, number>;
   notes: string;
 }
-
-export interface LearningStats {
-  total_reviews: number;
-  words_mastered: number;
-  average_ease_factor: number;
-  retention_rate: number;
-  streak_days: number;
-  last_study_date: string | null;
-  study_time_minutes: number;
-}
-
-export interface WordList {
-  id: string;
-  name: string;
-  description: string;
-  hash_id: string;
-  words: WordListItem[];
-  total_words: number;
-  unique_words: number;
-  learning_stats: LearningStats;
-  last_accessed: string | null;
-  created_at: string;
-  updated_at: string;
-  metadata: Record<string, any>;
-  tags: string[];
-  is_public: boolean;
-  owner_id: string | null;
-}
-
-// UI-specific types merged from wordlist-ui.ts
-export type MasteryLevel = 'default' | 'bronze' | 'silver' | 'gold';
-export type Temperature = 'hot' | 'cold';
-
-// Const objects for runtime usage (dual type/value export)
-export const MasteryLevel = {
-  DEFAULT: 'default' as const,
-  BRONZE: 'bronze' as const,
-  SILVER: 'silver' as const,
-  GOLD: 'gold' as const
-} as const;
-
-export const Temperature = {
-  HOT: 'hot' as const,
-  COLD: 'cold' as const
-} as const;
 
 // Filter types
 export interface WordlistFilters {
@@ -275,7 +223,7 @@ export interface WordListsResponse {
   limit: number;
 }
 
-export interface WordListResponse {
+export interface WordListResponseEnvelope {
   data: WordList;
   metadata?: Record<string, any>;
 }
@@ -326,11 +274,11 @@ export interface WordListQueryParams {
   min_views?: number;
   max_views?: number;
   reviewed?: boolean;
-  
+
   // Sorting
   sort_by?: string;           // Can be comma-separated for multiple criteria
   sort_order?: string;        // Can be comma-separated to match sort_by
-  
+
   // Pagination
   offset?: number;
   limit?: number;
@@ -358,7 +306,7 @@ export interface WordListsQueryParams {
   max_words?: number;
   created_after?: string;
   created_before?: string;
-  
+
   // Pagination and sorting
   offset?: number;
   limit?: number;
