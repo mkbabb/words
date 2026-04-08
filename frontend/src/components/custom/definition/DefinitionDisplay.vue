@@ -127,10 +127,7 @@
             </div>
 
             <!-- Gradient Separator -->
-            <hr
-                class="mt-1 mb-1 h-[2px] border-0"
-                style="background: linear-gradient(to right, transparent 2%, var(--color-border) 15%, var(--color-border) 85%, transparent 98%);"
-            />
+            <hr class="mt-1 mb-1 border-0 divider-h-tapered" />
 
             <!-- Admin Edit Dock -->
             <DefinitionToolbar

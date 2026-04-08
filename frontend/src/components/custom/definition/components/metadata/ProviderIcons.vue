@@ -192,13 +192,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Wand2, Info } from 'lucide-vue-next';
-import { Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Popover, PopoverTrigger, PopoverContent, StackedIconGroup, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import {
     getProviderIcon,
     getProviderDisplayName,
 } from '../../utils/providers';
 import ProviderMetadataCard from './ProviderMetadataCard.vue';
-import StackedIconGroup from '@/components/custom/common/StackedIconGroup.vue';
 import { providersApi, type ProviderEntry } from '@/api/providers';
 import type { SourceReference } from '@/types/api';
 

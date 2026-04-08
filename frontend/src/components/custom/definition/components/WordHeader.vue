@@ -2,7 +2,7 @@
     <CardHeader class="relative">
         <!-- Word + controls: all on one line, wrapping only when needed -->
         <CardTitle>
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-2" style="overflow-wrap: anywhere;" lang="en">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-2 [overflow-wrap:anywhere]" lang="en">
                 <!-- Word title — inline, takes natural width -->
                 <AnimatedTitle
                     :text="word"
@@ -222,13 +222,12 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
-import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, StackedIconGroup, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './media/AudioPlaybackButton.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
 import ProviderIcons from './metadata/ProviderIcons.vue';
-import StackedIconGroup from '@/components/custom/common/StackedIconGroup.vue';
 import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
 import type { AudioFile, SourceReference } from '@/types/api';

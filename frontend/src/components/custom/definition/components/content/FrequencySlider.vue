@@ -54,23 +54,25 @@ function handleInput(e: Event) {
 <style scoped>
 .freq-slider::-webkit-slider-thumb {
     appearance: none;
-    height: 12px;
-    width: 12px;
-    border-radius: 9999px;
-    background: var(--thumb-color, hsl(40, 80%, 55%));
+    height: var(--icon-xs);
+    width: var(--icon-xs);
+    border-radius: var(--radius-pill);
+    background: var(--thumb-color, var(--color-gold));
     border: 2px solid var(--background);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    transition: transform 0.15s ease;
+    box-shadow: var(--shadow-xs);
+    transition: transform var(--duration-fast) var(--ease-standard);
 }
 .freq-slider::-webkit-slider-thumb:hover {
     transform: scale(1.25);
 }
 .freq-slider::-moz-range-thumb {
-    height: 12px;
-    width: 12px;
-    border-radius: 9999px;
-    background: var(--thumb-color, hsl(40, 80%, 55%));
+    appearance: none;
+    -moz-appearance: none;
+    height: var(--icon-xs);
+    width: var(--icon-xs);
+    border-radius: var(--radius-pill);
+    background: var(--thumb-color, var(--color-gold));
     border: 2px solid var(--background);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-xs);
 }
 </style>
