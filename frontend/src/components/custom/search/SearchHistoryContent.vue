@@ -132,12 +132,20 @@ const lookupWord = (word: string) => {
 
 <style scoped>
 /* Hide scrollbar by default */
+.scrollbar-none {
+    scrollbar-width: none;
+}
 .scrollbar-none::-webkit-scrollbar {
     width: 0;
     display: none;
 }
 
-/* Show thin scrollbar on hover */
+/* Show thin scrollbar on hover — Firefox first, WebKit fallback */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
     width: 4px;
 }

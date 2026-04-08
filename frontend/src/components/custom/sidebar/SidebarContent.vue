@@ -263,7 +263,7 @@ const formatTimestamp = (timestamp: Date): string => {
     return date.toLocaleDateString();
 };
 
-const formatWordlistDate = (dateString: string | null): string => {
+const formatWordlistDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'Never accessed';
     
     const date = new Date(dateString);

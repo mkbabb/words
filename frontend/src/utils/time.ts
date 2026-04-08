@@ -1,4 +1,4 @@
-export function formatRelativeTime(date: Date | string | null): string {
+export function formatRelativeTime(date: Date | string | null | undefined): string {
     if (!date) return 'Never';
     
     const now = new Date();

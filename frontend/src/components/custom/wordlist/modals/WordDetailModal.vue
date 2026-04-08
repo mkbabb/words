@@ -110,7 +110,7 @@
           </div>
 
           <!-- Tags -->
-          <div v-if="word.tags?.length > 0" class="mt-3 flex flex-wrap gap-1.5">
+          <div v-if="(word.tags?.length ?? 0) > 0" class="mt-3 flex flex-wrap gap-1.5">
             <span
               v-for="tag in word.tags"
               :key="tag"
