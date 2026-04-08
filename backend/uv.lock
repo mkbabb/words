@@ -640,6 +640,11 @@ wheels = [
 ]
 
 [[package]]
+name = "ffuzzy"
+version = "0.1.0"
+source = { directory = ".ffuzzy/crates/ffuzzy-py" }
+
+[[package]]
 name = "filelock"
 version = "3.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -674,6 +679,7 @@ dependencies = [
     { name = "ebooklib" },
     { name = "faiss-cpu" },
     { name = "fastapi" },
+    { name = "ffuzzy" },
     { name = "ftfy" },
     { name = "genanki" },
     { name = "httpx", extra = ["http2"] },
@@ -753,6 +759,7 @@ requires-dist = [
     { name = "ebooklib", specifier = ">=0.18" },
     { name = "faiss-cpu", specifier = ">=1.8.0" },
     { name = "fastapi", specifier = ">=0.104.0" },
+    { name = "ffuzzy", directory = ".ffuzzy/crates/ffuzzy-py" },
     { name = "ftfy", specifier = ">=6.1.0" },
     { name = "genanki", specifier = ">=0.13.0" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.0" },

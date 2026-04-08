@@ -55,6 +55,9 @@ PHONETIC_BUDGET_CAP = 200
 # ─── BK-Tree Configuration ───────────────────────────────────────
 
 BKTREE_MAX_CORPUS_SIZE = 500_000  # Skip BK-tree above this (time-budgeted)
+BKTREE_MAX_QUERY_LENGTH = 20  # Skip BK-tree for queries longer than this;
+#   trigram index handles long tokens better (O(t*p̄) vs O(n^(k/log n)))
+BKTREE_MAX_NODE_VISITS = 50_000  # Safety cap on tree nodes visited per find()
 BKTREE_TIME_BUDGET_SMALL = 20.0  # ms, corpora < 5K words
 BKTREE_TIME_BUDGET_MEDIUM = 15.0  # ms, corpora 5K-50K
 BKTREE_TIME_BUDGET_LARGE = 10.0  # ms, corpora > 50K

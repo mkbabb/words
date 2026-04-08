@@ -67,6 +67,8 @@ dependencies = [
     "jellyfish>=1.2.1",
     "pydivsufsort>=0.0.20",
     "pyicu>=2.16.2",
+    # Hybrid fuzzy search Rust crate (SymSpell + BK-tree + 3.5-gram + Metaphone)
+    "ffuzzy>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -88,6 +90,14 @@ packages = ["src/floridify"]
 
 [tool.hatchling.build]
 sources = ["src"]
+
+# Resolve `ffuzzy` from a path that lives under the backend root in both
+# local dev (via the `.ffuzzy` symlink → `../../ffuzzy`) and Docker (where
+# the crate is COPYed in via the `ffuzzy` additional build context). uv
+# refuses path sources that escape the workspace root, so we keep the
+# crate inside backend/ via the symlink.
+[tool.uv.sources]
+ffuzzy = { path = ".ffuzzy/crates/ffuzzy-py", editable = false }
 
 [dependency-groups]
 dev = [

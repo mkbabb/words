@@ -58,7 +58,7 @@ backend/src/floridify/
 ├── search/                 # Multi-method search → docs/search.md
 │   ├── engine.py           # Search orchestrator, cascade logic
 │   ├── index.py            # SearchIndex versioned model (links trie+fuzzy+semantic)
-│   ├── config.py           # All tunable constants (thresholds, budgets, boosts)
+│   ├── config.py           # Score thresholds, corpus tiers, Bloom filter params
 │   ├── constants.py        # SearchMethod, SearchMode, FuzzySearchMethod enums
 │   ├── result.py           # SearchResult, MatchDetail
 │   ├── language.py         # LanguageSearch (multi-corpus delegation)
@@ -66,17 +66,12 @@ backend/src/floridify/
 │   │   ├── search.py       # TrieSearch (marisa-trie C++ backend)
 │   │   ├── index.py        # TrieIndex (versioned, includes Bloom filter bytes)
 │   │   └── bloom.py        # BloomFilter (xxHash, probabilistic membership)
-│   ├── fuzzy/              # Multi-strategy fuzzy matching
-│   │   ├── search.py       # FuzzySearch (candidate aggregation pipeline)
-│   │   ├── index.py        # FuzzyIndex (versioned, bundles BK+phonetic+suffix)
-│   │   ├── candidates.py   # Trigram inverted index + length buckets
-│   │   ├── bk_tree.py      # BKTree (Damerau-Levenshtein, adaptive k)
+│   ├── fuzzy/              # Fuzzy + phonetic via ffuzzy Rust crate
+│   │   ├── search.py       # FuzzySearch — thin wrapper around ffuzzy.Index
+│   │   ├── index.py        # FuzzyIndex — versioned, stores ffuzzy blob + pickled suffix array via GridFS
+│   │   ├── candidates.py   # Legacy trigram helpers used by suffix array substring path
 │   │   ├── suffix_array.py # SuffixArray (pydivsufsort, O(m log n) substring)
-│   │   └── scoring.py      # Length correction, frequency heuristics
-│   ├── phonetic/           # Multilingual phonetic matching
-│   │   ├── index.py        # PhoneticIndex (composite + per-word codes)
-│   │   ├── encoder.py      # PhoneticEncoder (ICU normalization + jellyfish Metaphone)
-│   │   └── constants.py    # ICU transliteration rules (CLDR-sourced)
+│   │   └── scoring.py      # Length correction for suffix array candidates
 │   └── semantic/           # FAISS vector search
 │       ├── search.py       # SemanticSearch (from_corpus, query caching)
 │       ├── index.py        # SemanticIndex (versioned, binary data in GridFS)
@@ -247,9 +242,9 @@ Query → Search → Cache check
 **Search** ([`search/engine.py`](src/floridify/search/engine.py)):
 ```
 Query → Exact (<1ms, marisa-trie) → Prefix → Substring (suffix array)
-  → Fuzzy (BK-tree + phonetic + trigram) → Semantic (FAISS HNSW) → Deduplicate → Top N
+  → Fuzzy (ffuzzy: SymSpell + BK-tree + 3.5-gram + phonetic) → Semantic (FAISS HNSW) → Top N
 ```
-SearchEngineManager: hot-reload via 30s vocabulary_hash polling, atomic swap.
+Fuzzy search is the `ffuzzy` Rust crate loaded via PyO3. See [docs/search.md](../docs/search.md#fuzzy-search-the-ffuzzy-crate). SearchEngineManager: hot-reload via 30s vocabulary_hash polling, atomic swap.
 
 **AI Synthesis** ([`ai/synthesizer.py`](src/floridify/ai/synthesizer.py)):
 ```

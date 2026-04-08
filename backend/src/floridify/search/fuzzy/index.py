@@ -1,19 +1,23 @@
-"""FuzzyIndex active-record model for fuzzy search index persistence.
+"""FuzzyIndex — persisted ``ffuzzy`` Rust index, stored as an opaque blob.
 
-Persists the BK-tree, phonetic index, suffix array, and trigram index
-as a single versioned unit using the existing caching infrastructure.
-Keyed by corpus_uuid + vocabulary_hash for cache invalidation.
+The index blob is a single self-contained byte buffer produced by
+``ffuzzy.Index.to_bytes()``. The metadata document is small (a few
+hundred bytes); the binary payload (ffuzzy bytes + pickled suffix
+array) is stored externally via :class:`VersionedDataManager`'s
+``binary_payload`` hook, which pickles it into GridFS in a single
+shot — no JSON serialization, no double-pass, no consumer-side GridFS
+plumbing.
 """
 
 from __future__ import annotations
 
-import base64
 import pickle
 import time
 from typing import Any, ClassVar
 
+import ffuzzy
 from beanie import PydanticObjectId
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field
 
 from ...caching.core import get_versioned_content
 from ...caching.manager import get_version_manager
@@ -30,10 +34,15 @@ logger = get_logger(__name__)
 
 
 class FuzzyIndex(BaseModel):
-    """Persisted fuzzy search structures.
+    """Persisted ffuzzy index (opaque Rust blob).
 
-    Stores serialized BK-tree, phonetic index, and suffix array alongside
-    the trigram index data, all keyed by vocabulary_hash for invalidation.
+    The binary payload (``binary_data``) is excluded from
+    ``model_dump`` so the version manager only sees a small metadata
+    document. ``save()`` hands the bytes to the version manager via
+    its ``binary_payload`` hook, which routes them to GridFS in one
+    atomic write. ``get()`` reverses the process — the manager
+    rehydrates the dict from GridFS and we pop the ``binary_data``
+    key off before validating the metadata.
     """
 
     # Identification
@@ -42,31 +51,19 @@ class FuzzyIndex(BaseModel):
     corpus_name: str
     vocabulary_hash: str
 
-    # Serialized binary data (pickle'd, base64-encoded for JSON storage)
-    bk_tree_bytes: bytes | None = None
-    phonetic_index_bytes: bytes | None = None
-    suffix_array_bytes: bytes | None = None
-
     # Statistics
     vocabulary_size: int = 0
     build_time_seconds: float = 0.0
+    ffuzzy_size_bytes: int = 0
+    suffix_array_size_bytes: int = 0
 
-    # Base64 encode/decode for JSON serialization (versioned storage uses JSON)
-    @field_serializer("bk_tree_bytes", "phonetic_index_bytes", "suffix_array_bytes")
-    @classmethod
-    def _encode_bytes(cls, v: bytes | None) -> str | None:
-        return base64.b85encode(v).decode("ascii") if v else None
-
-    @field_validator("bk_tree_bytes", "phonetic_index_bytes", "suffix_array_bytes", mode="before")
-    @classmethod
-    def _decode_bytes(cls, v: Any) -> bytes | None:
-        if v is None:
-            return None
-        if isinstance(v, bytes):
-            return v
-        if isinstance(v, str):
-            return base64.b85decode(v.encode("ascii"))
-        return v
+    # Binary payload — never serialized through model_dump.
+    # Holds {"ffuzzy": bytes, "suffix_array": bytes}.
+    binary_data: dict[str, bytes] | None = Field(
+        default=None,
+        exclude=True,
+        description="Opaque binary payload stored externally via GridFS",
+    )
 
     class Metadata(
         BaseVersionedData,
@@ -83,13 +80,20 @@ class FuzzyIndex(BaseModel):
         corpus_uuid: str
         vocabulary_hash: str = ""
 
+    # ── Read path ────────────────────────────────────────────────
+
     @classmethod
     async def get(
         cls,
         corpus_uuid: str,
         config: VersionConfig | None = None,
     ) -> FuzzyIndex | None:
-        """Load fuzzy index from versioned storage."""
+        """Load fuzzy index from versioned storage.
+
+        Loads the metadata document, then pops the binary payload off
+        the dict the manager rehydrated from GridFS. Returns ``None`` if
+        no version exists.
+        """
         effective_config = config or VersionConfig()
         if effective_config.force_rebuild:
             effective_config = effective_config.model_copy()
@@ -112,20 +116,49 @@ class FuzzyIndex(BaseModel):
         if not content:
             return None
 
+        binary_data = content.pop("binary_data", None) if isinstance(content, dict) else None
+
         index = cls.model_validate(content)
+        if binary_data is not None:
+            index.binary_data = binary_data
         if metadata.id:
             index.index_id = metadata.id
         return index
 
+    def deserialize(
+        self,
+    ) -> tuple[Any | None, Any | None, Any | None]:
+        """Deserialize stored structures back to runtime objects.
+
+        Returns a 3-tuple matching the legacy pipeline shape:
+        ``(ffuzzy_index, None, suffix_array)``. The ``None`` slot used
+        to hold the Python phonetic index — phonetic now lives inside
+        the ffuzzy crate.
+        """
+        if self.binary_data is None:
+            return None, None, None
+
+        ffuzzy_bytes = self.binary_data.get("ffuzzy")
+        suffix_array_bytes = self.binary_data.get("suffix_array")
+
+        ffuzzy_index: Any = None
+        if ffuzzy_bytes:
+            ffuzzy_index = ffuzzy.Index.from_bytes(ffuzzy_bytes)
+
+        suffix_array = pickle.loads(suffix_array_bytes) if suffix_array_bytes else None
+        return ffuzzy_index, None, suffix_array
+
+    # ── Write path ───────────────────────────────────────────────
+
     @classmethod
     def create(cls, corpus: Corpus) -> FuzzyIndex:
-        """Build fuzzy index structures from corpus.
+        """Build a new ffuzzy index + suffix array from a corpus.
 
-        Builds BK-tree, phonetic index, and suffix array, then
-        serializes them to bytes for storage.
+        Builds the full SymSpell ``k=2`` hybrid. The resulting binary
+        payload (potentially hundreds of MB) is opaque to the model —
+        :meth:`save` hands it to the version manager which routes it
+        through GridFS without ever touching JSON.
         """
-        from ..phonetic.index import PhoneticIndex
-        from .bk_tree import BKTree
         from .suffix_array import SuffixArray
 
         if not corpus.corpus_uuid:
@@ -134,23 +167,17 @@ class FuzzyIndex(BaseModel):
         start_time = time.perf_counter()
         vocab = corpus.vocabulary
 
-        # Build and serialize BK-tree
-        bk_tree = BKTree.build(vocab)
-        bk_tree_bytes = pickle.dumps(bk_tree) if bk_tree else None
+        rust_index = ffuzzy.Index.build(vocab)
+        ffuzzy_bytes = rust_index.to_bytes()
 
-        # Build and serialize phonetic index
-        phonetic_index = PhoneticIndex(vocab)
-        phonetic_index_bytes = pickle.dumps(phonetic_index)
-
-        # Build and serialize suffix array
+        # Build and pickle the suffix array (Python).
         suffix_array = SuffixArray(vocab)
         suffix_array_bytes = pickle.dumps(suffix_array)
 
         build_time = time.perf_counter() - start_time
         logger.info(
-            f"Built FuzzyIndex for '{corpus.corpus_name}': "
-            f"BK={len(bk_tree_bytes) // 1024 if bk_tree_bytes else 0}KB, "
-            f"phonetic={len(phonetic_index_bytes) // 1024}KB, "
+            f"Built FuzzyIndex (ffuzzy) for '{corpus.corpus_name}': "
+            f"ffuzzy={len(ffuzzy_bytes) // 1024}KB, "
             f"suffix={len(suffix_array_bytes) // 1024}KB, "
             f"time={build_time:.1f}s"
         )
@@ -159,27 +186,15 @@ class FuzzyIndex(BaseModel):
             corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
             vocabulary_hash=corpus.vocabulary_hash,
-            bk_tree_bytes=bk_tree_bytes,
-            phonetic_index_bytes=phonetic_index_bytes,
-            suffix_array_bytes=suffix_array_bytes,
             vocabulary_size=len(vocab),
             build_time_seconds=build_time,
+            ffuzzy_size_bytes=len(ffuzzy_bytes),
+            suffix_array_size_bytes=len(suffix_array_bytes),
+            binary_data={
+                "ffuzzy": ffuzzy_bytes,
+                "suffix_array": suffix_array_bytes,
+            },
         )
-
-    def deserialize(
-        self,
-    ) -> tuple[Any | None, Any | None, Any | None]:
-        """Deserialize stored structures back to runtime objects.
-
-        Returns:
-            Tuple of (BKTree | None, PhoneticIndex | None, SuffixArray | None)
-        """
-        bk_tree = pickle.loads(self.bk_tree_bytes) if self.bk_tree_bytes else None
-        phonetic_index = (
-            pickle.loads(self.phonetic_index_bytes) if self.phonetic_index_bytes else None
-        )
-        suffix_array = pickle.loads(self.suffix_array_bytes) if self.suffix_array_bytes else None
-        return bk_tree, phonetic_index, suffix_array
 
     @classmethod
     async def get_or_create(
@@ -189,14 +204,26 @@ class FuzzyIndex(BaseModel):
     ) -> FuzzyIndex:
         """Get cached fuzzy index or build a new one.
 
-        Uses vocabulary_hash for cache invalidation — if the hash matches,
-        the cached structures are still valid.
+        A cached entry is reused only when its ``vocabulary_hash``
+        matches and its ``binary_data`` contains the ``ffuzzy`` blob.
+        Stale cache entries from earlier schemas (no binary, missing
+        ``ffuzzy`` key) trigger a rebuild.
         """
         if corpus.corpus_uuid:
             existing = await cls.get(corpus.corpus_uuid, config)
-            if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
+            if (
+                existing
+                and existing.vocabulary_hash == corpus.vocabulary_hash
+                and existing.binary_data is not None
+                and existing.binary_data.get("ffuzzy")
+            ):
                 logger.debug(f"Using cached fuzzy index for '{corpus.corpus_name}'")
                 return existing
+            if existing:
+                logger.info(
+                    f"Cached FuzzyIndex for '{corpus.corpus_name}' is stale "
+                    f"or missing ffuzzy payload; rebuilding."
+                )
 
         logger.info(f"Building new fuzzy index for '{corpus.corpus_name}'")
         index = cls.create(corpus)
@@ -204,22 +231,39 @@ class FuzzyIndex(BaseModel):
         return index
 
     async def save(self, config: VersionConfig | None = None) -> None:
-        """Save fuzzy index to versioned storage."""
+        """Save the fuzzy index via the version manager.
+
+        The metadata document is small. The opaque binary blob
+        (ffuzzy bytes + pickled suffix array) is handed to the manager
+        through the ``binary_payload`` hook, which pickles it into
+        GridFS and warms the L1/L2 cache in one shot.
+        """
         manager = get_version_manager()
         resource_id = f"{self.corpus_uuid}:fuzzy"
+
+        # binary_data is excluded from model_dump, so the metadata dict
+        # stays small even when self.binary_data holds hundreds of MB.
+        content = self.model_dump(exclude_none=True)
+
+        if not self.binary_data:
+            logger.warning(f"FuzzyIndex.save: no binary_data for {resource_id}")
 
         await manager.save(
             resource_id=resource_id,
             resource_type=ResourceType.SEARCH,
             namespace=manager._get_namespace(ResourceType.SEARCH),
-            content=self.model_dump(mode="json"),
+            content=content,
             config=config or VersionConfig(),
             metadata={
                 "corpus_uuid": self.corpus_uuid,
+                "vocabulary_hash": self.vocabulary_hash,
             },
+            binary_payload=self.binary_data,
         )
 
-        logger.info(f"Saved fuzzy index for {resource_id}")
+        if self.binary_data:
+            binary_mb = sum(len(v) for v in self.binary_data.values()) / (1024 * 1024)
+            logger.info(f"Saved fuzzy index for {resource_id} (binary={binary_mb:.1f}MB)")
 
     async def delete(self) -> None:
         """Delete fuzzy index from versioned storage."""

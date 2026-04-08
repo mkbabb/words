@@ -9,7 +9,7 @@ from ....core.search_pipeline import get_search_engine_manager
 from ....corpus.manager import get_tree_corpus_manager
 from ....models.parameters import SearchParams
 from ....models.responses import SearchResponse
-from ....search.constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
+from ....search.constants import DEFAULT_MIN_SCORE, SearchError, SearchMethod, SearchMode
 from ....search.engine import Search
 from ....search.index import SearchIndex
 from ....utils.logging import get_logger
@@ -256,6 +256,11 @@ async def search_words_query(
 
     except HTTPException:
         raise
+    except (ValueError, SearchError) as e:
+        if "initializing" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e))
+        logger.error(f"Search failed for '{q}': {e}")
+        raise HTTPException(status_code=500, detail="Internal error during search")
     except Exception as e:
         logger.error(f"Search failed for '{q}': {e}")
         raise HTTPException(status_code=500, detail="Internal error during search")
@@ -283,6 +288,11 @@ async def search_words_path(
 
     except HTTPException:
         raise
+    except (ValueError, SearchError) as e:
+        if "initializing" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e))
+        logger.error(f"Search failed for '{query}': {e}")
+        raise HTTPException(status_code=500, detail="Internal error during search")
     except Exception as e:
         logger.error(f"Search failed for '{query}': {e}")
         raise HTTPException(status_code=500, detail="Internal error during search")

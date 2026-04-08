@@ -13,7 +13,7 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   │   ├── api/                # REST API: routers, repositories, middleware
 │   │   ├── core/               # Pipelines: lookup, search, WOTD, SSE streaming
 │   │   ├── models/             # Pydantic/Beanie models
-│   │   ├── search/             # Multi-method: exact, prefix, substring, fuzzy (BK-tree + phonetic + trigram), semantic (FAISS)
+│   │   ├── search/             # Multi-method: exact, prefix, substring, fuzzy (ffuzzy Rust crate), semantic (FAISS)
 │   │   ├── ai/                 # OpenAI/Anthropic: 3-tier model selection
 │   │   ├── caching/            # L1 memory → L2 disk → L3 versioned MongoDB
 │   │   ├── corpus/             # UUID-based tree hierarchy, parsers
@@ -92,7 +92,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 
 **Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV
 **AI/ML**: OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, local models (ollama/vLLM), sentence-transformers (Qwen3-0.6B), FAISS, WordNet, wordfreq, sklearn clustering
-**Search**: marisa-trie (exact), BK-tree + phonetic + trigram (fuzzy), suffix array (substring), FAISS HNSW (semantic), Bloom filter
+**Search**: marisa-trie (exact), [ffuzzy](https://github.com/mkbabb/ffuzzy) Rust crate for fuzzy + phonetic (SymSpell + bounded BK-tree + 3.5-gram + Double Metaphone), suffix array (substring), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
 **Frontend**: Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk
 **TTS**: KittenTTS (English), Kokoro-ONNX (8 languages)
@@ -104,7 +104,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 Search → Cache check → Provider fetch (asyncio.gather) → AI synthesis → Store
 
 **Search** ([`search/engine.py`](backend/src/floridify/search/engine.py)):
-Exact (marisa-trie) → Prefix → Substring (suffix array) → Fuzzy (BK-tree + phonetic + trigram) → Semantic (FAISS HNSW)—cascade with early termination. See [docs/search.md](docs/search.md).
+Exact (marisa-trie) → Prefix → Substring (suffix array) → Fuzzy (ffuzzy: SymSpell + BK-tree + 3.5-gram + phonetic) → Semantic (FAISS HNSW), cascade with early termination. Fuzzy stage is a Rust crate loaded via PyO3. See [docs/search.md](docs/search.md).
 
 **AI Synthesis** ([`ai/synthesizer.py`](backend/src/floridify/ai/synthesizer.py)):
 Local 3-tier dedup (exact→fuzzy→semantic) → Local pre-clustering (agglomerative + silhouette gating) → AI clustering refinement (if needed) → Definition synthesis → Parallel enhance (local-first: CEFR/freq/register/domain via WordNet+wordfreq; hybrid: synonyms/antonyms via WordNet→AI delta; AI-only: examples/etymology/facts) → Post-process → Versioned save. Supports OpenAI, Anthropic, and local models (ollama/vLLM). See [docs/synthesis.md](docs/synthesis.md).

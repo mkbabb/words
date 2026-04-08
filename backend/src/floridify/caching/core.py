@@ -565,9 +565,9 @@ async def get_versioned_content(
 
             raw = await gridfs_get(location.path)
             if raw is not None:
-                # Use the compression type recorded at write time
-                # force_external writes use pickle only (no compression);
-                # normal large content uses ZSTD
+                # Use the compression type recorded at write time.
+                # binary_payload path (pickle-only) has no compression;
+                # normal large content uses ZSTD.
                 compression = location.compression
                 if isinstance(compression, str):
                     compression = CompressionType(compression)
@@ -593,12 +593,21 @@ async def set_versioned_content(
     versioned_data: BaseVersionedData,
     content: Any,
     *,
-    force_external: bool = False,
+    binary_payload: dict[str, bytes] | None = None,
 ) -> None:
     """Store versioned content using inline or GridFS-backed external storage.
 
-    Small content (<16KB) is stored inline in MongoDB. Large content is uploaded
-    to GridFS (durable, no TTL) with L1/L2 cache warmed for fast reads.
+    Three storage paths:
+
+    1. ``binary_payload`` provided  → pickle ``{**content, "binary_data": binary_payload}``
+       and upload to GridFS in a single shot. Used by models with opaque binary
+       blobs (FAISS indices, ffuzzy bytes) so the JSON path never sees them.
+    2. Small content (<16KB)       → store inline in the MongoDB document.
+    3. Large content (>=16KB)      → ZSTD compress and upload to GridFS.
+
+    For paths (1) and (3) the L1/L2 cache is warmed with the *full* content
+    dict (binary included for path 1) so subsequent reads in the same process
+    skip the GridFS round trip.
     """
     # Lazy: heavyweight module
     import pickle
@@ -606,9 +615,25 @@ async def set_versioned_content(
     # Lazy: heavyweight module
     from .gridfs import gridfs_put
 
-    # CRITICAL FIX: Skip expensive JSON encoding when force_external=True
-    # This prevents hanging on large binary data (e.g., 1290MB embeddings)
-    if force_external:
+    # ── Path 1: explicit binary payload ─────────────────────────────────
+    # Pickle metadata + binary together. Skip JSON entirely so multi-GB
+    # blobs never hit pydantic's encoder.
+    if binary_payload is not None:
+        if not isinstance(content, dict):
+            raise TypeError("binary_payload requires content to be a dict (the metadata document)")
+
+        # Compose the full payload that gets persisted *and* cached.
+        # The "binary_data" key is the contract with consumers like
+        # SemanticIndex / FuzzyIndex — they pop it on read.
+        full_content: dict[str, Any] = {**content, "binary_data": binary_payload}
+
+        binary_size, binary_checksum = estimate_binary_size(full_content)
+        max_binary_size = 8 * 1024 * 1024 * 1024  # 8GB ceiling
+        if binary_size > max_binary_size:
+            raise ValueError(
+                f"Binary payload too large ({binary_size / (1024**3):.1f}GB); 8GB limit"
+            )
+
         cache_key = generate_resource_key(
             versioned_data.resource_type,
             versioned_data.resource_id,
@@ -620,13 +645,13 @@ async def set_versioned_content(
         if isinstance(namespace, str):
             namespace = CacheNamespace(namespace)
 
-        # Upload to GridFS — pickle the content directly (no ZSTD for force_external
-        # since SEMANTIC data is already gzip'd internally)
-        pickled = pickle.dumps(content, protocol=pickle.HIGHEST_PROTOCOL)
-
         resource_type = versioned_data.resource_type
         if isinstance(resource_type, str):
             resource_type = ResourceType(resource_type)
+
+        # Pickle directly — caller is responsible for any internal compression
+        # (e.g. SemanticIndex serializes embeddings with FAISS native I/O).
+        pickled = pickle.dumps(full_content, protocol=pickle.HIGHEST_PROTOCOL)
 
         file_id = await gridfs_put(
             filename=f"{resource_type.value}:{versioned_data.resource_id}",
@@ -635,32 +660,33 @@ async def set_versioned_content(
                 "resource_type": resource_type.value,
                 "resource_id": versioned_data.resource_id,
                 "data_hash": versioned_data.version_info.data_hash[:8],
+                "version": versioned_data.version_info.version,
             },
         )
 
-        # Warm L1/L2 cache for immediate reads
+        # Warm L1/L2 cache for immediate reads. Storing the full content
+        # (with binary_data) so the next get_versioned_content() returns
+        # immediately without re-fetching from GridFS.
         cache = await get_global_cache()
         await cache.set(
             namespace=namespace,
             key=cache_key,
-            value=content,
+            value=full_content,
             ttl_override=versioned_data.ttl,
         )
-
-        content_size, checksum = estimate_binary_size(content)
 
         versioned_data.content_location = ContentLocation(
             cache_namespace=versioned_data.namespace,
             cache_key=cache_key,
             storage_type=StorageType.DATABASE,
             path=file_id,
-            size_bytes=content_size,
-            checksum=checksum,
+            size_bytes=binary_size,
+            checksum=binary_checksum,
         )
         versioned_data.content_inline = None
         return
 
-    # Normal path: serialize once and decide storage strategy
+    # ── Path 2 / 3: normal serialize-and-decide flow ───────────────────
     serialized = serialize_content(content)
 
     inline_threshold = INLINE_CONTENT_THRESHOLD_BYTES

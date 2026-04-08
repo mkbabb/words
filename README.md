@@ -38,7 +38,7 @@ floridify lookup perspicacious
 
 **[AI Synthesis](docs/synthesis.md)**: 5-stage pipeline—dedup, cluster, synthesize, enhance, version—through a 3-tier GPT-5 routing (5.4/Mini/Nano) that produces one coherent entry from all provider data. Definitions get synonyms, examples, CEFR levels, collocations, and more via parallel enhancement.
 
-**[Search Cascade](docs/search.md)**: Five methods cascading with early termination—exact via marisa-trie, prefix, substring via suffix array, fuzzy via BK-tree + phonetic + trigram, semantic via FAISS HNSW with Qwen3-0.6B embeddings. Quality gate before semantic fallback.
+**[Search Cascade](docs/search.md)**: Five methods cascading with early termination, exact via marisa-trie, prefix, substring via suffix array, fuzzy via the [`ffuzzy`](https://github.com/mkbabb/ffuzzy) Rust crate (SymSpell + bounded BK-tree + 3.5-gram trigram + silent-consonant Double Metaphone, loaded via PyO3), semantic via FAISS HNSW with Qwen3-0.6B embeddings. Quality gate before semantic fallback.
 
 **[Versioning & Caching](docs/versioning.md)**: Content-addressable versioning (SHA-256) with 3-tier cache—in-memory LRU, DiskCache+ZSTD, MongoDB with delta compression. TimeMachine UI shows inline diffs between versions.
 
@@ -99,7 +99,7 @@ GET  /api/v1/wordlist/{id}/due          # due words for review
 |-------|-------------|
 | Backend | FastAPI, Pydantic v2, Beanie ODM, MongoDB, Motor (async), UV |
 | AI | OpenAI GPT-5 (3-tier: 5.4/Mini/Nano), Anthropic Claude, sentence-transformers (Qwen3-0.6B), FAISS |
-| Search | marisa-trie, BK-tree + phonetic + trigram, suffix array, FAISS HNSW, Bloom filter |
+| Search | marisa-trie, [ffuzzy](https://github.com/mkbabb/ffuzzy) Rust crate (SymSpell + BK-tree + 3.5-gram + Double Metaphone), suffix array, FAISS HNSW, Bloom filter |
 | Cache | OrderedDict LRU, DiskCache + ZSTD, MongoDB versioned (SHA-256) |
 | Frontend | Vue 3.5, TypeScript 5.9, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4, Vite, Clerk |
 | TTS | KittenTTS (English), Kokoro-ONNX (8 languages) |

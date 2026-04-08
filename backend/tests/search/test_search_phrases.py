@@ -8,17 +8,16 @@ mixed-language phrase coverage.
 
 from __future__ import annotations
 
+import ffuzzy
 import pytest
 
 from floridify.audit import build_corpus_fixture
 from floridify.audit.fixtures import CORPUS_SIZES
 from floridify.search.constants import DEFAULT_MIN_SCORE, SearchMode
 from floridify.search.engine import Search
-from floridify.search.fuzzy.bk_tree import BKTree
 from floridify.search.fuzzy.search import FuzzySearch
 from floridify.search.fuzzy.suffix_array import SuffixArray
 from floridify.search.index import SearchIndex
-from floridify.search.phonetic.index import PhoneticIndex
 from floridify.search.trie.index import TrieIndex
 from floridify.search.trie.search import TrieSearch
 
@@ -46,7 +45,7 @@ async def _build_phrase_engine(name: str, size: int) -> Search:
     """Build an in-memory search engine with phrase vocabulary included.
 
     Merges PHRASE_VOCABULARY into the generated corpus, then builds all search
-    components (trie, BK-tree, phonetic, suffix array) in-memory without DB.
+    components (trie, ffuzzy hybrid, suffix array) in-memory without DB.
     """
     corpus = await build_corpus_fixture(name, size)
     # Merge phrases into vocabulary (in-memory, no DB)
@@ -66,8 +65,7 @@ async def _build_phrase_engine(name: str, size: int) -> Search:
     engine = Search(index=index, corpus=corpus)
     engine.trie_search = TrieSearch(index=trie_index)
     engine.fuzzy_search = FuzzySearch(min_score=DEFAULT_MIN_SCORE)
-    engine.fuzzy_search.bk_tree = BKTree.build(merged)
-    engine.fuzzy_search.phonetic_index = PhoneticIndex(merged)
+    engine.fuzzy_search.load(ffuzzy.Index.build(merged))
     engine.suffix_array = SuffixArray(merged)
     engine._initialized = True
     engine._semantic_ready = False
@@ -101,21 +99,19 @@ async def test_fuzzy_finds_phrase_edit_distance_1(size_name: str) -> None:
 @pytest.mark.search
 @pytest.mark.asyncio
 async def test_per_word_bk_tree_surfaces_phrase_candidates() -> None:
-    """Per-word BK-tree search should surface phrase candidates even when
-    full-phrase BK-tree is skipped (corpus >100K, simulated via medium corpus)."""
+    """Multi-word phrase fuzzy search should surface 'en coulisse' for the
+    plural query 'en coulisses' at medium corpus size — verifies that the
+    ffuzzy hybrid handles per-word candidate generation correctly without
+    the legacy 20-char cap.
+    """
     engine = await _build_phrase_engine("phrase-perword-bk", CORPUS_SIZES["medium"])
 
-    # Collect candidates directly to verify BK-tree per-word path
-    candidates = engine.fuzzy_search._collect_candidates(
-        "en coulisses", engine.corpus, 200
-    )
+    results = engine.search_fuzzy("en coulisses", max_results=20, min_score=0.5)
+    words = [r.word for r in results]
 
-    # Resolve candidate indices to words
-    candidate_words = engine.corpus.get_words_by_indices(list(candidates.keys()))
-
-    assert "en coulisse" in candidate_words, (
-        f"Per-word decomposition should surface 'en coulisse' as a candidate, "
-        f"got {len(candidate_words)} candidates: {candidate_words[:10]}"
+    assert "en coulisse" in words, (
+        f"ffuzzy fuzzy search should surface 'en coulisse' for 'en coulisses', "
+        f"got top {len(words)} candidates: {words[:10]}"
     )
 
 

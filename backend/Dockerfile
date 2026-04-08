@@ -34,16 +34,30 @@ COPY --from=uv-installer /bin/uv /bin/uv
 # - build-essential: C/C++ compiler for native extensions
 # - pkg-config: required by PyICU's setup.py to find ICU
 # - libicu-dev: ICU headers + libraries for PyICU compilation
+# - curl + ca-certificates + Rust toolchain: for building the ffuzzy wheel
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libicu-dev \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+       | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy the ffuzzy source via the `ffuzzy` additional build context. The
+# pyproject.toml `tool.uv.sources` entry references the path
+# `.ffuzzy/crates/ffuzzy-py` (relative to /app/pyproject.toml). uv
+# refuses path sources that escape the workspace root, so we vendor the
+# crate inside /app under the same name as the local symlink.
+COPY --from=ffuzzy . /app/.ffuzzy
 
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies only (CPU-only PyTorch — no NVIDIA/CUDA packages)
+# Install dependencies only (CPU-only PyTorch — no NVIDIA/CUDA packages).
+# uv sync will build the ffuzzy wheel via maturin from the path source.
 RUN --mount=type=cache,target=/opt/uv-cache \
     UV_TORCH_BACKEND=cpu uv sync --frozen --no-install-project --no-dev
 
@@ -62,10 +76,19 @@ RUN --mount=type=cache,target=/opt/uv-cache \
 FROM base AS development
 WORKDIR /app
 
-# Install development dependencies
+# Install development dependencies + the build tools needed to (re)build
+# the ffuzzy Rust wheel when uv sync runs from a mounted volume.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    pkg-config \
+    libicu-dev \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+       | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY --from=uv-installer /bin/uv /bin/uv
 COPY --from=builder /app /app

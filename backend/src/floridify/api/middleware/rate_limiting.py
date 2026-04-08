@@ -217,8 +217,8 @@ def get_client_key(request: Request) -> str:
     """
     from .auth_state import AuthState
 
-    auth: AuthState = request.state.auth
-    if auth.user_id:
+    auth: AuthState | None = getattr(request.state, "auth", None)
+    if auth and auth.user_id:
         return f"user:{auth.user_id}"
 
     # IP-based identification

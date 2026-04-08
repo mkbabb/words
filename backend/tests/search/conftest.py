@@ -489,6 +489,17 @@ SMART_QUERIES = [
 
 SEMANTIC_QUERIES = ["fruit", "animal", "emotion", "technology", "nature"]
 
+# Pathological queries that stress the cascade at 278K scale.
+# Each is a (query, max_allowed_ms) tuple.
+PATHOLOGICAL_QUERIES = [
+    ("zyx", 100),           # Short nonsense, no prefix/exact — BK-tree stress
+    ("qzw", 100),           # Same category
+    ("perspicaciousness", 20),  # >15 chars — fuzzy must be skipped
+    ("antidisestablishment", 20),  # Same
+    ("a", 20),              # 1-char exact match — must not cascade
+    ("the", 20),            # Common exact match
+]
+
 VOCAB_DIACRITICS = [
     # Diacritics
     "café",
@@ -576,11 +587,12 @@ async def _make_engine(corpus: Corpus) -> Search:
 
     Avoids TrieIndex.get_or_create() which hits MongoDB -- important for
     session-scoped fixtures that must not depend on Beanie global state.
+    Uses the ffuzzy Rust crate for the fuzzy pipeline.
     """
-    from floridify.search.fuzzy.bk_tree import BKTree
+    import ffuzzy
+
     from floridify.search.fuzzy.search import FuzzySearch
     from floridify.search.fuzzy.suffix_array import SuffixArray
-    from floridify.search.phonetic.index import PhoneticIndex
     from floridify.search.trie.index import TrieIndex
     from floridify.search.trie.search import TrieSearch
 
@@ -599,11 +611,10 @@ async def _make_engine(corpus: Corpus) -> Search:
     trie_index = await TrieIndex.create(corpus)
     engine.trie_search = TrieSearch(index=trie_index)
 
-    # Build fuzzy search with BK-tree and phonetic index
+    # Build ffuzzy hybrid index (BK-tree + SymSpell + trigram + phonetic).
     engine.fuzzy_search = FuzzySearch(min_score=engine.index.min_score)
-
-    engine.fuzzy_search.bk_tree = BKTree.build(corpus.vocabulary)
-    engine.fuzzy_search.phonetic_index = PhoneticIndex(corpus.vocabulary)
+    rust_index = ffuzzy.Index.build(corpus.vocabulary)
+    engine.fuzzy_search.load(rust_index)
     engine.suffix_array = SuffixArray(corpus.vocabulary)
 
     engine._initialized = True

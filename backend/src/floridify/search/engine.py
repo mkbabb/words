@@ -10,6 +10,8 @@ import itertools
 from difflib import SequenceMatcher
 from typing import Any
 
+import ffuzzy
+
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..corpus.manager import get_tree_corpus_manager
@@ -17,6 +19,7 @@ from ..text import normalize
 from ..utils.logging import get_logger
 from .cache import get_cached_search, put_cached_search
 from .config import (
+    BKTREE_MAX_QUERY_LENGTH,
     HIGH_QUALITY_FUZZY_SCORE,
     LEXICAL_GATE_SCORE_MARGIN,
     LEXICAL_SANITY_THRESHOLD,
@@ -28,12 +31,10 @@ from .config import (
     SEMANTIC_SMALL_CORPUS_WORD_FLOOR,
 )
 from .constants import DEFAULT_MIN_SCORE, SearchError, SearchMethod, SearchMode
-from .fuzzy.bk_tree import BKTree
 from .fuzzy.index import FuzzyIndex
-from .fuzzy.search import FuzzySearch  # Multi-strategy fuzzy pipeline
+from .fuzzy.search import FuzzySearch  # Thin wrapper around ffuzzy Rust crate
 from .fuzzy.suffix_array import SuffixArray
 from .index import SearchIndex
-from .phonetic.index import PhoneticIndex
 from .result import SearchResult
 from .scoring import (
     deduplicate_results,
@@ -258,19 +259,20 @@ class Search:
                     self.index.trie_index_id = trie_index_id
                     index_linkage_changed = True
 
-            logger.debug("Initializing Fuzzy search (multi-strategy)")
+            logger.debug("Initializing Fuzzy search (ffuzzy hybrid)")
             self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
 
-            # Load or build fuzzy structures (BK-tree, phonetic, suffix array)
-            # Uses versioned storage with vocabulary_hash for cache invalidation.
+            # Load or build the ffuzzy blob + suffix array. The ffuzzy
+            # index contains BK-tree, SymSpell, trigram, phonetic; the
+            # suffix array stays separate because it's for substring search.
             try:
                 fuzzy_index = await FuzzyIndex.get_or_create(
                     self.corpus,
                     config=VersionConfig(),
                 )
-                bk_tree, phonetic_index, suffix_array = fuzzy_index.deserialize()
-                self.fuzzy_search.bk_tree = bk_tree
-                self.fuzzy_search.phonetic_index = phonetic_index
+                ffuzzy_obj, _legacy_phonetic, suffix_array = fuzzy_index.deserialize()
+                if ffuzzy_obj is not None:
+                    self.fuzzy_search.load(ffuzzy_obj)
                 self.suffix_array = suffix_array
 
                 # Persist linkage in SearchIndex
@@ -280,15 +282,14 @@ class Search:
 
                 logger.debug(
                     f"Loaded fuzzy structures from cache "
-                    f"(BK={'yes' if bk_tree else 'no'}, "
-                    f"phonetic={'yes' if phonetic_index else 'no'}, "
+                    f"(ffuzzy={'yes' if ffuzzy_obj else 'no'}, "
                     f"suffix={'yes' if suffix_array else 'no'})"
                 )
             except Exception as e:
                 # Fallback: build in-memory without persistence (e.g., no DB connection)
                 logger.warning(f"FuzzyIndex cache unavailable, building in-memory: {e}")
-                self.fuzzy_search.bk_tree = BKTree.build(combined_vocab)
-                self.fuzzy_search.phonetic_index = PhoneticIndex(combined_vocab)
+                rust_index = ffuzzy.Index.build(combined_vocab)
+                self.fuzzy_search.load(rust_index)
                 self.suffix_array = SuffixArray(combined_vocab)
 
         # Initialize semantic search if enabled
@@ -481,21 +482,21 @@ class Search:
         if self.trie_search:
             self.trie_search = await TrieSearch.from_corpus(updated_corpus)
 
-        # Rebuild fuzzy structures (BK-tree, phonetic, suffix array)
+        # Rebuild ffuzzy blob + suffix array
         if self.fuzzy_search:
             try:
                 fuzzy_index = await FuzzyIndex.get_or_create(
                     updated_corpus,
                     config=VersionConfig(force_rebuild=True),
                 )
-                bk_tree, phonetic_index, suffix_array = fuzzy_index.deserialize()
-                self.fuzzy_search.bk_tree = bk_tree
-                self.fuzzy_search.phonetic_index = phonetic_index
+                ffuzzy_obj, _legacy_phonetic, suffix_array = fuzzy_index.deserialize()
+                if ffuzzy_obj is not None:
+                    self.fuzzy_search.load(ffuzzy_obj)
                 self.suffix_array = suffix_array
             except Exception as e:
                 logger.warning(f"FuzzyIndex rebuild failed, building in-memory: {e}")
-                self.fuzzy_search.bk_tree = BKTree.build(updated_corpus.vocabulary)
-                self.fuzzy_search.phonetic_index = PhoneticIndex(updated_corpus.vocabulary)
+                rust_index = ffuzzy.Index.build(updated_corpus.vocabulary)
+                self.fuzzy_search.load(rust_index)
                 self.suffix_array = SuffixArray(updated_corpus.vocabulary)
 
         # Update semantic search if enabled and hash changed
@@ -604,10 +605,17 @@ class Search:
                     result.word = self._get_original_word(result.word)
                 return results[:max_results]
             elif method == SearchMethod.SEMANTIC:
-                # If semantic was explicitly requested but still initializing, await it
+                # If semantic was explicitly requested but still initializing,
+                # wait briefly — don't block indefinitely.
                 if not self.semantic_search and self._semantic_init_task:
                     try:
-                        await self._semantic_init_task
+                        await asyncio.wait_for(
+                            asyncio.shield(self._semantic_init_task), timeout=5.0
+                        )
+                    except asyncio.TimeoutError:
+                        raise SearchError(
+                            "Semantic search is still initializing. Try again shortly."
+                        )
                     except Exception as e:
                         raise SearchError(f"Semantic search initialization failed: {e}") from e
                 if not self.semantic_search:
@@ -676,12 +684,20 @@ class Search:
         elif mode == SearchMode.FUZZY:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
-            # Wait for semantic search to be ready if it's being initialized
-            # CRITICAL FIX: Use await_semantic_ready for proper synchronization
-            await self.await_semantic_ready()
+            # Wait briefly for semantic init — don't block indefinitely
+            try:
+                await asyncio.wait_for(self.await_semantic_ready(), timeout=5.0)
+            except asyncio.TimeoutError:
+                raise ValueError(
+                    "Semantic search is still initializing. Try again shortly."
+                )
 
             if not self.semantic_search:
-                raise ValueError("Semantic search is not enabled for this SearchEngine instance")
+                if self._semantic_init_task and not self._semantic_init_task.done():
+                    raise ValueError(
+                        "Semantic search is still initializing. Try again shortly."
+                    )
+                raise ValueError("Semantic search is not available")
 
             results = await self.search_semantic(normalized_query, max_results, min_score)
         else:
@@ -1011,7 +1027,17 @@ class Search:
         words that START WITH their query, not just an exact match.
 
         Order: exact → prefix → substring → fuzzy → semantic.
+        Time-budgeted: cascade aborts after CASCADE_TIME_BUDGET_MS to ensure
+        sub-50ms response for typeahead.
         """
+        import time as _time
+
+        _cascade_start = _time.perf_counter()
+        CASCADE_TIME_BUDGET_MS = 50.0  # hard ceiling for typeahead responsiveness
+
+        def _budget_exceeded() -> bool:
+            return (_time.perf_counter() - _cascade_start) * 1000 > CASCADE_TIME_BUDGET_MS
+
         # 1. Exact search (fastest — marisa-trie O(m))
         exact_results = self.search_exact(query)
 
@@ -1051,13 +1077,25 @@ class Search:
                 reverse=True,
             )[:max_results]
 
+        # Early exit on exact match: when the query IS a known word, fuzzy/semantic
+        # are wasteful — they're for misspellings and discovery. Exact + prefix +
+        # substring are sufficient, and substring is cheap (suffix array).
+        has_exact = bool(exact_results)
+
         # 3. Substring search (for infix matches like "graph" → "paragraph")
         substring_results: list[SearchResult] = []
-        if len(query) >= 3:
+        if len(query) >= 3 and not _budget_exceeded():
             substring_results = self.search_substring(query, max_results=max_results)
 
-        # 4. Fuzzy search (most comprehensive for misspellings)
-        fuzzy_results = self.search_fuzzy(query, max_results, min_score)
+        # 4. Fuzzy search — skip only when:
+        #   - Exact match exists (no misspelling to correct)
+        #   - Cascade time budget is spent
+        # Note: long queries (>BKTREE_MAX_QUERY_LENGTH) still run fuzzy —
+        # the BK-tree is skipped internally by FuzzySearch, but trigram +
+        # phonetic strategies still fire. The cascade doesn't need to know
+        # about BK-tree routing; that's FuzzySearch's concern.
+        skip_fuzzy = has_exact or _budget_exceeded()
+        fuzzy_results = [] if skip_fuzzy else self.search_fuzzy(query, max_results, min_score)
 
         # 5. Semantic search — quality-based gating
         # Only supplement when exact/fuzzy/prefix provide some anchor results.
@@ -1067,7 +1105,7 @@ class Search:
         has_text_results = bool(
             exact_results or prefix_results or substring_results or fuzzy_results
         )
-        if semantic and self._semantic_ready and self.semantic_search:
+        if semantic and not has_exact and not _budget_exceeded() and self._semantic_ready and self.semantic_search:
             high_quality = [r for r in fuzzy_results if r.score >= HIGH_QUALITY_FUZZY_SCORE]
             semantic_limit = max(
                 0, max_results - len(high_quality) - len(prefix_results) - len(exact_results)

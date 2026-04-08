@@ -80,7 +80,7 @@ class TestBigramCandidateSelection:
     )
     async def test_typo_fuzzy_search_finds_target(self, typo_corpus, typo, expected):
         """Full fuzzy search finds the correct word for common misspellings."""
-        search = FuzzySearch(min_score=0.3)
+        search = FuzzySearch.for_corpus(typo_corpus, min_score=0.3)
         results = search.search(typo, corpus=typo_corpus, max_results=10)
         result_words = [r.word for r in results]
         assert expected in result_words[:5], (
@@ -122,9 +122,9 @@ class TestFuzzySearchCorrectness:
         return corpus
 
     @pytest.fixture
-    def strict_search(self):
-        """FuzzySearch with standard min_score."""
-        return FuzzySearch(min_score=0.3)
+    def strict_search(self, correctness_corpus):
+        """FuzzySearch with standard min_score, loaded from the test corpus."""
+        return FuzzySearch.for_corpus(correctness_corpus, min_score=0.3)
 
     @pytest.mark.asyncio
     async def test_false_positive_prevention(self, strict_search, correctness_corpus):

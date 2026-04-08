@@ -123,9 +123,8 @@ class SemanticSearch:
         # Create search with index
         search = cls(index=index, corpus=corpus)
 
-        # FIX: Check if embeddings actually exist (not just the fields)
-        # Require both num_embeddings > 0 AND actual data present
-        # binary_data is properly typed as dict[str, str] | None
+        # Check if embeddings actually exist (not just the fields).
+        # Require both num_embeddings > 0 AND binary_data populated.
         has_embeddings = index.num_embeddings > 0 and index.binary_data is not None
 
         if has_embeddings:
@@ -179,9 +178,8 @@ class SemanticSearch:
             )
             self.index.device = self._encoder.device
 
-        # FIX: Load from binary_data (external storage) instead of inline fields
-        # The embeddings and index_data fields are not populated when loading from cache
-        # binary_data is properly typed as dict[str, str] | None in SemanticIndex
+        # Load from binary_data (rehydrated from GridFS by the version manager).
+        # SemanticIndex.binary_data is dict[str, bytes] | None.
         binary_data = self.index.binary_data
 
         if not binary_data:

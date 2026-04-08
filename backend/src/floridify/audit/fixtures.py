@@ -6,17 +6,16 @@ import hashlib
 import types
 from typing import Any
 
+import ffuzzy
 import numpy as np
 
 from ..corpus.core import Corpus
 from ..models.base import Language
 from ..search.constants import DEFAULT_MIN_SCORE
 from ..search.engine import Search
-from ..search.fuzzy.bk_tree import BKTree
 from ..search.fuzzy.search import FuzzySearch
 from ..search.fuzzy.suffix_array import SuffixArray
 from ..search.index import SearchIndex
-from ..search.phonetic.index import PhoneticIndex
 from ..search.semantic.index import SemanticIndex
 from ..search.semantic.search import SemanticSearch
 from ..search.trie.index import TrieIndex
@@ -142,7 +141,11 @@ async def build_search_fixture(
     *,
     min_score: float = DEFAULT_MIN_SCORE,
 ) -> Search:
-    """Create an in-memory Search instance without touching persistence."""
+    """Create an in-memory Search instance without touching persistence.
+
+    Uses the ffuzzy Rust crate for the fuzzy pipeline (SymSpell + BK-tree
+    + 3.5-gram trigram + Metaphone + length correction + signal boost).
+    """
     corpus = await build_corpus_fixture(name, size)
     trie_index = await TrieIndex.create(corpus)
     search_index = await SearchIndex.create(corpus, min_score=min_score, semantic=False)
@@ -151,10 +154,10 @@ async def build_search_fixture(
     search = Search(index=search_index, corpus=corpus)
     search.trie_search = TrieSearch(index=trie_index)
 
-    # Build full fuzzy pipeline: BK-tree + phonetic index + suffix array
+    # Build the full hybrid ffuzzy index and attach via the thin wrapper.
     search.fuzzy_search = FuzzySearch(min_score=min_score)
-    search.fuzzy_search.bk_tree = BKTree.build(corpus.vocabulary)
-    search.fuzzy_search.phonetic_index = PhoneticIndex(corpus.vocabulary)
+    rust_index = ffuzzy.Index.build(corpus.vocabulary)
+    search.fuzzy_search.load(rust_index)
     search.suffix_array = SuffixArray(corpus.vocabulary)
 
     search._initialized = True

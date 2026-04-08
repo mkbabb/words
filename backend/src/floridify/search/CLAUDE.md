@@ -1,6 +1,6 @@
 # search/
 
-Multi-method search: exact (marisa-trie), prefix, substring (suffix array), fuzzy (BK-tree + phonetic + trigram), semantic (FAISS). Cascade with early termination.
+Multi-method search: exact (marisa-trie), prefix, substring (suffix array), fuzzy + phonetic (ffuzzy Rust crate), semantic (FAISS). Cascade with early termination.
 
 ## Structure
 
@@ -8,7 +8,7 @@ Multi-method search: exact (marisa-trie), prefix, substring (suffix array), fuzz
 search/
 ├── engine.py               # Search orchestrator, cascade logic
 ├── index.py                 # SearchIndex versioned model (links trie+fuzzy+semantic)
-├── config.py                # All tunable constants (thresholds, budgets, boosts)
+├── config.py                # Score thresholds, corpus tiers, Bloom filter params
 ├── constants.py             # SearchMethod, SearchMode, FuzzySearchMethod enums
 ├── result.py                # SearchResult, MatchDetail
 ├── language.py              # LanguageSearch (multi-corpus delegation)
@@ -18,18 +18,12 @@ search/
 │   ├── index.py             # TrieIndex (versioned, includes Bloom filter bytes)
 │   └── bloom.py             # BloomFilter (xxHash, probabilistic membership)
 │
-├── fuzzy/                   # Multi-strategy fuzzy matching
-│   ├── search.py            # FuzzySearch (candidate aggregation pipeline)
-│   ├── index.py             # FuzzyIndex (versioned, bundles BK+phonetic+suffix)
-│   ├── candidates.py        # Trigram inverted index + length buckets
-│   ├── bk_tree.py           # BKTree (Damerau-Levenshtein, adaptive k)
+├── fuzzy/                   # Fuzzy + phonetic via ffuzzy Rust crate
+│   ├── search.py            # FuzzySearch — thin wrapper around ffuzzy.Index
+│   ├── index.py             # FuzzyIndex — versioned, stores ffuzzy blob + pickled suffix array via GridFS
+│   ├── candidates.py        # Legacy trigram helpers used by the suffix array substring path
 │   ├── suffix_array.py      # SuffixArray (pydivsufsort, O(m log n) substring)
-│   └── scoring.py           # Length correction, frequency heuristics
-│
-├── phonetic/                # Multilingual phonetic matching
-│   ├── index.py             # PhoneticIndex (composite + per-word codes)
-│   ├── encoder.py           # PhoneticEncoder (ICU normalization + jellyfish Metaphone)
-│   └── constants.py         # ICU transliteration rules (CLDR-sourced)
+│   └── scoring.py           # Length correction for suffix array candidates
 │
 └── semantic/                # FAISS vector search
     ├── search.py            # SemanticSearch (from_corpus, query caching)
@@ -55,15 +49,13 @@ Exact → Prefix → Substring (if query >= 3 chars) → Fuzzy → if <33% high-
 
 Early termination: exact+prefix fill max_results. Quality gating: skip semantic if fuzzy suffices.
 
-## Fuzzy Pipeline
+## Fuzzy + Phonetic
 
-Multi-strategy candidate aggregation:
-1. **BK-tree**: Damerau-Levenshtein with adaptive k (2-5 based on query length), cascading expansion, time-budgeted
-2. **Phonetic**: ICU cross-linguistic normalization → jellyfish Metaphone, composite + per-word inverted index
-3. **Trigram overlap**: Structured numpy arrays with 8-bit positional + next-char masks ("3.5-gram" precision)
-4. **Per-word decomposition**: Multi-word queries search each word independently
+The entire fuzzy stage is the [`ffuzzy`](https://github.com/mkbabb/ffuzzy) Rust crate, loaded via PyO3 and driven through a ~30-line wrapper at `fuzzy/search.py`. `ffuzzy.Index` fuses five engines behind an adaptive router: SymSpell (k≤2), Levenshtein automaton + FST (scaffolded, search-path stubbed), bounded BK-tree (Damerau-Levenshtein), 3.5-gram trigram, and Double Metaphone with silent-consonant handling.
 
-Signal-based score boosting: phonetic match (1.08x), close edit distance (1.02x), multi-strategy (1.03x).
+Candidate generation, signal boosting, length correction, and SIMD DL verification all happen on the Rust side. Python just converts `ffuzzy.SearchHit` to `SearchResult`. Persistence: `FuzzyIndex` stores `ffuzzy.Index.to_bytes()` as an opaque binary blob in GridFS alongside a pickled `SuffixArray` (for substring search, unrelated to fuzzy).
+
+Details: see [`../../../../docs/search.md#fuzzy-search-the-ffuzzy-crate`](../../../../docs/search.md#fuzzy-search-the-ffuzzy-crate) or the `ffuzzy` repo docs directly.
 
 ## FAISS Index Selection
 
@@ -79,6 +71,6 @@ Signal-based score boosting: phonetic match (1.08x), close edit distance (1.02x)
 
 ## Configuration
 
-All tunable constants in `config.py`: score thresholds, corpus size tiers, candidate budgets, BK-tree time limits, signal boost factors, trigram parameters, Bloom filter error rates.
+Python-level constants in `config.py`: score thresholds, corpus size tiers, Bloom filter error rates. Fuzzy-specific tuning (BK-tree visit cap, trigram cap fractions, signal boosts, adaptive k) lives inside the `ffuzzy` Rust crate and is exposed via `ffuzzy.Index` constructor arguments.
 
 HNSW config via env vars: `FLORIDIFY_USE_HNSW`, `FLORIDIFY_HNSW_M` (default 32), `FLORIDIFY_HNSW_EF_CONSTRUCTION` (200), `FLORIDIFY_HNSW_EF_SEARCH` (64).

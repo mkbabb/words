@@ -43,6 +43,11 @@ logs/
 .env.*
 !.env.example
 
+# ffuzzy is mounted via the `ffuzzy` additional build context, not via the
+# local symlink (which would otherwise collide with the directory copied
+# in by the dependencies stage).
+.ffuzzy
+
 # Git
 .git/
 .gitignore

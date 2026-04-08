@@ -7,7 +7,6 @@ import asyncio
 import pytest
 
 from floridify.corpus.core import Corpus
-from floridify.search.fuzzy.bk_tree import BKTree
 from floridify.search.fuzzy.suffix_array import SuffixArray
 
 
@@ -22,11 +21,6 @@ def multilingual_vocab() -> list[str]:
         "apple", "application", "apply", "banana", "beautiful",
         "cat", "dog", "elephant", "philosophy", "government",
     ])
-
-
-@pytest.fixture(scope="module")
-def bk_tree(multilingual_vocab: list[str]) -> BKTree:
-    return BKTree.build(multilingual_vocab)
 
 
 @pytest.fixture(scope="module")

@@ -118,10 +118,16 @@ class SemanticEncoder:
         # INT8 quantization needs at least 100 embeddings for stable quantization ranges
         use_quantization = USE_QUANTIZATION and len(texts) >= 100
 
-        # CRITICAL: Multi-process encoding requires float32 precision
-        # Int8 quantization causes shared state issues across processes
+        # CRITICAL: Multiprocessing is disabled in Docker/containerized environments.
+        # Both fork (deadlocks from asyncio lock inheritance) and spawn
+        # (BrokenPipeError on large result arrays in pipes) fail reliably.
+        # Single-process encoding is slower but actually completes.
+        in_container = os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
         will_use_multiprocessing = (
-            use_multiprocessing and len(texts) > 5000 and self.device == "cpu"
+            use_multiprocessing
+            and not in_container
+            and len(texts) > 5000
+            and self.device == "cpu"
         )
         precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = (
             "float32"
@@ -164,15 +170,17 @@ class SemanticEncoder:
         except AttributeError:
             available_cpus = os.cpu_count() or 8
 
-        # On Linux (Docker), fork shares parent memory via COW — workers are cheap.
-        # On macOS, spawn copies the full model (~600MB each) — cap at 2 to avoid OOM.
-        # Scale with available CPUs but cap at 6 to avoid diminishing returns from
-        # GIL contention in the parent process during result aggregation.
-        is_fork = platform.system() != "Darwin"
-        if is_fork:
-            num_workers = min(available_cpus, 6)
-        else:
-            num_workers = min(available_cpus, 2)
+        # Spawn workers each load the model independently (~600MB each).
+        # Cap based on available memory to avoid OOM.
+        try:
+            import psutil
+            mem_gb = psutil.virtual_memory().total / (1024 ** 3)
+        except ImportError:
+            mem_gb = 16  # fallback assumption
+        # Each spawn worker needs ~1.5GB (model + batch tensors + overhead).
+        # Leave 4GB for parent process + OS + search engine structures.
+        mem_workers = max(1, int((mem_gb - 4) / 1.5))
+        num_workers = min(available_cpus, mem_workers, 4)
 
         logger.info(
             f"Encoding {len(texts)} texts with {num_workers} parallel processes "
@@ -191,13 +199,14 @@ class SemanticEncoder:
         # Create worker arguments
         worker_args = [(chunk, model_name, batch_size, i) for i, chunk in enumerate(chunks)]
 
-        # Use spawn on macOS (fork is unsafe with threads/CoreFoundation)
-        # Use fork on Linux (efficient copy-on-write memory sharing)
-        mp_method = "spawn" if platform.system() == "Darwin" else "fork"
-        ctx = mp.get_context(mp_method)
+        # Always use spawn: fork is unsafe when the parent has an active asyncio
+        # event loop with Motor/MongoDB connections — forked workers inherit
+        # held locks and futexes, causing deadlocks. Spawn is slower (each
+        # worker loads the model independently) but correct.
+        ctx = mp.get_context("spawn")
 
         logger.info(
-            f"Starting multiprocessing.Pool with {num_workers} workers ({mp_method} method)..."
+            f"Starting multiprocessing.Pool with {num_workers} workers (spawn method)..."
         )
         start_time = time.perf_counter()
 

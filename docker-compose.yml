@@ -8,6 +8,8 @@ services:
     build:
       context: ./backend
       target: ${BUILD_TARGET:-development}
+      additional_contexts:
+        ffuzzy: ../ffuzzy
     container_name: floridify-search
     restart: unless-stopped
     command: ["uvicorn", "floridify.search_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -22,26 +24,27 @@ services:
       MULTIPROCESSING_START_METHOD: "spawn"
       SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
       MONGODB_URL: ${MONGODB_URL:-mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE:-floridify}?authSource=admin}
-    depends_on:
-      mongo:
-        condition: service_healthy
+      # Redirect HuggingFace cache to a writable path inside /app/cache
+      HF_HOME: /app/cache/huggingface
+      TRANSFORMERS_CACHE: /app/cache/huggingface/hub
     networks:
       - app-network
     volumes:
       - ./backend/src:/app/src
       - ./auth:/app/auth:ro
+      - floridify_search_cache:/app/cache
 
   backend:
     build:
       context: ./backend
       target: ${BUILD_TARGET:-development}
+      additional_contexts:
+        ffuzzy: ../ffuzzy
     container_name: floridify-backend
     restart: unless-stopped
     depends_on:
       search:
         condition: service_started
-      mongo:
-        condition: service_healthy
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8003}:8000"
     environment:
@@ -75,7 +78,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: ${BUILD_TARGET:-development}
+      target: ${FRONTEND_BUILD_TARGET:-${BUILD_TARGET:-development}}
       additional_contexts:
         glass-ui: ../glass-ui
         latex-paper: ../latex-paper
@@ -179,5 +182,7 @@ networks:
 
 volumes:
   notification_logs:
+    driver: local
+  floridify_search_cache:
     driver: local
   floridify_mongo_data:

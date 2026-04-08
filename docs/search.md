@@ -10,12 +10,12 @@ The system processes corpora from hundreds of words to 300,000+, adapting its da
 - [Exact & Prefix Search: marisa-Trie](#exact--prefix-search-marisa-trie)
 - [Bloom Filter](#bloom-filter)
 - [Substring Search: Suffix Arrays](#substring-search-suffix-arrays)
-- [Fuzzy Search](#fuzzy-search)
-  - [BK-Tree](#bk-tree)
-  - [Trigram Index with Probabilistic Masks](#trigram-index-with-probabilistic-masks)
-  - [Length Buckets & Round-Robin Merging](#length-buckets--round-robin-merging)
-  - [RapidFuzz Scoring Pipeline](#rapidfuzz-scoring-pipeline)
-  - [Length Correction & Signal-Based Score Boosting](#length-correction--signal-based-score-boosting)
+- [Fuzzy Search: the `ffuzzy` crate](#fuzzy-search-the-ffuzzy-crate)
+  - [Adaptive k](#adaptive-k)
+  - [Damerau-Levenshtein, not plain Levenshtein](#damerau-levenshtein-not-plain-levenshtein)
+  - [BK-tree, bounded](#bk-tree-bounded)
+  - [The "3.5-gram" trigram index](#the-35-gram-trigram-index)
+  - [Signal-based score boosting](#signal-based-score-boosting)
 - [Phonetic Search](#phonetic-search)
 - [Semantic Search](#semantic-search)
 - [Cascade Orchestration & Scoring](#cascade-orchestration--scoring)
@@ -34,7 +34,7 @@ The cascade topology is sequential with early termination:
 Query → Normalize → Exact (marisa-trie)
                   → Prefix (marisa-trie)
                   → Substring (suffix array, if |query| >= 3)
-                  → Fuzzy (BK-tree + phonetic + trigram → RapidFuzz scoring)
+                  → Fuzzy (ffuzzy: SymSpell + BK-tree + 3.5-gram + phonetic)
                   → Semantic (FAISS, quality-gated)
                   → Deduplicate (METHOD_PRIORITY)
                   → Sort (score + METHOD_SORT_BONUS)
@@ -52,7 +52,7 @@ Four search modes control routing:
 | `FUZZY` | Only fuzzy pipeline |
 | `SEMANTIC` | Only semantic search (awaits initialization if still building) |
 
-**Component ownership.** The [`Search`](../backend/src/floridify/search/engine.py) orchestrator owns one instance each of [`TrieSearch`](../backend/src/floridify/search/trie/search.py), [`FuzzySearch`](../backend/src/floridify/search/fuzzy/search.py), [`SemanticSearch`](../backend/src/floridify/search/semantic/search.py), and [`SuffixArray`](../backend/src/floridify/search/fuzzy/suffix_array.py). It delegates to each in turn, aggregates their results, deduplicates, and returns a ranked list of [`SearchResult`](../backend/src/floridify/search/result.py) objects. Each result carries the matched word, a score in [0, 1], the search method that produced it, an optional lemmatized form, and language metadata.
+**Component ownership.** The [`Search`](../backend/src/floridify/search/engine.py) orchestrator owns one instance each of [`TrieSearch`](../backend/src/floridify/search/trie/search.py), [`FuzzySearch`](../backend/src/floridify/search/fuzzy/search.py) (a thin Python wrapper around an `ffuzzy.Index`), [`SemanticSearch`](../backend/src/floridify/search/semantic/search.py), and [`SuffixArray`](../backend/src/floridify/search/fuzzy/suffix_array.py). It delegates to each in turn, aggregates their results, deduplicates, and returns a ranked list of [`SearchResult`](../backend/src/floridify/search/result.py) objects. Each result carries the matched word, a score in [0, 1], the search method that produced it, an optional lemmatized form, and language metadata.
 
 **Normalization boundary.** Query normalization happens exactly once, at the `Search` entry point. The `normalize()` function (from `floridify.text`) performs lowercase conversion, diacritic stripping, contraction expansion, and Unicode normalization. Results are mapped back to original forms with diacritics via a pre-built `normalized_to_original` dictionary on the corpus. This ensures that searches for "cafe," "café," "CAFE," and "Café" all match the same entry, while the user sees "café" in the results.
 
@@ -151,188 +151,113 @@ When invoked from the cascade orchestrator (`search_substring()`), results recei
 
 A fallback path handles queries shorter than 3 characters (which can't form trigrams) by direct substring scan over the vocabulary.
 
-## Fuzzy Search
+## Fuzzy Search: the `ffuzzy` crate
 
-Fuzzy search handles the case where the user has misspelled a word, transposed characters, or used a phonetically plausible but orthographically incorrect variant. The implementation is a multi-strategy candidate aggregation pipeline: multiple independent strategies each propose candidate vocabulary indices, the candidates are merged into a unified pool, and RapidFuzz scores the pool to produce final results.
+Fuzzy search handles the case where the user has misspelled a word, transposed characters, or used a phonetically plausible but orthographically incorrect variant. The entire fuzzy stage is the [`ffuzzy`](https://github.com/mkbabb/ffuzzy) Rust crate, loaded from Python via PyO3 and driven from a thin wrapper at [`FuzzySearch`](../backend/src/floridify/search/fuzzy/search.py) that maps its `SearchHit` objects into Floridify's `SearchResult`.
 
-The [`FuzzySearch`](../backend/src/floridify/search/fuzzy/search.py) orchestrates four candidate sources:
+`ffuzzy` is a hybrid. No single fuzzy algorithm wins across all query shapes, so it fuses five engines behind an adaptive router:
 
-1. **BK-tree**: Edit distance within an adaptive radius
-2. **Phonetic index**: Sound-alike matching via ICU normalization + Metaphone
-3. **Trigram index**: Character n-gram overlap with probabilistic masks
-4. **Length buckets**: Words of similar length as a fallback
+1. **SymSpell** — precomputed delete variants for O(1) `k ≤ 2` lookup. The hot path for short typos.
+2. **Levenshtein automaton + FST** — scaffolded but currently a no-op stub, pending a maintained upstream Rust DFA crate. SymSpell covers the band in the meantime.
+3. **BK-tree (Damerau-Levenshtein)** — arena-allocated metric tree with bounded search (node-visit cap + wall-clock time budget + cascading k). Fallback for `k ≥ 3` and long queries.
+4. **3.5-gram trigram index** — padded trigrams with 8-bit positional mask plus a 3-bit next-char hash. High-recall candidate pre-filter.
+5. **Phonetic (pragmatic Double Metaphone)** — silent-consonant-aware encoder (`kn-`/`ps-`/`wr-`/`gn-`/`pn-`) that catches the sound-alike cases lexical distance misses.
 
-Each strategy writes to a shared `dict[int, CandidateSignals]` mapping vocabulary indices to metadata about which strategies found them. The `CandidateSignals` model tracks four fields: `edit_distance` (int or None), `phonetic_match` (bool), `trigram_overlap` (bool), and `substring_match` (bool). This signals dictionary serves two purposes: it deduplicates candidates across strategies (each index appears at most once in the pool), and it enables score boosting later—candidates found by multiple independent strategies are almost certainly correct matches.
+The router orders the engines by `(query_length, adaptive_k)`, aggregates their candidates into a signal map, splits the pool into lexical-only and phonetic-marked halves (phonetic candidates get a relaxed verification bound so equivalents aren't dropped by the strict lexical filter), and runs a SIMD-accelerated Damerau-Levenshtein verification pass. Length correction and multiplicative signal boosts produce the final score.
 
-**Scale-aware candidate budgets.** The total candidate pool is capped to prevent RapidFuzz from being overwhelmed. The budget scales with corpus size:
+Full algorithmic details live in the `ffuzzy` repo's docs:
 
-| Corpus Size | Candidate Budget |
-|-------------|-----------------|
-| < 500 (TINY) | Full vocabulary |
-| < 5,000 (SMALL) | 300 |
-| < 50,000 (MEDIUM) | 700 |
-| < 300,000 (XLARGE) | 1,100 |
-| >= 300,000 | 1,700 |
+- [`ffuzzy` README](https://github.com/mkbabb/ffuzzy/blob/master/README.md) — public API, installation, and measured results on Floridify's 278K corpus.
+- [`ffuzzy` router](https://github.com/mkbabb/ffuzzy/blob/master/docs/router.md) — adaptive engine selection, aggregation, and the relaxed phonetic bound.
+- [`ffuzzy` scoring](https://github.com/mkbabb/ffuzzy/blob/master/docs/scoring.md) — length correction, signal boosts, SIMD verification.
+- [`ffuzzy` engines/](https://github.com/mkbabb/ffuzzy/blob/master/docs/engines/) — one file per engine with data structures, algorithms, and code excerpts.
+- [`ffuzzy` integration](https://github.com/mkbabb/ffuzzy/blob/master/docs/integration.md) — how Floridify itself wires the crate in via `docker-compose` `additional_contexts`, a uv path source, and versioned MongoDB blob storage.
 
-When the candidate pool exceeds the budget, candidates are prioritized by signal strength: BK-tree matches with small edit distance rank highest, followed by phonetic matches, then trigram matches. This ensures the strongest candidates survive truncation.
+### Adaptive k
 
-### BK-Tree
-
-A BK-tree [Burkhard & Keller (1973)](#references) is a metric tree that exploits the triangle inequality of edit distance to prune the search space. Each node stores a word and a dictionary mapping edit distances to child subtrees. To search for all words within distance k of a query q, the algorithm computes d(root, q), adds the root if d ≤ k, then recurses only into children whose edge labels are in the range [d - k, d + k]. By the triangle inequality, children outside this range can't possibly contain words within distance k of q.
-
-The expected number of nodes visited is O(n^(k/log n))—far less than the full n for small k.
-
-**Damerau-Levenshtein distance.** The [`BKTree`](../backend/src/floridify/search/fuzzy/bk_tree.py) uses Damerau-Levenshtein distance rather than standard Levenshtein. The critical difference: DL treats transposition of two adjacent characters as a single edit operation (cost 1), while standard Levenshtein decomposes it into a deletion plus an insertion (cost 2). Transpositions are the most common single-keystroke error—"teh" for "the," "recieve" for "receive"—and penalizing them as two edits inflates distances and degrades recall for the most frequent class of typos [Damerau (1964)](#references), [Levenshtein (1966)](#references). The implementation delegates to RapidFuzz's C++ `DamerauLevenshtein.distance()` for speed.
-
-Why BK-tree over VP-tree? Both are metric trees, but they differ in branching strategy. A VP-tree (vantage-point tree) performs a binary split at each node: points closer than a median distance go left, farther go right. A BK-tree performs a multi-way split on exact distance values, creating one child per distinct distance. For integer metrics like edit distance (which produces discrete values 0, 1, 2, ...), the multi-way split is a natural fit—it partitions the space more finely than a binary split, leading to better pruning when the maximum search distance k is small relative to the tree depth.
-
-**Adaptive k.** The maximum edit distance scales with query length:
+The maximum edit distance scales with query length (`ffuzzy-core::lib::adaptive_max_distance`):
 
 ```
 max_k = min(5, max(2, ceil(query_length * 0.35)))
 ```
 
-This yields k=2 for 1-4 character queries, k=2-3 for 5-8 characters, k=3-4 for 9-14 characters, and k=4-5 for 15+ characters. Shorter words tolerate fewer edits because a single edit represents a larger fraction of the word. The constants `EDIT_DISTANCE_MIN=2`, `EDIT_DISTANCE_MAX=5`, and `EDIT_DISTANCE_LENGTH_MULTIPLIER=0.35` are configurable.
+This yields k=2 for 1-4 character queries, k=2-3 for 5-8 characters, k=3-4 for 9-14 characters, and k=4-5 for 15+ characters. Shorter words tolerate fewer edits because a single edit represents a larger fraction of the word. Callers can override it via `SearchConfig.max_distance` (`max_distance=` keyword on the Python API).
 
-**Cascading search with time budgets.** The [`cascading_search()`](../backend/src/floridify/search/fuzzy/bk_tree.py) function starts at k=1 and expands to k+1 if fewer than `BKTREE_CASCADE_MIN_CANDIDATES` (10) results are found, up to the adaptive max_k. At each level, the search checks a time budget:
+### Damerau-Levenshtein, not plain Levenshtein
 
-| Corpus Size | Time Budget |
-|-------------|-------------|
-| < 5,000 | 20ms |
-| 5,000 – 50,000 | 10ms |
-| > 50,000 | 5ms |
+`ffuzzy` uses Damerau-Levenshtein distance rather than standard Levenshtein. The critical difference: DL treats a transposition of two adjacent characters as a single edit (cost 1), while plain Levenshtein decomposes it into a deletion plus an insertion (cost 2). Transpositions are the most common single-keystroke error — `teh` for the, `recieve` for receive — and penalizing them as two edits inflates distances and degrades recall for the most frequent class of typos [Damerau (1964)](#references), [Levenshtein (1966)](#references).
 
-If the budget is exceeded mid-expansion, the search returns the best results found so far. Above `BKTREE_MAX_CORPUS_SIZE` (100,000 words), the BK-tree is skipped entirely—at that scale, the tree is deep enough that even k=1 traversal becomes expensive, and trigram + phonetic strategies provide sufficient recall.
+The BK-tree uses scalar DL via the `strsim` crate for correctness during tree traversal. Candidate verification on the hot path uses SIMD restricted DL via `triple_accel::levenshtein_exp`, with a scalar cross-check on very short strings where restricted DL can diverge from full DL.
 
-**Build.** `BKTree.build()` inserts words one at a time from a sorted vocabulary, computing a DL distance at each insertion to determine the child slot. Build time is O(n * h) where h is the tree height, typically O(log n) for random vocabularies.
+### BK-tree, bounded
 
-### Trigram Index with Probabilistic Masks
+Classical BK-trees [Burkhard & Keller (1973)](#references) prune the search space via the triangle inequality: compute `d = DL(root, q)`, recurse only into children whose edge labels fall in `[d - k, d + k]`. Unbounded, the worst case scans most of the tree on high-k long queries. `ffuzzy`'s BK-tree bounds the recursion in three dimensions:
 
-The trigram index is an inverted index mapping character trigrams to the vocabulary words that contain them. Given a query, the system extracts its trigrams, intersects the posting lists, and returns words with sufficient overlap—a standard information retrieval technique. What makes this implementation unusual is the addition of two 8-bit masks per posting that provide sub-trigram positional precision, reducing false positives by 40-60%.
+- **Node visit cap** (default 50,000) — stops the traversal after a fixed number of visited nodes and returns partial results.
+- **Wall-clock time budget** (default 10ms) — checked every 256 visits, stops mid-traversal if exceeded.
+- **Cascading k** — starts at k=1 and expands only when fewer than `min_candidates` (default 10) results have been found, up to the adaptive max.
 
-The design draws inspiration from [GitHub's Code Search architecture](https://github.blog/engineering/architecture-optimization/the-technology-behind-githubs-new-code-search/) (2023), which uses similar positional metadata to filter trigram matches.
+The nodes live in a contiguous `Vec<Node>` arena with sorted `Vec<(u8, u32)>` children, eliminating pointer-chasing on every visit. There is no 20-character query-length cap; long misspellings run against the bounded search and return whatever fits within the budget.
 
-**Standard trigram indexing.** Each word is padded with sentinel characters (`##word##`) and decomposed into overlapping 3-character sequences. "cat" becomes `["##c", "#ca", "cat", "at#", "t##"]`. The inverted index maps each trigram to the list of vocabulary indices containing it. To query, extract query trigrams, retrieve the posting lists, count how many trigrams each candidate shares with the query, and keep candidates above a threshold.
+### The "3.5-gram" trigram index
 
-The problem: short queries produce few trigrams, and common trigrams (like `"the"`) appear in thousands of words. The overlap threshold must be low enough to catch genuine matches but this admits many false positives.
+Padded trigrams (`"##cat##"` → `["##c", "#ca", "cat", "at#", "t##"]`) map to posting lists keyed on a compact record:
 
-**The "3.5-gram" extension.** Each posting in the index is a structured numpy array with three fields:
-
-```python
-POSTING_DTYPE = np.dtype([("idx", np.int32), ("loc", np.uint8), ("nxt", np.uint8)])
+```rust
+#[repr(C)]
+pub struct Posting {
+    pub idx: u32,       // vocabulary word index
+    pub loc: u8,        // positional mask: bit (i & 7) for each position
+    pub nxt: u8,        // 3-bit hash of the next character, packed in 8 bits
+    pub _reserved: u16, // padding to 8 bytes
+}
 ```
 
-- **`idx`**: The vocabulary word index (standard).
-- **`loc`**: A positional mask. Bit `i % 8` is set for each position i where this trigram appears in the word. This records approximately *where* in the word the trigram occurs.
-- **`nxt`**: A next-character mask. Bit `hash(next_char) % 8` is set, where `next_char` is the character immediately following the trigram. This gives "3.5-gram" precision—not quite a full 4-gram, but enough to eliminate candidates where the trigram is followed by a different character than in the query.
+At query time, each trigram's posting list is filtered by bitwise intersection against the query's positional and next-char masks: `(p.loc & query_loc_bit) != 0 && (p.nxt & query_nxt_bit) != 0`. The overlap threshold is `max(2, n_trigrams / 3)` — a 6-trigram query needs 2 mask-passing trigrams, a 12-trigram query needs 4. The design borrows from GitHub's code search trigram architecture, adapted for natural-language fuzzy matching rather than source tokens.
 
-At query time, for each query trigram at position i, the system computes `query_loc_bit = 1 << (i & 7)` and `query_nxt_bit = 1 << hash(next_char) & 7`, then filters the posting list using vectorized numpy operations:
+When the trigram pass produces fewer candidates than the budget, the remainder is filled via round-robin over **length buckets** (`AHashMap<u32, Vec<u32>>`, sorted word indices by byte length), within a `±length_tolerance` window (default 2). Round-robin matters because a single bucket (L=5 English words, for example) would otherwise swamp the pool and drown out adjacent lengths.
 
-```python
-loc_match = (posting["loc"] & query_loc_bit).astype(bool)
-nxt_match = (posting["nxt"] & query_nxt_bit).astype(bool)
-mask_pass = loc_match & nxt_match
-```
+### Signal-based score boosting
 
-Only postings that pass both mask checks are counted toward the overlap score. This eliminates candidates where the trigram occurs at a different position or is followed by a different character—a common source of false positives in standard trigram indexes.
-
-**Overlap threshold.** A candidate must match at least `max(2, n_trigrams // 3)` of the query's trigrams (where `n_trigrams` is the total number of query trigrams). The `TRIGRAM_THRESHOLD_DENOMINATOR=3` constant controls this ratio. The trigram candidates are capped at `TRIGRAM_CAP_FRACTION` (0.8) of the total candidate budget, reserving 20% for length-bucket candidates.
-
-**Memory layout.** The structured numpy arrays provide cache-friendly sequential access. For a vocabulary of 100,000 words with an average of 10 trigrams per word, the index contains roughly 1 million postings at 6 bytes each (int32 + uint8 + uint8) = ~6MB. Duplicate (trigram, word_idx) pairs are merged by OR-ing their masks.
-
-### Length Buckets & Round-Robin Merging
-
-Length buckets are the simplest candidate source: a dictionary mapping word lengths to numpy arrays of vocabulary indices. For a query of length L, the system collects words of length L-2 through L+2 (controlled by `length_tolerance`).
-
-The key design decision is how to merge length-bucket candidates with higher-priority candidates from other strategies. Naively concatenating them would let a single large bucket (e.g., 5-letter words, which are extremely common in English) drown out candidates from adjacent buckets. The implementation uses **round-robin interleaving**: it creates iterators over each bucket and takes one unseen candidate from each bucket per round, cycling until the budget is filled.
-
-```
-Priority candidates (trigram + BK-tree + phonetic): [a, b, c, d, ...]
-Length bucket L-1: [e, f, g, ...]
-Length bucket L:   [h, i, j, ...]
-Length bucket L+1: [k, l, m, ...]
-
-Merged: [a, b, c, d, ..., e, h, k, f, i, l, g, j, m, ...]
-```
-
-This ensures that candidates from nearby lengths are evenly represented in the pool, giving the RapidFuzz scorer a balanced view of the neighborhood.
-
-### RapidFuzz Scoring Pipeline
-
-After candidate aggregation, the pool of candidate words is scored by [RapidFuzz](https://github.com/maxbachmann/RapidFuzz), a C++ implementation of fuzzy string matching.
-
-**Primary scorer: WRatio.** The main scorer is `fuzz.WRatio` (Weighted Ratio), which computes the best score across several strategies (simple ratio, partial ratio, token sort, token set) and returns the maximum. The score cutoff is `min_score * 50` for single words and `min_score * 45` for phrases, preventing low-quality candidates from consuming processing time.
-
-**Secondary scorer: token_set_ratio.** For phrases and long queries (>= 8 characters), a secondary pass uses `fuzz.token_set_ratio`, which decomposes strings into token sets and scores based on set overlap. This catches reorderings ("machine learning" vs "learning machine") that WRatio might miss. Secondary results receive a 1.2x boost (`SECONDARY_RESULT_BOOST`) to compensate for typically lower raw scores.
-
-The secondary pass is skipped when:
-- The primary pass already found 3+ results scoring above 0.85 (`STRONG_PRIMARY_SCORE`)
-- The query is a short single word (< 6 characters) with existing results
-- The query is a single word shorter than 8 characters
-
-**Result limit.** RapidFuzz's `process.extract()` receives a limit of `max_results * multiplier`, where the multiplier is 5 for vocabulary pools > 200 words and 3 for smaller pools.
-
-### Length Correction & Signal-Based Score Boosting
-
-RapidFuzz's WRatio can be biased by length asymmetries. A 3-character candidate matching against a 15-character query can score deceptively high due to partial matching. The [`apply_length_correction()`](../backend/src/floridify/search/fuzzy/scoring.py) function applies multiplicative corrections:
-
-- **Length ratio penalty**: `min(query_len, candidate_len) / max(query_len, candidate_len)`—penalizes large length mismatches.
-- **Short fragment penalty**: Candidates <= 3 characters against queries > 6 characters receive a 0.5x penalty.
-- **Phrase mismatch penalty**: Query is a phrase but candidate is a single word → 0.7x. Reverse → 0.95x (or 1.2x if the query matches the first word of the candidate phrase).
-- **Prefix bonus**: 1.3x if the candidate starts with the query.
-
-After length correction, **signal-based score boosting** rewards candidates that were found by multiple independent strategies:
+Each engine tags its candidates in a shared signal map (`CandidateSignals { edit_distance, phonetic_match, trigram_overlap, symspell_match, automaton_match }`). After SIMD DL verification and length correction, the scoring pipeline applies multiplicative boosts:
 
 | Signal | Boost | Rationale |
 |--------|-------|-----------|
-| Phonetic match | 1.08x | Candidate "sounds right"—strong signal for homophones and near-homophones |
-| Edit distance ≤ 1 | 1.02x | Very close in edit space—modest tiebreaker |
-| 3+ strategies found candidate | 1.03x | Multiple independent strategies converging = high confidence |
+| Phonetic match | ×1.12 | Candidate sounds right — strong signal for homophones and near-homophones |
+| Edit distance ≤ 1 | ×1.02 | Very close in edit space — modest tiebreaker |
+| SymSpell hit | ×1.01 | Authoritative k≤2 lookup — tiny bump |
+| 3+ engines found candidate | ×1.03 | Multiple independent engines converging = high confidence |
 
-All boosts are capped at 1.0 to prevent score inflation. They are applied *after* length correction, ensuring they act as tiebreakers between candidates of similar corrected quality rather than overriding the base scoring.
+All boosts clamp to 1.0 at each step. They act as tiebreakers between candidates of similar corrected quality rather than overriding the base scoring. The phonetic boost is ×1.12 (up from the Python baseline's ×1.08) because the prior value was insufficient to move `filosofy`→philosophy ahead of `filosofy`→falsify in the final ranking. Length correction is a linear ramp: factor `1.0` when `len_ratio ≥ 0.75`, falling linearly to `0.85` at ratio 0.
 
 ## Phonetic Search
 
-Phonetic search finds words that "sound like" the query, regardless of spelling. "Filosofy" should find "philosophy"; "nife" should find "knife." The implementation combines ICU transliteration for cross-linguistic sound normalization with jellyfish's Metaphone encoder [Philips (1990)](#references) for final phonetic coding.
+The phonetic engine lives inside `ffuzzy` alongside the rest and runs in parallel as an orthogonal recall signal. Its job is to catch sound-alike misspellings that lexical distance cannot see: `filosofy` finding philosophy, `knite` finding knight, `sycology` finding psychology, `noledge` finding knowledge.
 
-### ICU Normalization Pipeline
+The implementation is a pragmatic Double Metaphone port with explicit silent-consonant collapse at word start — the fix for the specific regression the Python baseline had:
 
-The [`PhoneticEncoder`](../backend/src/floridify/search/phonetic/encoder.py) applies a two-stage normalization pipeline:
+```rust
+let start = if n >= 2 {
+    match (chars[0], chars[1]) {
+        ('k', 'n') => 1, // knite → nite
+        ('p', 'n') => 1, // pneumonia → neumonia
+        ('p', 's') => 1, // psychology → sychology
+        ('w', 'r') => 1, // wrong → rong
+        ('g', 'n') => 1, // gnome → nome
+        _ => 0,
+    }
+} else {
+    0
+};
+```
 
-**Stage 1: Script normalization.** The CLDR-standard `Any-Latin; Latin-ASCII; Lower` transliteration converts any Unicode script to Latin, strips diacritics, and lowercases. This is a compiled ICU transliterator ([Unicode CLDR](#references)) that handles Cyrillic, Greek, CJK, and Arabic scripts transparently.
+The main Metaphone loop then walks from `start`, so `knight` and `knite` both encode to `NT`, `psychology` and `sycology` collapse to the same code, and so on. The inverted index (`AHashMap<String, SmallVec<[u32; 4]>>`) maps each code to the vocabulary entries that encode to it. Lookup is a single Metaphone call + a hash lookup.
 
-**Stage 2: Cross-linguistic phonetic rules.** A custom ICU rule set in [`phonetic/constants.py`](../backend/src/floridify/search/phonetic/constants.py) collapses sound equivalences that Metaphone—being English-phonology-only—doesn't handle:
+Candidates surfaced only by the phonetic engine can have large lexical distances (`knite` → knight is DL=2, `sycology` → psychology is DL=3, and bigger cases go further). The router handles this by verifying phonetic-marked candidates against a relaxed bound `max(max_k, query_len / 2 + 1)` so phonetic equivalents aren't killed by the strict lexical filter.
 
-- **French nasal vowels**: `en`, `an`, `on`, `in`, `un` before consonants → unified `an`. This makes "en coulisses" and "an coulisses" produce the same code.
-- **French vowel digraphs**: `eau`/`aux` → `o`, `oi` → `wa`, `ou` → `oo`, `eu` → `oy`.
-- **French consonant patterns**: `tion` → `sion`, `gn` → `ny`, `ille` → `eey`, `qu` → `k`.
-- **German consonant clusters**: `tsch` → `ch`, `sch` → `sh`.
-- **German vowel patterns**: `ei` → `ay`, `ie` → `ee`.
-- **Cross-linguistic consonants**: `ph` → `f`, `ck` → `k`, `wh` → `w`, `ght` → `t`.
-- **Double consonant simplification**: `ss` → `s`, `ll` → `l`, `cc` → `k`, etc.
+The Python baseline's ICU-based cross-linguistic normalization pipeline (French nasal vowels, German consonant clusters, `ph → f`, `ght → t`, and friends) is *not* carried over into `ffuzzy`. The current phonetic engine is English-first, and the silent-consonant fix is the primary contribution over the Python baseline. If cross-linguistic phonetic matching becomes load-bearing again, the `PhoneticIndex` interface is agnostic to the encoder — the ICU pipeline can be ported in behind the same inverted-index layer without touching the router or the scoring stages.
 
-ICU rule syntax uses context operators (`{` for lookbehind, `}` for lookahead) to express positional constraints. For example, the rule `e n } [bcdfghjklmnpqrstvwxyz] → a n` fires only when "en" is followed by a consonant—it won't trigger for "enable" (where "en" is followed by "a"). Rules are processed in order; the first match wins. The full rule set is approximately 50 rules covering the major phonetic patterns of French, German, and cross-linguistic consonant equivalences.
-
-These rules are compiled into an ICU transliterator automaton at module load time. The compilation produces a finite-state transducer that processes the input string in a single left-to-right pass. Per-query cost is sub-microsecond—the ICU C++ engine handles the string transformation without any Python-level iteration.
-
-Why Metaphone + ICU over Double Metaphone alone? Double Metaphone generates two codes per word (primary and alternate) to handle English ambiguities, but it has no knowledge of French nasals, German clusters, or other cross-linguistic patterns. By normalizing these patterns *before* Metaphone encoding, the system produces consistent phonetic codes regardless of source language orthography.
-
-### Phonetic Index Architecture
-
-The [`PhoneticIndex`](../backend/src/floridify/search/phonetic/index.py) builds two inverted indexes:
-
-1. **Composite index**: Maps the composite Metaphone key (per-word codes joined with `|`) to vocabulary indices. For "en coulisses," the composite key is `AN|KLSS`.
-2. **Per-word index**: Maps individual word Metaphone codes to vocabulary indices. "coulisses" → code `KLSS` → all vocabulary entries containing a word with that code.
-
-### Search Strategy Cascade
-
-Phonetic search uses a three-strategy cascade:
-
-1. **Exact composite match**: Look up the query's composite key in the composite index. If found, these are very high-confidence matches—the entire phrase sounds identical.
-
-2. **Fuzzy composite match**: If the composite index has fewer than `PHONETIC_FUZZY_COMPOSITE_LIMIT` (10,000) entries, compute Levenshtein distance between the query's composite key and all stored keys, accepting matches within `max(1, len(code) // 4)` distance. This catches slight phonetic variations.
-
-3. **Per-word intersection**: Encode each query word independently, look up each code in the per-word index, and count how many query words each candidate matches. Candidates matching at least half the query words (`threshold = max(1, len(query_words) // 2)`) are returned, ordered by count.
+Details: [`ffuzzy` engines/phonetic.md](https://github.com/mkbabb/ffuzzy/blob/master/docs/engines/phonetic.md).
 
 ## Semantic Search
 
@@ -477,7 +402,7 @@ All search indices participate in the project's three-level versioned storage sy
 ```
 SearchIndex (top-level, links component indices by ID)
 ├── TrieIndex (marisa-trie data, frequencies, Bloom filter bytes)
-├── FuzzyIndex (BK-tree, PhoneticIndex, SuffixArray as pickled bytes)
+├── FuzzyIndex (ffuzzy blob + pickled SuffixArray, binary via GridFS)
 └── SemanticIndex (FAISS index + embeddings via GridFS)
 ```
 
@@ -489,7 +414,7 @@ Each index type extends `BaseVersionedData` with a `Metadata` inner class, provi
 
 **TrieIndex persistence.** The trie data (sorted word list), word frequencies, normalized-to-original mapping, and Bloom filter bytes are stored as JSON via the versioned content manager. The Bloom filter's `bytearray` is persisted alongside its parameters (bit count, hash count, item count, error rate) so it can be restored without recomputation.
 
-**FuzzyIndex persistence.** The BK-tree, PhoneticIndex, and SuffixArray are serialized via Python's `pickle`, then encoded with base85 for JSON-safe storage. Base85 encoding adds ~25% overhead compared to raw bytes but avoids binary-in-JSON issues. On load, `FuzzyIndex.deserialize()` unpickles all three structures and returns them as a tuple.
+**FuzzyIndex persistence.** The `ffuzzy.Index` is serialized by Rust into a single opaque byte blob via `to_bytes()` (bincode format with a schema version byte; see [`ffuzzy` docs/format.md](https://github.com/mkbabb/ffuzzy/blob/master/docs/format.md)). That blob plus a pickled `SuffixArray` are handed to the version manager's `binary_payload` hook, which routes them to GridFS in a single atomic write. The small metadata document (corpus ID, vocabulary hash, size stats, build time) stays inline. On load, the manager rehydrates the binary dict from GridFS and `FuzzyIndex.deserialize()` calls `ffuzzy.Index.from_bytes()` to reconstruct the Rust index. A schema mismatch surfaces as a `ValueError` and triggers a rebuild from the live vocabulary.
 
 **SemanticIndex persistence.** Embeddings and FAISS index data are stored as binary blobs via the GridFS-backed external storage system. The `SemanticIndex.binary_data` field (excluded from `model_dump()`) holds references to the externally stored bytes. The resource ID includes the model name and a vocabulary hash prefix to support coexistence of indices built with different models or Matryoshka dimensions.
 
@@ -547,47 +472,54 @@ If semantic initialization fails, the error is recorded in `_semantic_init_error
 | Prefix (marisa-trie) |—(shared with exact) | O(m + k) where k = results |—(shared) |
 | Bloom filter | O(n * k_hash) | O(k_hash) | O(n) bits |
 | Substring (suffix array) | O(n * m) via SA-IS | O(m * log(n * m)) | O(n * m) |
-| BK-tree | O(n * h) | O(n^(k/log n)) | O(n) nodes |
-| Trigram index | O(n * m) | O(t * p̄) where t=trigrams, p̄=avg posting length | O(n * m) postings |
-| Phonetic index | O(n * w) where w=words per entry | O(c) where c=composite codes (strategy 2) | O(n * w) |
+| ffuzzy SymSpell (k≤2) | O(n * m^2) parallel | O(1) amortized hashmap | O(n * m^2) variants |
+| ffuzzy BK-tree (bounded) | O(n * h) serial | O(min(max_visits, n^(k/log n))) | O(n) arena nodes |
+| ffuzzy 3.5-gram trigram | O(n * m) | O(t * p̄) where t=trigrams, p̄=avg posting length | O(n * m) postings |
+| ffuzzy phonetic index | O(n) | O(1) hashmap | O(n) |
 | Semantic (FAISS Flat) | O(n * d) | O(n * d) brute force | O(n * d) |
 | Semantic (FAISS HNSW) | O(n * M * log n) | O(d * log n) | O(n * (d + M)) |
 | Semantic (FAISS OPQ+IVF-PQ) | O(n * d) + training | O(d * nprobe) | O(n * m_pq * nbits/8) |
 
-**Profiled numbers** (Apple M4 Max, Qwen3-0.6B, 300K word English corpus):
+**Profiled numbers** (Apple M4 Max, Qwen3-0.6B, 278K word English corpus):
 
 | Operation | Time | Notes |
 |-----------|------|-------|
 | Exact lookup (trie + Bloom) | ~0.001ms | Two O(m) passes: Bloom filter then trie |
 | Prefix search (20 results) | ~0.001ms | marisa-trie C++ traversal |
 | Substring search (suffix array) | ~1ms | Twin binary search over ~4.5MB text |
-| Fuzzy search (full pipeline) | ~5-20ms | BK-tree + trigram + phonetic + RapidFuzz scoring |
+| Fuzzy search, short typo (`algorythm`) | ~12ms server-side | ffuzzy: SymSpell authoritative, no BK-tree fire |
+| Fuzzy search, phonetic (`sycology`/`noledge`) | ~12-13ms server-side | ffuzzy: phonetic + relaxed DL verify |
+| Fuzzy search, long misspelling (`antidisestablishmentarianizm`) | ~15-25ms server-side | ffuzzy: BK-tree bounded traversal, no 20-char cap |
+| Fuzzy search, multi-word phrase (`en couliss`) | ~13ms server-side, p95 flat | ffuzzy: was ~31ms / p95 403ms in Python baseline |
 | Semantic search (FAISS, result cache hit) | ~0.001ms | LRU dict lookup |
 | Semantic search (FAISS, vocab embedding hit) | ~0.1ms | O(1) array access + FAISS query |
 | Semantic search (FAISS, full encode) | ~10-50ms | Transformer inference + FAISS query |
 | Model load (first query) | ~1.5s | Cached after first load |
 | Corpus embedding (1,323 words, batch=128) | ~3.3s | 397 words/sec |
 | Corpus embedding (5,000 words, batch=128) | ~11.6s | 430 words/sec |
-| Full corpus embedding (300K words, batch=128) | ~13min | Multiprocessing, 2 workers (macOS) |
+| Full corpus embedding (278K words, batch=128) | ~13min | Multiprocessing, 2 workers (macOS) |
 | FAISS index build (FlatL2, 10K vectors, 512D) | ~10ms | Brute-force, no training |
 | FAISS index build (HNSW, 100K vectors, 512D) | ~5s | M=32, efConstruction=200 |
+| ffuzzy build (278K words) | ~10s | Parallel SymSpell via rayon; BK-tree insertion serial |
+| ffuzzy blob deserialize | ~200ms | bincode, single-shot |
 | Hot reload (index rebuild) | ~2-5s | Excludes semantic rebuild |
 | Corpus change detection | ~1-2ms | Indexed MongoDB query |
 
+Fuzzy numbers above are server-side `X-Process-Time` (whole request, including HTTP middleware, normalization, corpus lookup, serialization). The ffuzzy search itself is sub-millisecond for SymSpell-authoritative k≤2 cases. See [`ffuzzy` docs/motivation.md](https://github.com/mkbabb/ffuzzy/blob/master/docs/motivation.md) for the full benchmark table and the pre-ffuzzy baseline.
+
 **Batch size matters.** On Apple Silicon, `batch_size=128` is 42% faster than `batch_size=32` for the 0.6B model due to better SIMD utilization. Model-specific batch sizes are defined in `MODEL_BATCH_SIZES`. MPS (Apple GPU) is 0.72x the speed of CPU for this model size—the overhead of CPU-GPU data transfer dominates for the relatively small model.
 
-**Memory footprint** for a 300K word corpus at 512D (after Matryoshka truncation):
+**Memory footprint** for a 278K word corpus at 512D (after Matryoshka truncation):
 
 | Component | Memory |
 |-----------|--------|
-| Embeddings (float32) | ~585MB |
+| Embeddings (float32) | ~545MB |
 | FAISS HNSW index | ~20MB overhead |
-| Suffix array + reverse map | ~54MB |
-| Trigram index | ~6MB |
+| Suffix array + reverse map | ~50MB |
 | marisa-trie | ~20MB |
 | Bloom filter | ~120KB |
-| BK-tree (pickled) | ~15MB |
-| PhoneticIndex | ~5MB |
+| ffuzzy full blob (SymSpell k=2 + BK-tree + 3.5-gram + FST + phonetic) | ~128MB |
+| ffuzzy slim (no SymSpell) | ~48MB |
 
 ## Configuration Reference
 
@@ -606,17 +538,9 @@ All tunable constants are centralized in [`search/config.py`](../backend/src/flo
 | `LEXICAL_SANITY_THRESHOLD` | 0.35 | Minimum SequenceMatcher ratio for semantic results |
 | `LEXICAL_GATE_SCORE_MARGIN` | 0.05 | Score margin above floor to bypass lexical gate |
 | `HIGH_QUALITY_FUZZY_SCORE` | 0.7 | Fuzzy score threshold for quality gating |
-| `STRONG_PRIMARY_SCORE` | 0.85 | RapidFuzz score to skip secondary scorer |
-| `STRONG_PRIMARY_COUNT` | 3 | Number of strong results needed to skip secondary |
 | `FUZZY_PERFECT_SCORE` | 0.99 | Score treated as perfect match |
 
-### Signal Boost Factors
-
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `PHONETIC_MATCH_BOOST` | 1.08 | Boost for candidates with phonetic match |
-| `CLOSE_EDIT_DISTANCE_BOOST` | 1.02 | Boost for edit distance ≤ 1 |
-| `MULTI_SIGNAL_BOOST` | 1.03 | Boost for candidates found by 3+ strategies |
+Signal-boost factors (phonetic match, close-edit, multi-engine) live inside the `ffuzzy` crate now. See the [ffuzzy tuning knobs](#ffuzzy-tuning-knobs) table below.
 
 ### Corpus Size Thresholds
 
@@ -628,37 +552,31 @@ All tunable constants are centralized in [`search/config.py`](../backend/src/flo
 | `CORPUS_LARGE` | 100,000 | Large corpus threshold |
 | `CORPUS_XLARGE` | 300,000 | Extra-large corpus threshold |
 
-### Candidate Budgets
+### ffuzzy tuning knobs
 
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `FUZZY_BUDGET_SMALL` | 300 | Max candidates for corpora < 5K |
-| `FUZZY_BUDGET_MEDIUM` | 700 | Max candidates for corpora < 50K |
-| `FUZZY_BUDGET_LARGE` | 1,100 | Max candidates for corpora < 300K |
-| `FUZZY_BUDGET_XLARGE` | 1,700 | Max candidates for corpora >= 300K |
-| `PHONETIC_BUDGET_CAP` | 200 | Cap on phonetic candidates |
+The fuzzy stage is driven by `ffuzzy`, so the previous Python-level constants (`BKTREE_*`, `FUZZY_BUDGET_*`, `TRIGRAM_*`, `PHONETIC_*`, `RAPIDFUZZ_*`) are no longer load-bearing. Tuning now happens inside the Rust crate via `SearchConfig`, `BoundedSearchConfig`, and `CandidateConfig`. The Python PyO3 wrapper (`ffuzzy.Index.search`) exposes the most important knobs as keyword arguments — `max_results`, `min_score`, `max_distance` — and uses `ffuzzy`'s defaults for everything else.
 
-### BK-Tree Configuration
+Representative defaults (all configurable via `ffuzzy-core`'s Rust API):
 
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `BKTREE_MAX_CORPUS_SIZE` | 100,000 | Skip BK-tree above this size |
-| `BKTREE_TIME_BUDGET_SMALL` | 20ms | Time budget for corpora < 10K |
-| `BKTREE_TIME_BUDGET_MEDIUM` | 10ms | Time budget for corpora 10K-50K |
-| `BKTREE_TIME_BUDGET_LARGE` | 5ms | Time budget for corpora > 50K |
-| `BKTREE_CASCADE_MIN_CANDIDATES` | 10 | Min candidates before stopping k expansion |
-| `BKTREE_MAX_RESULTS_CAP` | 2,000 | Safety cap per k level |
-| `EDIT_DISTANCE_LENGTH_MULTIPLIER` | 0.35 | Multiplier for adaptive max_k |
-| `EDIT_DISTANCE_MIN` | 2 | Minimum edit distance |
-| `EDIT_DISTANCE_MAX` | 5 | Maximum edit distance |
+| Knob | Default | Source |
+|------|---------|--------|
+| `SearchConfig.max_results` | 20 | `ffuzzy-core/src/router/mod.rs` |
+| `SearchConfig.min_score` | 0.6 | same |
+| `BoundedSearchConfig.max_visits` | 50,000 | `ffuzzy-core/src/bktree/search.rs` |
+| `BoundedSearchConfig.time_budget_ms` | 10.0 | same |
+| `BoundedSearchConfig.min_candidates` | 10 | same |
+| `CandidateConfig.trigram_cap_fraction` | 0.8 | `ffuzzy-core/src/trigram/query.rs` |
+| `CandidateConfig.length_tolerance` | 2 | same |
+| `BuildConfig.symspell_max_k` | 2 | `ffuzzy-core/src/router/mod.rs` |
+| `BuildConfig.symspell_max_word_len` | 30 | same |
+| adaptive k formula | `min(5, max(2, ceil(len * 0.35)))` | `ffuzzy-core/src/lib.rs::adaptive_max_distance` |
+| Phonetic boost | ×1.12 | `ffuzzy-core/src/score/signals.rs` |
+| Close-edit boost (d ≤ 1) | ×1.02 | same |
+| Multi-engine boost (≥ 3 engines) | ×1.03 | same |
+| SymSpell boost | ×1.01 | same |
+| Length correction ramp | `0.85 + 0.15 * (ratio / 0.75)` below 0.75 | `ffuzzy-core/src/score/length_correct.rs` |
 
-### Trigram Index
-
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `TRIGRAM_THRESHOLD_DENOMINATOR` | 3 | Overlap threshold = max(2, n_trigrams // this) |
-| `TRIGRAM_CAP_FRACTION` | 0.8 | Reserve 20% of budget for length-bucket candidates |
-| `TRIGRAM_CAP_MINIMUM` | 10 | Minimum trigram candidate cap |
+Details: [`ffuzzy` docs/scoring.md](https://github.com/mkbabb/ffuzzy/blob/master/docs/scoring.md), [`ffuzzy` docs/engines/](https://github.com/mkbabb/ffuzzy/blob/master/docs/engines/).
 
 ### Bloom Filter
 
@@ -669,27 +587,6 @@ All tunable constants are centralized in [`search/config.py`](../backend/src/flo
 | `BLOOM_ERROR_RATE_SMALL` | 0.001 | Error rate for corpora < 10K |
 | `BLOOM_ERROR_RATE_MEDIUM` | 0.01 | Error rate for corpora 10K-100K |
 | `BLOOM_ERROR_RATE_LARGE` | 0.05 | Error rate for corpora > 100K |
-
-### RapidFuzz Scoring
-
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `PRIMARY_PHRASE_CUTOFF_MULTIPLIER` | 45 | Score cutoff = min_score * this (phrases) |
-| `PRIMARY_WORD_CUTOFF_MULTIPLIER` | 50 | Score cutoff = min_score * this (words) |
-| `SECONDARY_PHRASE_CUTOFF_MULTIPLIER` | 35 | Secondary cutoff for phrases |
-| `SECONDARY_WORD_CUTOFF_MULTIPLIER` | 45 | Secondary cutoff for words |
-| `SECONDARY_RESULT_BOOST` | 1.2 | Boost for secondary scorer results |
-| `RAPIDFUZZ_LIMIT_MULTIPLIER_LARGE` | 5 | Result limit multiplier for large pools |
-| `RAPIDFUZZ_LIMIT_MULTIPLIER_SMALL` | 3 | Result limit multiplier for small pools |
-| `VOCABULARY_SIZE_LIMIT_THRESHOLD` | 200 | Pool size to switch multiplier |
-
-### Phonetic Search
-
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `PHONETIC_FUZZY_COMPOSITE_LIMIT` | 10,000 | Max composite codes for fuzzy scan |
-| `PHONETIC_CODE_DISTANCE_FRACTION` | 4 | max_dist = len(code) // this |
-| `PHONETIC_WORD_THRESHOLD_FRACTION` | 2 | Majority = len(words) // this |
 
 ### Search Pipeline
 

@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import zlib
 from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...caching.core import get_global_cache, get_versioned_content
-from ...caching.manager import _generate_cache_key, get_version_manager
+from ...caching.core import get_versioned_content
+from ...caching.manager import get_version_manager
 from ...caching.models import (
     BaseVersionedData,
     CacheNamespace,
-    ContentLocation,
     ResourceType,
-    StorageType,
     VersionConfig,
 )
 from ...corpus.core import Corpus
@@ -78,14 +75,13 @@ class SemanticIndex(BaseModel):
     embedding_dimension: int = 0
     build_time_seconds: float = 0.0
 
-    # CRITICAL FIX: Binary data storage field
-    # This field holds embeddings and FAISS index data (bytes or base64 strings)
-    # It's excluded from serialization since it's stored externally via content_location
-    # Previous implementation used object.__setattr__() which was fragile
-    binary_data: dict[str, str | bytes] | None = Field(
+    # Opaque binary payload — never serialized through model_dump.
+    # Holds {"embeddings_bytes": bytes, "index_bytes": bytes}. The version
+    # manager pickles this into GridFS via the binary_payload= hook.
+    binary_data: dict[str, bytes] | None = Field(
         default=None,
-        exclude=True,  # Never serialize to model_dump() - handled via external storage
-        description="Embeddings and FAISS index data as bytes or base64 strings (stored externally)",
+        exclude=True,
+        description="Embeddings and FAISS index bytes stored externally via GridFS",
     )
 
     class Metadata(
@@ -171,19 +167,21 @@ class SemanticIndex(BaseModel):
         if not metadata:
             return None
 
-        # Load content from metadata, respecting config.use_cache
+        # Load content from metadata, respecting config.use_cache.
+        # When binary_payload was used at write time, the manager-driven
+        # GridFS path returns a dict with the "binary_data" key already
+        # populated — we pop it off before model_validate so pydantic
+        # doesn't have to coerce raw bytes.
         content = await get_versioned_content(metadata, config=config)
         if not content:
             return None
 
+        binary_data = content.pop("binary_data", None) if isinstance(content, dict) else None
+
         index = cls.model_validate(content)
+        if binary_data is not None:
+            index.binary_data = binary_data
 
-        # CRITICAL FIX: Preserve binary_data from external storage
-        # Now using proper field assignment instead of object.__setattr__()
-        if "binary_data" in content:
-            index.binary_data = content["binary_data"]
-
-        # Ensure the index ID is set from metadata
         if metadata.id:
             index.index_id = metadata.id
         return index
@@ -259,21 +257,23 @@ class SemanticIndex(BaseModel):
             corpus=corpus,
         )
 
-        # FIX: Check embeddings exist AND match the current vocabulary size.
+        # Check embeddings exist AND match the current corpus.
         # Reject cached indices with 0 embeddings (corrupted/incomplete builds)
-        # or with a different vocabulary size (stale from different aggregation).
+        # or with a stale vocabulary hash (different aggregation).
+        # Note: num_embeddings matches LEMMATIZED vocabulary (often ~60% of full vocab),
+        # so we compare against the hash, not the count.
+        lemma_size = len(corpus.lemmatized_vocabulary) if corpus.lemmatized_vocabulary else 0
         vocab_size = len(corpus.vocabulary) if corpus.vocabulary else 0
         if existing:
             logger.info(
                 f"Semantic cache check for '{corpus.corpus_name}': "
                 f"cached_hash={existing.vocabulary_hash[:8]}, corpus_hash={corpus.vocabulary_hash[:8]}, "
-                f"cached_embeddings={existing.num_embeddings}, corpus_vocab={vocab_size}"
+                f"cached_embeddings={existing.num_embeddings}, corpus_vocab={vocab_size}, lemmas={lemma_size}"
             )
         if (
             existing
             and existing.vocabulary_hash == corpus.vocabulary_hash
             and existing.num_embeddings > 0
-            and (vocab_size == 0 or abs(existing.num_embeddings - vocab_size) < vocab_size * 0.05)
         ):
             logger.debug(
                 f"Using cached semantic index for corpus '{corpus.corpus_name}' "
@@ -303,141 +303,48 @@ class SemanticIndex(BaseModel):
         self,
         config: VersionConfig | None = None,
         corpus_uuid: str | None = None,
-        binary_data: dict[str, str] | None = None,
+        binary_data: dict[str, bytes] | None = None,
     ) -> None:
         """Save semantic index to versioned storage.
 
-        Large binary data (embeddings, FAISS index) is automatically stored
-        externally via the filesystem cache for indices > 16MB.
+        The metadata document is small (statistics, mappings, model config).
+        The opaque binary blob (embeddings + FAISS index bytes) is handed
+        to the version manager via the ``binary_payload`` hook, which
+        pickles it into GridFS and warms the L1/L2 cache in one shot.
 
         Args:
-            config: Version configuration
-            corpus_uuid: Stable UUID of the associated corpus
-            binary_data: Optional dict with 'embeddings' and 'index_data' keys
-                        containing base64-encoded binary data
-
+            config: Version configuration.
+            corpus_uuid: Stable UUID of the associated corpus.
+            binary_data: ``{"embeddings_bytes": bytes, "index_bytes": bytes}``.
+                Falls back to ``self.binary_data`` if not provided.
         """
         manager = get_version_manager()
         cid = corpus_uuid or self.corpus_uuid
         resource_id = _build_resource_id(cid, self.model_name, self.vocabulary_hash)
 
-        # CRITICAL FIX: Prepare content WITHOUT binary_data for manager.save()
-        # binary_data will be added to external storage AFTER metadata is saved
-        # This prevents JSON encoding 1290MB of data which causes hang
+        # `binary_data` field is excluded from model_dump, so the metadata
+        # dict stays small even when self.binary_data is populated.
         content = self.model_dump(exclude_none=True)
-
-        # Store binary_data separately to avoid JSON encoding in manager.save()
-        binary_data_to_store = binary_data
+        payload = binary_data if binary_data is not None else self.binary_data
 
         try:
-            # Save metadata using version manager (without binary_data)
-            versioned = await manager.save(
+            await manager.save(
                 resource_id=resource_id,
                 resource_type=ResourceType.SEMANTIC,
                 namespace=manager._get_namespace(ResourceType.SEMANTIC),
                 content=content,
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_uuid": corpus_uuid or self.corpus_uuid,
+                    "corpus_uuid": cid,
                     "model_name": self.model_name,
                     "vocabulary_hash": self.vocabulary_hash,
                     "embedding_dimension": self.embedding_dimension,
                     "index_type": self.index_type,
-                    # Extra metadata (not in Metadata model)
                     "num_embeddings": self.num_embeddings,
                 },
+                binary_payload=payload,
             )
-
-            # Store binary_data via GridFS for durable persistence
-            # Falls back to L1/L2 cache for fast subsequent reads
-            if binary_data_to_store:
-                import pickle
-
-                from ...caching.gridfs import gridfs_put
-
-                cache = await get_global_cache()
-
-                cache_key = _generate_cache_key(
-                    versioned.resource_type,
-                    versioned.resource_id,
-                    "content",
-                    versioned.version_info.data_hash[:8],
-                )
-
-                content_with_binary = {**content, "binary_data": binary_data_to_store}
-
-                namespace = versioned.namespace
-                if isinstance(namespace, str):
-                    namespace = CacheNamespace(namespace)
-
-                # Estimate size and reject excessively large data
-                binary_size = sum(
-                    len(v) if isinstance(v, bytes) else len(str(v))
-                    for v in binary_data_to_store.values()
-                )
-                max_binary_size = 8 * 1024 * 1024 * 1024  # 8GB
-                if binary_size > max_binary_size:
-                    raise ValueError(
-                        f"Binary data too large ({binary_size / (1024**3):.1f}GB). "
-                        f"Maximum allowed: 8GB"
-                    )
-
-                # Upload to GridFS — pickle directly (SEMANTIC data already contains
-                # gzip'd bytes, so no ZSTD re-compression)
-                pickled = pickle.dumps(content_with_binary, protocol=pickle.HIGHEST_PROTOCOL)
-                gridfs_file_id = await gridfs_put(
-                    filename=resource_id,
-                    data=pickled,
-                    metadata={
-                        "version": versioned.version_info.version,
-                        "corpus_uuid": corpus_uuid or self.corpus_uuid,
-                    },
-                )
-                logger.info(f"Stored {binary_size:,} bytes to GridFS for {resource_id}")
-
-                # Warm L1/L2 cache for immediate reads
-                await cache.set(
-                    namespace=namespace,
-                    key=cache_key,
-                    value=content_with_binary,
-                    ttl_override=versioned.ttl,
-                )
-
-                content_size = binary_size + 1000
-
-                binary_crc = 0
-                for value in binary_data_to_store.values():
-                    if isinstance(value, bytes):
-                        binary_crc = zlib.crc32(value, binary_crc)
-                    elif isinstance(value, str):
-                        binary_crc = zlib.crc32(value.encode("utf-8"), binary_crc)
-
-                versioned.content_location = ContentLocation(
-                    storage_type=StorageType.DATABASE,
-                    path=gridfs_file_id,
-                    cache_namespace=versioned.namespace,
-                    cache_key=cache_key,
-                    size_bytes=content_size,
-                    checksum=f"crc32:{binary_crc & 0xFFFFFFFF:08x}",
-                )
-                versioned.content_inline = None
-
-                await versioned.save()
-
-                # Re-cache metadata so get_latest() returns updated content_location
-                meta_cache_key = _generate_cache_key(
-                    versioned.resource_type,
-                    versioned.resource_id,
-                )
-                await cache.set(
-                    namespace=namespace,
-                    key=meta_cache_key,
-                    value=versioned,
-                    ttl_override=versioned.ttl,
-                )
-
             logger.info(f"Successfully saved semantic index for {resource_id}")
-
         except Exception as e:
             logger.error(f"Failed to save semantic index {resource_id}: {e}")
             raise RuntimeError(

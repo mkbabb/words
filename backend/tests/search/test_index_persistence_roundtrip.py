@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import gzip
 import pickle
 import tempfile
 
@@ -32,7 +31,9 @@ async def test_trie_index_roundtrip_persistence(test_db):
     trie_index = await TrieIndex.create(corpus)
     await trie_index.save()
 
-    loaded = await TrieIndex.get(corpus_uuid=corpus.corpus_uuid, config=VersionConfig(use_cache=False))
+    loaded = await TrieIndex.get(
+        corpus_uuid=corpus.corpus_uuid, config=VersionConfig(use_cache=False)
+    )
     assert loaded is not None
     assert loaded.trie_data == sorted(corpus.vocabulary)
     assert loaded.word_count == len(corpus.vocabulary)
@@ -66,22 +67,16 @@ async def test_semantic_index_roundtrip_with_binary_data(test_db):
         dtype=np.float32,
     )
 
-    embeddings_bytes = pickle.dumps(embeddings)
-    embeddings_compressed = gzip.compress(embeddings_bytes, compresslevel=1)
-
     faiss_index = faiss.IndexFlatL2(4)
     faiss_index.add(embeddings)
     with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
         faiss.write_index(faiss_index, tmp.name)
         with open(tmp.name, "rb") as f:
             index_bytes = f.read()
-    index_compressed = gzip.compress(index_bytes, compresslevel=1)
 
-    binary_data = {
-        "embeddings_compressed_bytes": embeddings_compressed,
-        "embeddings_compressed": "gzip",
-        "index_compressed_bytes": index_compressed,
-        "index_compressed": "gzip",
+    binary_data: dict[str, bytes] = {
+        "embeddings_bytes": pickle.dumps(embeddings),
+        "index_bytes": index_bytes,
     }
 
     await semantic.save(binary_data=binary_data)
@@ -96,9 +91,9 @@ async def test_semantic_index_roundtrip_with_binary_data(test_db):
     assert loaded.embedding_dimension == 4
     assert loaded.num_embeddings == 3
     assert loaded.binary_data is not None
-    assert "embeddings_compressed_bytes" in loaded.binary_data
+    assert "embeddings_bytes" in loaded.binary_data
 
-    restored = pickle.loads(gzip.decompress(loaded.binary_data["embeddings_compressed_bytes"]))
+    restored = pickle.loads(loaded.binary_data["embeddings_bytes"])
     np.testing.assert_array_almost_equal(restored, embeddings)
 
     manager = get_version_manager()
@@ -120,7 +115,9 @@ async def test_search_index_roundtrip_with_component_references(test_db):
 
     trie_index = await TrieIndex.create(corpus)
     await trie_index.save()
-    saved_trie = await TrieIndex.get(corpus_uuid=corpus.corpus_uuid, config=VersionConfig(use_cache=False))
+    saved_trie = await TrieIndex.get(
+        corpus_uuid=corpus.corpus_uuid, config=VersionConfig(use_cache=False)
+    )
     assert saved_trie is not None
 
     search_index = await SearchIndex.create(corpus=corpus, semantic=False)

@@ -188,9 +188,28 @@ class VersionedDataManager:
         config: VersionConfig = VersionConfig(),
         metadata: dict[str, Any] | None = None,
         dependencies: list[PydanticObjectId] | None = None,
+        binary_payload: dict[str, bytes] | None = None,
     ) -> BaseVersionedData:
-        """Save with versioning and optimal serialization."""
-        # Single serialization with sorted keys and ObjectId handling
+        """Save with versioning and optimal serialization.
+
+        ``binary_payload`` is the first-class hook for models that own large
+        opaque blobs (FAISS indices, ffuzzy bytes). When provided, the manager
+        routes the entire write through GridFS in a single atomic flow:
+
+        1. Hash + version-resolve over the *metadata* dict only (small).
+        2. Pickle ``{**content, "binary_data": binary_payload}`` and upload
+           it to GridFS via :func:`set_versioned_content`.
+        3. Persist the version document with ``content_location`` pointing
+           at the GridFS blob.
+        4. Warm L1/L2 cache so subsequent reads in the same process bypass
+           GridFS entirely.
+
+        Consumers receive a fully-populated ``BaseVersionedData`` and never
+        need to know about ``ContentLocation``, ``StorageType``, or GridFS.
+        """
+        # Hash over the small metadata dict — never the binary blob.
+        # binary_payload is opaque to versioning; identical metadata with
+        # different binary content still produces a single canonical version.
         content_str = json.dumps(content, sort_keys=True, default=encode_for_json)
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
 
@@ -291,8 +310,10 @@ class VersionedDataManager:
         versioned = model_class(**constructor_params)
         logger.info(f"Created {model_class.__name__} instance with uuid={versioned.uuid}")
 
-        # Set content with automatic storage strategy
-        await set_versioned_content(versioned, content)
+        # Set content with automatic storage strategy. When binary_payload is
+        # provided, the helper pickles {content, binary_data: payload} into a
+        # single GridFS blob and warms the L1/L2 cache transparently.
+        await set_versioned_content(versioned, content, binary_payload=binary_payload)
 
         # Atomic save with version chain update using per-resource lock
         async with self._get_lock(resource_type, resource_id):

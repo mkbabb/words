@@ -1,6 +1,5 @@
 """Tests for index persistence crash recovery and corruption handling."""
 
-import gzip
 import pickle
 import tempfile
 from unittest.mock import MagicMock, patch
@@ -106,10 +105,8 @@ class TestCrashRecovery:
             vocabulary_hash=test_corpus.vocabulary_hash,
             model_name="test_model",
             binary_data={
-                "embeddings_compressed_bytes": gzip.compress(b"not_valid_pickle"),
-                "embeddings_compressed": "gzip",
-                "index_compressed_bytes": gzip.compress(b"not_valid_faiss"),
-                "index_compressed": "gzip",
+                "embeddings_bytes": b"not_valid_pickle",
+                "index_bytes": b"not_valid_faiss",
             },
         )
 
@@ -236,60 +233,45 @@ class TestCrashRecovery:
         assert retrieved is None
 
     @pytest.mark.asyncio
-    async def test_compression_decompression_integrity(self, test_corpus):
-        """Test that compression/decompression maintains data integrity."""
-        # Create semantic index with known data
+    async def test_binary_data_roundtrip_integrity(self, test_corpus):
+        """Save and reload a SemanticIndex; verify byte-exact binary_data roundtrip."""
         semantic_index = SemanticIndex(
             corpus_uuid=test_corpus.corpus_uuid,
             corpus_name=test_corpus.corpus_name,
             vocabulary_hash=test_corpus.vocabulary_hash,
             model_name="compression_test",
-            vocabulary=TEST_VOCABULARY,
-            lemmatized_vocabulary=TEST_LEMMAS,
         )
 
-        # Create specific embeddings
         original_embeddings = np.array(
             [[1.0, 2.0, 3.0] for _ in TEST_VOCABULARY],
             dtype=np.float32,
         )
 
-        # Compress using current format (gzip)
-        embeddings_bytes = pickle.dumps(original_embeddings)
-        embeddings_compressed = gzip.compress(embeddings_bytes, compresslevel=1)
-
-        # Build a FAISS index for complete binary_data
-        index = faiss.IndexFlatL2(3)
-        index.add(original_embeddings)
+        # Build a FAISS index so binary_data is well-formed.
+        faiss_index = faiss.IndexFlatL2(3)
+        faiss_index.add(original_embeddings)
         with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
-            faiss.write_index(index, tmp.name)
+            faiss.write_index(faiss_index, tmp.name)
             with open(tmp.name, "rb") as f:
                 index_bytes = f.read()
-        index_compressed = gzip.compress(index_bytes, compresslevel=1)
 
-        binary_data = {
-            "embeddings_compressed_bytes": embeddings_compressed,
-            "embeddings_compressed": "gzip",
-            "index_compressed_bytes": index_compressed,
-            "index_compressed": "gzip",
+        binary_data: dict[str, bytes] = {
+            "embeddings_bytes": pickle.dumps(original_embeddings),
+            "index_bytes": index_bytes,
         }
 
         await semantic_index.save(binary_data=binary_data)
 
-        # Retrieve and verify
         retrieved = await SemanticIndex.get(
             corpus_uuid=test_corpus.corpus_uuid,
             model_name="compression_test",
         )
         assert retrieved is not None
+        assert retrieved.binary_data is not None
+        assert "embeddings_bytes" in retrieved.binary_data
 
-        # Decompress and verify data integrity
-        if hasattr(retrieved, "binary_data") and retrieved.binary_data:
-            decompressed = gzip.decompress(retrieved.binary_data["embeddings_compressed_bytes"])
-            restored_embeddings = pickle.loads(decompressed)
-
-            # Verify exact match
-            np.testing.assert_array_almost_equal(original_embeddings, restored_embeddings)
+        restored_embeddings = pickle.loads(retrieved.binary_data["embeddings_bytes"])
+        np.testing.assert_array_almost_equal(original_embeddings, restored_embeddings)
 
     @pytest.mark.asyncio
     async def test_cache_invalidation_on_corruption(self, test_corpus):

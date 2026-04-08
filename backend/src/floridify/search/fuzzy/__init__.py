@@ -1,7 +1,13 @@
 """Fuzzy search sub-module.
 
-Heavy imports (FuzzySearch, FuzzyIndex) are lazy to avoid circular imports
-with corpus.core which imports candidates.py from this package.
+The fuzzy search path is now implemented by the ``ffuzzy`` Rust crate —
+see ``search.py`` for the thin Python wrapper and ``index.py`` for the
+persistence bridge. This package re-exports the substring-search helpers
+(``candidates`` / ``suffix_array``) and the frequency scoring helper
+used by ``trie.index``; everything else has moved to Rust.
+
+Heavy imports (``FuzzySearch``, ``FuzzyIndex``) are lazy to avoid
+circular imports with ``corpus.core`` which imports ``candidates.py``.
 """
 
 from __future__ import annotations
@@ -9,7 +15,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # Pure-function modules — safe to import eagerly (no corpus dependency)
-from .bk_tree import BKTree, adaptive_max_distance, cascading_search
 from .candidates import (
     POSTING_DTYPE,
     LengthBuckets,
@@ -30,9 +35,6 @@ if TYPE_CHECKING:
 __all__ = [
     "FuzzySearch",
     "FuzzyIndex",
-    "BKTree",
-    "cascading_search",
-    "adaptive_max_distance",
     "SuffixArray",
     "apply_length_correction",
     "calculate_default_frequency",

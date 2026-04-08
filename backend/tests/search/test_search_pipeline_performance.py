@@ -73,9 +73,10 @@ async def test_search_modes_across_corpus_sizes(size_name: str) -> None:
     assert any(result.word == "audittrail" for result in fuzzy_results[-1])
     assert any(result.word == "audittrail" for result in smart_results[-1])
 
-    # Gates scale with corpus size — fuzzy is O(n), others are O(1) or O(log n)
-    fuzzy_ceiling = {"tiny": 50.0, "small": 100.0, "medium": 500.0, "large": 5000.0}
-    smart_ceiling = {"tiny": 100.0, "small": 150.0, "medium": 600.0, "large": 5000.0}
+    # Gates scale with corpus size — fuzzy is O(n), others are O(1) or O(log n).
+    # BK-tree node visit cap (50K) bounds worst-case fuzzy to ~50ms at 278K.
+    fuzzy_ceiling = {"tiny": 50.0, "small": 100.0, "medium": 500.0, "large": 500.0}
+    smart_ceiling = {"tiny": 100.0, "small": 150.0, "medium": 600.0, "large": 500.0}
     _assert_fast_enough(f"{size_name}:exact", exact_case.stats.p95_ms, 20.0)
     _assert_fast_enough(f"{size_name}:prefix", prefix_case.stats.p95_ms, 40.0)
     _assert_fast_enough(f"{size_name}:fuzzy", fuzzy_case.stats.p95_ms, fuzzy_ceiling[size_name])
