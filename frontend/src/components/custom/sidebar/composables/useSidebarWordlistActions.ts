@@ -41,23 +41,12 @@ export function useSidebarWordlistActions() {
         wordlistMode.allWordlists = val;
     };
 
-    // Transform API response to frontend WordList format
+    // Transform API response to frontend WordList format. The /wordlists
+    // list endpoint returns metadata only — words are loaded separately
+    // via /wordlists/{id}/words.
     const transformWordlistFromAPI = (apiWordlist: any): WordList => ({
+        ...apiWordlist,
         id: apiWordlist._id || apiWordlist.id,
-        name: apiWordlist.name,
-        description: apiWordlist.description,
-        hash_id: apiWordlist.hash_id,
-        words: apiWordlist.words || [],
-        total_words: apiWordlist.total_words,
-        unique_words: apiWordlist.unique_words,
-        learning_stats: apiWordlist.learning_stats,
-        last_accessed: apiWordlist.last_accessed,
-        created_at: apiWordlist.created_at,
-        updated_at: apiWordlist.updated_at,
-        metadata: apiWordlist.metadata || {},
-        tags: apiWordlist.tags || [],
-        is_public: apiWordlist.is_public || false,
-        owner_id: apiWordlist.owner_id,
     });
 
     // File handling
@@ -219,14 +208,12 @@ export function useSidebarWordlistActions() {
 
     const handleWordlistDuplicate = async (wordlist: WordList) => {
         try {
-            const words = wordlist.words.map((w) => w.word);
-            const result = await wordlistApi.createWordlist({
-                name: `${wordlist.name} (Copy)`,
-                description: wordlist.description,
-                words,
-                tags: wordlist.tags,
-                owner_id: 'current_user',
-            });
+            // Use the backend clone endpoint — it copies words server-side
+            // without requiring the frontend to know them.
+            const result = await wordlistApi.cloneWordlist(
+                wordlist.id,
+                `${wordlist.name} (Copy)`,
+            );
 
             const newWordlist = transformWordlistFromAPI(result.data);
             const wordlists = getWordlists();

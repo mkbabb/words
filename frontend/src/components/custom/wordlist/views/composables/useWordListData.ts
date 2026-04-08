@@ -50,21 +50,8 @@ export function useWordListData() {
             ]);
 
             currentWordlistData.value = {
+                ...response.data,
                 id: (response.data as any)._id || response.data.id,
-                name: response.data.name,
-                description: response.data.description,
-                hash_id: response.data.hash_id,
-                words: [],
-                total_words: response.data.total_words,
-                unique_words: response.data.unique_words,
-                learning_stats: response.data.learning_stats,
-                last_accessed: response.data.last_accessed,
-                created_at: response.data.created_at,
-                updated_at: response.data.updated_at,
-                metadata: response.data.metadata || {},
-                tags: response.data.tags || [],
-                is_public: response.data.is_public || false,
-                owner_id: response.data.owner_id,
             };
 
             const statsData = (stats as any)?.data ?? stats;

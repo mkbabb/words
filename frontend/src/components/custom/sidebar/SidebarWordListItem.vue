@@ -161,28 +161,15 @@ const handleConfirmDelete = () => {
 };
 
 const handleExport = () => {
-  // Create a simple CSV export
-  const words = props.wordlist.words || [];
-  const csvContent = [
-    'word,mastery_level,frequency,last_visited,notes',
-    ...words.map(word => [
-      word.word,
-      word.mastery_level,
-      word.frequency,
-      word.last_visited || '',
-      word.notes.replace(/,/g, ';') // Replace commas to avoid CSV issues
-    ].join(','))
-  ].join('\n');
-  
-  const blob = new Blob([csvContent], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
+  // Use the backend's CSV export endpoint — words live server-side, not in
+  // the metadata-only WordList response.
+  const url = `/api/v1/wordlists/${props.wordlist.id}/export?format=csv`;
   const link = document.createElement('a');
   link.href = url;
   link.download = `${props.wordlist.name.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 };
 </script>
 

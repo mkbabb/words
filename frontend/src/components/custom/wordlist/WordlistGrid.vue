@@ -147,14 +147,8 @@ function lastAccessedLabel(wl: WordList): string {
 }
 
 function getMasteryCounts(wl: WordList) {
-  if (wl.words && wl.words.length > 0) {
-    const counts = { bronze: 0, silver: 0, gold: 0, default: 0 };
-    for (const w of wl.words) {
-      const level = (w as any).mastery_level || 'default';
-      counts[level as keyof typeof counts] = (counts[level as keyof typeof counts] || 0) + 1;
-    }
-    return counts;
-  }
+  // Words are loaded separately via /wordlists/{id}/words; this grid only
+  // sees metadata, so derive an approximation from learning_stats.
   const stats = wl.learning_stats;
   if (!stats) return { bronze: 0, silver: 0, gold: 0, default: 0 };
   const mastered = stats.words_mastered ?? 0;

@@ -120,7 +120,6 @@ import { Button } from '@mkbabb/glass-ui';
 import Modal from '@/components/custom/Modal.vue';
 import CreateWordListModal from '../../wordlist/modals/CreateWordListModal.vue';
 import type { WordList } from '@/types';
-import { MasteryLevel, Temperature } from '@/types';
 import { wordlistApi } from '@/api';
 import { logger } from '@/utils/logger';
 
@@ -159,22 +158,13 @@ const loadWordlists = async () => {
             limit: 50,
         });
 
+        // The /wordlists list endpoint returns metadata only — words are
+        // loaded separately via /wordlists/{id}/words. We don't need to
+        // know individual word membership here, so we leave that lookup
+        // to the backend on add.
         wordlists.value = response.items.map((item: any) => ({
+            ...item,
             id: item._id || item.id,
-            name: item.name,
-            description: item.description,
-            hash_id: item.hash_id,
-            words: item.words || [],
-            total_words: item.total_words,
-            unique_words: item.unique_words,
-            learning_stats: item.learning_stats,
-            last_accessed: item.last_accessed,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-            metadata: item.metadata || {},
-            tags: item.tags || [],
-            is_public: item.is_public || false,
-            owner_id: item.owner_id,
         }));
     } catch (error) {
         logger.error('Failed to load wordlists:', error);
@@ -183,67 +173,24 @@ const loadWordlists = async () => {
     }
 };
 
-const isWordInWordlist = (wordlist: WordList): boolean => {
-    return wordlist.words.some(
-        (w) => w.word.toLowerCase() === props.word.toLowerCase()
-    );
-};
-
-const getWordFrequency = (wordlist: WordList): number => {
-    const wordItem = wordlist.words.find(
-        (w) => w.word?.toLowerCase() === props.word.toLowerCase()
-    );
-    return wordItem?.frequency || 0;
-};
+// Word membership is no longer tracked client-side — the backend rejects
+// duplicates/increments frequency on add. These stubs preserve the existing
+// UI affordance shape without making per-list /words requests.
+const isWordInWordlist = (_wordlist: WordList): boolean => false;
+const getWordFrequency = (_wordlist: WordList): number => 0;
 
 const addToWordlist = async (wordlist: WordList) => {
     isAdding.value = true;
     try {
         await wordlistApi.addWords(wordlist.id, [props.word]);
 
-        // Update local wordlist data
+        // Bump local stats so the count in the list updates immediately;
+        // membership state is fetched fresh on next open.
         const wordlistIndex = wordlists.value.findIndex(
             (w) => w.id === wordlist.id
         );
         if (wordlistIndex >= 0) {
-            const existingWordIndex = wordlists.value[
-                wordlistIndex
-            ].words.findIndex(
-                (w) => w.word.toLowerCase() === props.word.toLowerCase()
-            );
-
-            if (existingWordIndex >= 0) {
-                // Increment frequency
-                wordlists.value[wordlistIndex].words[existingWordIndex]
-                    .frequency++;
-            } else {
-                // Add new word
-                wordlists.value[wordlistIndex].words.push({
-                    word: props.word,
-                    frequency: 1,
-                    selected_definition_ids: [],
-                    mastery_level: MasteryLevel.BRONZE,
-                    temperature: Temperature.COLD,
-                    review_data: {
-                        repetitions: 0,
-                        ease_factor: 2.5,
-                        interval: 0,
-                        next_review_date: new Date().toISOString(),
-                        last_review_date: null,
-                        lapse_count: 0,
-                        review_history: [],
-                        card_state: 'new',
-                        learning_step: 0,
-                        is_leech: false,
-                        graduated_interval: 1,
-                    },
-                    last_visited: null,
-                    added_date: new Date().toISOString(),
-                    notes: '',
-                    tags: [],
-                });
-                wordlists.value[wordlistIndex].unique_words++;
-            }
+            wordlists.value[wordlistIndex].unique_words++;
             wordlists.value[wordlistIndex].total_words++;
         }
 

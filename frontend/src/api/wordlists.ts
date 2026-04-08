@@ -1,18 +1,21 @@
 import { api, API_BASE_URL } from './core';
 import { logger } from '@/utils/logger';
 import type {
+  WordList,
   WordListItem,
   WordListQueryParams,
   WordListSearchQueryParams,
   WordListsQueryParams,
   WordListNamesSearchParams,
-  WordListResponse,
   WordListsResponse,
   WordListSearchResponse,
   WordListStats,
   WordlistEntryInput,
 } from '@/types/wordlist';
-import type { ListResponse } from '@/types/api';
+import type { ListResponse, ResourceResponse } from '@/types/api/responses';
+
+// Envelope type used by single-wordlist endpoints
+type WordlistResource = ResourceResponse<WordList>;
 
 // -- Reconcile preview types (mirrors backend ReconcilePreviewResponse) --
 
@@ -63,8 +66,8 @@ export const wordlistApi = {
   },
 
   // Get single wordlist by ID
-  async getWordlist(id: string): Promise<WordListResponse> {
-    const response = await api.get<WordListResponse>(`/wordlists/${id}`);
+  async getWordlist(id: string): Promise<WordlistResource> {
+    const response = await api.get<WordlistResource>(`/wordlists/${id}`);
     return response.data;
   },
 
@@ -76,8 +79,8 @@ export const wordlistApi = {
     tags?: string[];
     is_public?: boolean;
     owner_id?: string;
-  }): Promise<WordListResponse> {
-    const response = await api.post<WordListResponse>('/wordlists', data);
+  }): Promise<WordlistResource> {
+    const response = await api.post<WordlistResource>('/wordlists', data);
     return response.data;
   },
 
@@ -88,7 +91,7 @@ export const wordlistApi = {
     tags?: string;
     is_public?: boolean;
     owner_id?: string;
-  }): Promise<WordListResponse> {
+  }): Promise<WordlistResource> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -98,7 +101,7 @@ export const wordlistApi = {
     if (options?.is_public !== undefined) formData.append('is_public', options.is_public.toString());
     if (options?.owner_id) formData.append('owner_id', options.owner_id);
 
-    const response = await api.post<WordListResponse>('/wordlists/upload', formData, {
+    const response = await api.post<WordlistResource>('/wordlists/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -210,8 +213,8 @@ export const wordlistApi = {
     description?: string;
     tags?: string[];
     is_public?: boolean;
-  }): Promise<WordListResponse> {
-    const response = await api.put<WordListResponse>(`/wordlists/${id}`, data);
+  }): Promise<WordlistResource> {
+    const response = await api.put<WordlistResource>(`/wordlists/${id}`, data);
     return response.data;
   },
 
@@ -221,8 +224,8 @@ export const wordlistApi = {
   },
 
   // Add words to wordlist
-  async addWords(id: string, words: Array<string | WordlistEntryInput>): Promise<WordListResponse> {
-    const response = await api.post<WordListResponse>(`/wordlists/${id}/words`, { words });
+  async addWords(id: string, words: Array<string | WordlistEntryInput>): Promise<WordlistResource> {
+    const response = await api.post<WordlistResource>(`/wordlists/${id}/words`, { words });
     return response.data;
   },
 
