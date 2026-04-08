@@ -204,10 +204,17 @@ class FuzzyIndex(BaseModel):
     ) -> FuzzyIndex:
         """Get cached fuzzy index or build a new one.
 
-        A cached entry is reused only when its ``vocabulary_hash``
-        matches and its ``binary_data`` contains the ``ffuzzy`` blob.
-        Stale cache entries from earlier schemas (no binary, missing
-        ``ffuzzy`` key) trigger a rebuild.
+        A cached entry is reused only when all three hold:
+
+        1. `vocabulary_hash` matches the current corpus.
+        2. `binary_data["ffuzzy"]` is present (not a legacy-schema row).
+        3. The ffuzzy blob round-trips through `ffuzzy.Index.from_bytes`
+           successfully — the Rust side owns its own schema version and
+           bincode layout, and when those shift (crate upgrade,
+           `SCHEMA_VERSION` bump) the cached blob becomes structurally
+           unreadable. Validating at get-time treats those as cache
+           misses cleanly and saves the rebuilt blob so the next
+           startup hits a warm cache.
         """
         if corpus.corpus_uuid:
             existing = await cls.get(corpus.corpus_uuid, config)
@@ -217,9 +224,19 @@ class FuzzyIndex(BaseModel):
                 and existing.binary_data is not None
                 and existing.binary_data.get("ffuzzy")
             ):
-                logger.debug(f"Using cached fuzzy index for '{corpus.corpus_name}'")
-                return existing
-            if existing:
+                try:
+                    ffuzzy.Index.from_bytes(existing.binary_data["ffuzzy"])
+                except Exception as e:
+                    logger.info(
+                        f"Cached FuzzyIndex for '{corpus.corpus_name}' "
+                        f"failed ffuzzy deserialization ({e}); rebuilding."
+                    )
+                else:
+                    logger.debug(
+                        f"Using cached fuzzy index for '{corpus.corpus_name}'"
+                    )
+                    return existing
+            elif existing:
                 logger.info(
                     f"Cached FuzzyIndex for '{corpus.corpus_name}' is stale "
                     f"or missing ffuzzy payload; rebuilding."
