@@ -19,14 +19,14 @@
 
             <!-- Inline pills -->
             <div class="flex items-center gap-1 flex-wrap">
-                <span v-if="word.frequency > 1" class="pill bg-muted/60 text-muted-foreground">
+                <span v-if="word.frequency > 1" class="inline-pill bg-muted/60 text-muted-foreground">
                     {{ word.frequency }}×
                 </span>
-                <span v-if="cardState" :class="['pill', cardStateBadgeClass]">
+                <span v-if="cardState" :class="['inline-pill', cardStateBadgeClass]">
                     {{ cardStateLabel }}
                 </span>
-                <span v-if="isDue" class="pill bg-primary/10 text-primary">due</span>
-                <span v-if="word.review_data?.is_leech" class="pill bg-destructive/10 text-destructive">leech</span>
+                <span v-if="isDue" class="inline-pill bg-primary/10 text-primary">due</span>
+                <span v-if="word.review_data?.is_leech" class="inline-pill bg-destructive/10 text-destructive">leech</span>
             </div>
         </div>
 
@@ -41,7 +41,7 @@
             <span v-if="word.temperature === 'hot'" class="h-1.5 w-1.5 rounded-full bg-orange-400" />
             <span
                 v-if="word.mastery_level && word.mastery_level !== 'default'"
-                :class="['pill font-semibold capitalize', masteryBadgeClass]"
+                :class="['inline-pill font-semibold capitalize', masteryBadgeClass]"
             >
                 {{ word.mastery_level }}
             </span>
@@ -121,15 +121,3 @@ function formatIntervalShort(interval: number): string {
     return `${(interval / 365).toFixed(1)}y`;
 }
 </script>
-
-<style scoped>
-.pill {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 1px 6px;
-    font-size: var(--type-micro);
-    font-weight: 500;
-    line-height: 1.4;
-}
-</style>
