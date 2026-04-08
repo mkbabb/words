@@ -170,8 +170,14 @@ export default defineConfig({
             if (id.includes('lucide-vue-next')) return 'icons';
             // Auth (loaded after paint)
             if (id.includes('@clerk')) return 'clerk';
-            // KaTeX (lazy-loaded, 261KB)
+            // KaTeX (lazy-loaded via DefinitionDisplay)
             if (id.includes('katex')) return 'katex';
+            // highlight.js (lazy-loaded via latex-paper CodeBlock)
+            if (id.includes('highlight.js')) return 'hljs';
+            // Virtual scrolling (lazy-loaded via WordListView)
+            if (id.includes('@tanstack')) return 'virtual';
+            // Carousel (lazy-loaded via DefinitionDisplay)
+            if (id.includes('embla-carousel')) return 'carousel';
           }
         },
       },
