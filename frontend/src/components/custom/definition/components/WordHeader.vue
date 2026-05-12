@@ -89,7 +89,8 @@
                             class="cursor-pointer"
                             :key-fn="(lang: string) => lang"
                         >
-                            <template #icon="{ item: lang }">
+                            <!-- @vue-ignore -->
+                            <template #icon="{ item: lang }: { item: string }">
                                 <span
                                     :class="[
                                         'flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-background/96 font-semibold uppercase shadow-cartoon-sm',
@@ -222,7 +223,8 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
-import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, StackedIconGroup, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { StackedIconGroup } from '@mkbabb/glass-ui/stacked-icons';
 import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './media/AudioPlaybackButton.vue';

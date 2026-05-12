@@ -102,7 +102,7 @@ import { useContentStore } from '@/stores/content/content';
 import { useHistoryStore } from '@/stores/content/history';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { useLoadingStore } from '@/stores/ui/loading';
-import { ConfirmDialog } from '@mkbabb/glass-ui';
+import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 
 // Sub-components
 import SearchBarShell from './components/SearchBarShell.vue';

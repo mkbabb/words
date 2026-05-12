@@ -57,7 +57,8 @@ import { ref, computed, watch, inject } from 'vue';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useStores } from '@/stores';
 import { useSidebarState, useSidebarNavigation } from './composables';
-import { useScrollTracker, useSidebarFollow } from '@mkbabb/glass-ui';
+import { useScrollTracker } from '@mkbabb/glass-ui/sidebar';
+import { useSidebarFollow } from '@mkbabb/glass-ui/sidebar';
 import SidebarCluster from './components/SidebarCluster.vue';
 import { EnsureTargetWindowKey } from '@/components/custom/definition/constants';
 

@@ -18,7 +18,7 @@
                             <button 
                                 @click="item.type === 'lookup' ? handleCollapsedWordClick(item.word!) : handleCollapsedAIClick(item.query!)"
                                 class="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-background/95 text-sm font-medium shadow-cartoon-sm transition-[background-color,border-color,color,box-shadow,transform] duration-fast ease-spring-snappy transform-gpu hover:-translate-y-0.5 hover:shadow-cartoon-md hover:border-border/60 hover:bg-background"
-                                :class="{ 'bg-[var(--color-gold)]/10 border-[var(--color-gold)]/20 text-[var(--color-gold)] hover:bg-[var(--color-gold)]/15 hover:border-[var(--color-gold)]/30': item.type === 'ai' }"
+                                :class="{ 'bg-gold/10 border-gold/20 text-gold hover:bg-gold/15 hover:border-gold/30': item.type === 'ai' }"
                             >
                                 <template v-if="item.type === 'lookup'">
                                     {{ item.word!.substring(0, 2).toUpperCase() }}
@@ -37,7 +37,7 @@
                                     </p>
                                 </template>
                                 <template v-else>
-                                    <h4 class="font-medium text-[var(--color-gold)]">AI Query</h4>
+                                    <h4 class="font-medium text-gold">AI Query</h4>
                                     <p class="text-sm text-muted-foreground">{{ item.query }}</p>
                                 </template>
                                 <p class="text-xs text-muted-foreground/70">

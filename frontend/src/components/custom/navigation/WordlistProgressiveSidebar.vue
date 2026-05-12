@@ -7,7 +7,7 @@
                 <div class="flex items-start gap-2">
                     <button
                         @click="goBack"
-                        class="glass-subtle p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-fast ease flex-shrink-0 shadow-cartoon-sm hover:shadow-cartoon-md"
+                        class="glass-wash p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:border-border/60 transition-[color,background-color,border-color,box-shadow] duration-fast ease flex-shrink-0 shadow-cartoon-sm hover:shadow-cartoon-md"
                     >
                         <ChevronLeft class="h-4 w-4" />
                     </button>

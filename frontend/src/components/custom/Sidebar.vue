@@ -35,7 +35,7 @@
       <div
         data-sidebar
         :class="cn(
-          'border-border pointer-events-auto fixed top-0 left-0 z-modal flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-subtle transform-gpu transition-[transform,opacity,box-shadow] duration-slow ease-spring-smooth will-change-[transform,opacity,box-shadow]',
+          'border-border pointer-events-auto fixed top-0 left-0 z-modal flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl rounded-r-2xl glass-wash transform-gpu transition-[transform,opacity,box-shadow] duration-slow ease-spring-smooth will-change-[transform,opacity,box-shadow]',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
         @touchstart.passive="onTouchStart"

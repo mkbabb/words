@@ -77,7 +77,8 @@ import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { cn } from '@mkbabb/glass-ui';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
-import { DarkModeToggle, Popover, PopoverTrigger, PopoverContent, Avatar, AvatarImage, Button } from '@mkbabb/glass-ui';
+import { DarkModeToggle } from '@mkbabb/glass-ui/controls';
+import { Popover, PopoverTrigger, PopoverContent, Avatar, AvatarImage, Button } from '@mkbabb/glass-ui';
 import { PanelRight } from 'lucide-vue-next';
 
 interface Props {

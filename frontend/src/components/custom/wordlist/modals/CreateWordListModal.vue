@@ -215,7 +215,8 @@
 import { computed, toRef } from 'vue';
 import { X } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
-import { Button, Input } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui';
+import { Input } from '@mkbabb/glass-ui/forms';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import type { WordList } from '@/types';
 import { useWordListForm } from './composables/useWordListForm';

@@ -162,7 +162,7 @@ import { Button } from '@mkbabb/glass-ui';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/modals/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/modals/CreateWordListModal.vue';
-import { ConfirmDialog } from '@mkbabb/glass-ui';
+import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 import type { WordList } from '@/types';
 import { useSidebarWordlistActions } from './composables/useSidebarWordlistActions';
 

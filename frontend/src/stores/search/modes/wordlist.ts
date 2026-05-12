@@ -17,7 +17,7 @@ import {
     type WordlistPanelFilters,
     type SortCriterion,
 } from '@/stores/types/constants';
-import { useWindowedStore } from '@mkbabb/glass-ui';
+import { useWindowedStore } from '@/composables/virtual';
 /**
  * Unified wordlist mode store — pure state management only.
  *

@@ -14,7 +14,7 @@
     >
         <button
             type="button"
-            class="group/info absolute right-4 top-4 z-content inline-flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-muted-foreground shadow-cartoon-sm transition-fast hover:text-foreground"
+            class="group/info absolute right-4 top-4 z-content inline-flex h-8 w-8 items-center justify-center rounded-full glass-wash text-muted-foreground shadow-cartoon-sm transition-fast hover:text-foreground"
             aria-label="Supported formats"
             @click.stop
         >

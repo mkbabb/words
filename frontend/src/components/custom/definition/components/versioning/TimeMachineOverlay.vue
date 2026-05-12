@@ -19,7 +19,7 @@
 
                 <!-- Close button -->
                 <button
-                    class="absolute top-4 right-4 z-controls flex h-8 w-8 items-center justify-center rounded-full glass-subtle text-foreground/70 transition-colors hover:bg-background/90 hover:text-foreground"
+                    class="absolute top-4 right-4 z-controls flex h-8 w-8 items-center justify-center rounded-full glass-wash text-foreground/70 transition-colors hover:bg-background/90 hover:text-foreground"
                     @click.stop="emit('close')"
                 >
                     <X :size="16" />
@@ -73,7 +73,7 @@
                         >
                             <!-- Left arrow (older) -->
                             <button
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-subtle text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-wash text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                 :disabled="isOldest"
                                 @click="$emit('navigatePrev')"
                             >
@@ -97,7 +97,7 @@
 
                             <!-- Right arrow (newer) -->
                             <button
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-subtle text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full glass-wash text-muted-foreground transition-[color,background-color,opacity] hover:bg-background/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                 :disabled="isNewest"
                                 @click="$emit('navigateNext')"
                             >

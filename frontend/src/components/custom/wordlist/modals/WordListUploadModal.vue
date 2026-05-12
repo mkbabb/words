@@ -59,7 +59,7 @@
                     key="review"
                     class="space-y-6"
                 >
-                    <div class="rounded-2xl glass-subtle p-4">
+                    <div class="rounded-2xl glass-wash p-4">
                         <div class="mb-4 flex items-center justify-between gap-3">
                             <div>
                                 <p class="font-medium">Parsed output</p>

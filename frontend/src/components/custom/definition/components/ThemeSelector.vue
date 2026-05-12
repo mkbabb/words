@@ -8,9 +8,9 @@
             <template #collapsed>
                 <Tooltip>
                     <TooltipTrigger as-child>
-                        <button class="dock-icon-btn" @click.stop="handleCollapsedClick">
+                        <DockIconButton @click.stop="handleCollapsedClick">
                             <Edit2 :size="20" />
-                        </button>
+                        </DockIconButton>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" :side-offset="6">
                         Enter edit mode
@@ -24,9 +24,9 @@
                     <!-- Card Theme (far left) -->
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <button class="dock-icon-btn" @click="toggleDropdown">
+                            <DockIconButton @click="toggleDropdown">
                                 <Layers :size="20" />
-                            </button>
+                            </DockIconButton>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="6">
                             Card Theme
@@ -38,9 +38,9 @@
                     <!-- Add Image -->
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <button class="dock-icon-btn" @click="$emit('add-image')">
+                            <DockIconButton @click="$emit('add-image')">
                                 <ImagePlus :size="20" />
-                            </button>
+                            </DockIconButton>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="6">
                             Add Image
@@ -50,9 +50,9 @@
                     <!-- Version History -->
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <button class="dock-icon-btn" @click="$emit('toggle-version-history')">
+                            <DockIconButton @click="$emit('toggle-version-history')">
                                 <History :size="20" />
-                            </button>
+                            </DockIconButton>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="6">
                             Version History
@@ -62,9 +62,9 @@
                     <!-- Re-synthesize -->
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <button class="dock-icon-btn" @click="showVersionSelector = !showVersionSelector">
+                            <DockIconButton @click="showVersionSelector = !showVersionSelector">
                                 <RefreshCw :size="20" />
-                            </button>
+                            </DockIconButton>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="6">
                             Re-synthesize
@@ -75,14 +75,13 @@
                 </template>
 
                 <!-- Edit toggle (far right — checkmark when active, pencil when collapsed) -->
-                <button
-                    class="dock-icon-btn"
-                    :class="editModeEnabled && 'active'"
+                <DockIconButton
+                    :class="editModeEnabled && 'is-active'"
                     @click="handleEditToggle"
                 >
                     <Edit2 v-if="!editModeEnabled" :size="20" />
                     <Check v-else :size="20" />
-                </button>
+                </DockIconButton>
             </div>
         </GlassDock>
 
@@ -142,7 +141,7 @@
 import { ref } from 'vue';
 import { Edit2, Check, History, RefreshCw, Layers, ImagePlus } from 'lucide-vue-next';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
-import { GlassDock } from '@mkbabb/glass-ui';
+import { GlassDock, DockIconButton } from '@mkbabb/glass-ui/dock';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';
@@ -204,35 +203,7 @@ const selectTheme = (theme: CardVariant) => {
 </script>
 
 <style scoped>
-/* Dock button styles (matches Fourier dock-buttons.css) */
-.dock-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 9999px;
-    border: none;
-    background: transparent;
-    color: var(--color-muted-foreground);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    padding: 0;
-}
-.dock-icon-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-foreground) 8%, transparent);
-    color: var(--color-foreground);
-    transform: scale(1.1);
-}
-.dock-icon-btn:active:not(:disabled) {
-    transform: scale(0.92);
-}
-.dock-icon-btn:focus-visible {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ring) 40%, transparent);
-    outline: none;
-}
-.dock-icon-btn.active {
+.is-active {
     background: color-mix(in srgb, var(--color-foreground) 8%, transparent);
     color: var(--color-foreground);
 }

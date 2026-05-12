@@ -10,7 +10,7 @@
             </div>
             <button
                 @click="showCreate = true"
-                class="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
+                class="glass-wash inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
                        transition-fast hover:shadow-cartoon-sm hover:bg-background/90
                        focus-ring"
             >
@@ -68,7 +68,7 @@
         <div
             v-else-if="allWordlists.length === 0"
             class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/40
-                   glass-subtle px-6 py-16 text-center"
+                   glass-wash px-6 py-16 text-center"
         >
             <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
                 <BookOpen class="h-7 w-7 text-muted-foreground/50" />
@@ -79,7 +79,7 @@
             </p>
             <button
                 @click="showCreate = true"
-                class="glass-subtle mt-5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
+                class="glass-wash mt-5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium
                        transition-fast hover:shadow-cartoon-sm hover:bg-background/90"
             >
                 <Plus class="h-3.5 w-3.5" />
@@ -90,7 +90,7 @@
         <!-- No matching results -->
         <div
             v-else-if="filteredWordlists.length === 0"
-            class="flex flex-col items-center justify-center rounded-2xl glass-subtle px-6 py-12 text-center"
+            class="flex flex-col items-center justify-center rounded-2xl glass-wash px-6 py-12 text-center"
         >
             <BookOpen class="mb-3 h-8 w-8 text-muted-foreground/30" />
             <p class="font-serif text-base font-semibold">No matching wordlists</p>
@@ -162,7 +162,8 @@ import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { wordlistApi } from '@/api/wordlists';
 import { Plus, BookOpen, Flame } from 'lucide-vue-next';
-import { useToast, ConfirmDialog } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui';
+import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 
 import WordlistGrid from '../WordlistGrid.vue';
 const CreateWordListModal = defineAsyncComponent(() => import('../modals/CreateWordListModal.vue'));

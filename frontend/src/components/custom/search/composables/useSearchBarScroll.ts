@@ -68,8 +68,8 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
 
         // Constant maxWidth — never changes during scroll to avoid layout shifts
         const maxWidth = isMobile
-            ? 'calc(100vw - 0.5rem)'
-            : 'min(32rem, calc(100vw - 2rem))';
+            ? 'calc(100dvw - 0.5rem)'
+            : 'min(32rem, calc(100dvw - 2rem))';
 
         // Interactive states: always full size
         if (isInteractive.value) {

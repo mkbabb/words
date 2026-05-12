@@ -86,8 +86,8 @@ import {
     CarouselItem,
     CarouselNext,
     CarouselPrevious,
-} from '@mkbabb/glass-ui';
-import type { CarouselApi } from '@mkbabb/glass-ui';
+} from '@mkbabb/glass-ui/carousel';
+import type { CarouselApi } from '@mkbabb/glass-ui/carousel';
 import CarouselSlide from './CarouselSlide.vue';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';

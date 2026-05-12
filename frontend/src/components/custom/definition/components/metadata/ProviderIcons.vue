@@ -123,7 +123,8 @@
                 size="lg"
                 :key-fn="(p: string) => p"
             >
-                <template #icon="{ item: provider }">
+                <!-- @vue-ignore -->
+                <template #icon="{ item: provider }: { item: string }">
                     <Tooltip>
                         <TooltipTrigger as-child>
                             <button
@@ -151,6 +152,7 @@
                     </Tooltip>
                 </template>
 
+                <!-- @vue-ignore -->
                 <template #info>
                     <PopoverTrigger as-child>
                         <button
@@ -192,7 +194,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Wand2, Info } from 'lucide-vue-next';
-import { Popover, PopoverTrigger, PopoverContent, StackedIconGroup, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { StackedIconGroup } from '@mkbabb/glass-ui/stacked-icons';
 import {
     getProviderIcon,
     getProviderDisplayName,

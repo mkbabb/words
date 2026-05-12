@@ -111,7 +111,7 @@ export function calculateContainerStyle(
     );
 
     // Use smaller responsive widths for better desktop experience
-    const responsiveMaxWidth = 'min(32rem, calc(100vw - 2rem))';
+    const responsiveMaxWidth = 'min(32rem, calc(100dvw - 2rem))';
 
     // Focused/hovered states or dropdowns shown: full size but responsive
     if (isFocused || isHovered || showControls || showResults) {
@@ -138,7 +138,7 @@ export function calculateContainerStyle(
     const maxWidthEnd = 24; // 24rem
     const interpolatedWidth =
         maxWidthStart - clampedProgress * (maxWidthStart - maxWidthEnd);
-    const currentMaxWidth = `min(${interpolatedWidth}rem, calc(100vw - ${2 + clampedProgress * 2}rem))`;
+    const currentMaxWidth = `min(${interpolatedWidth}rem, calc(100dvw - ${2 + clampedProgress * 2}rem))`;
 
     return {
         maxWidth: currentMaxWidth,

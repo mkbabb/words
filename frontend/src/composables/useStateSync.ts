@@ -2,7 +2,7 @@ import { watch, ref } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth';
 import { useHistoryStore } from '@/stores/content/history';
-import { useGlobalDark } from '@mkbabb/glass-ui';
+import { useGlobalDark } from '@mkbabb/glass-ui/dark';
 import { usersApi } from '@/api/users';
 import { logger } from '@/utils/logger';
 

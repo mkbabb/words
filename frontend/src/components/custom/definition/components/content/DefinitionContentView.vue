@@ -159,7 +159,7 @@ import {
     flattenDefinitionClusters,
     type FlatDefinitionCluster,
 } from '../../composables';
-import { useVirtualSectionWindow } from '@mkbabb/glass-ui';
+import { useVirtualSectionWindow } from '@/composables/virtual';
 import { normalizeEtymology } from '@/utils/guards';
 import { STAGGER } from '@/utils/animations';
 import type { CardVariant } from '@/types';

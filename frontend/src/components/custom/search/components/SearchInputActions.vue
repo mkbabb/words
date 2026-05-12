@@ -39,7 +39,7 @@
         >
             <Button
                 v-if="showClear"
-                :variant="aiMode ? 'ai' : 'glass-subtle'"
+                :variant="aiMode ? 'ai' : 'glass-wash'"
                 size="icon"
                 @click.stop="$emit('clear')"
                 :class="[

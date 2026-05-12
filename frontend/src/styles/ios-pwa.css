@@ -55,15 +55,13 @@
   }
 }
 
-/* iOS viewport height fix */
+/* iOS viewport height — 100dvh handles keyboard/URL-bar dynamics natively */
 .h-screen-ios {
   height: 100dvh;
-  height: calc(var(--vh, 1dvh) * 100);
 }
 
 @supports not (height: 100dvh) {
   .h-screen-ios {
-    height: 100vh;
     height: calc(var(--vh, 1vh) * 100);
   }
 }

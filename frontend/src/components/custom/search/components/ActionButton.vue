@@ -33,9 +33,9 @@ const props = withDefaults(defineProps<ActionButtonProps>(), {
 
 const variantMap = computed<Record<Variant, ButtonVariants['variant']>>(() => {
     return {
-        default: 'glass-subtle',
-        primary: 'glass-subtle',
-        danger: 'danger-subtle',
+        default: 'glass-wash',
+        primary: 'glass-wash',
+        danger: 'destructive',
         secondary: 'outline',
     };
 });

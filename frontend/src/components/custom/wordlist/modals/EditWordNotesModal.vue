@@ -50,8 +50,8 @@ import {
     DialogDescription,
     DialogFooter,
     Button,
-    Textarea,
 } from '@mkbabb/glass-ui';
+import { Textarea } from '@mkbabb/glass-ui/forms';
 import type { WordListItem } from '@/types';
 
 interface Props {

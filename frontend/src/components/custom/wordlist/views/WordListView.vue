@@ -24,20 +24,20 @@
                             <div class="flex items-center gap-1.5">
                                 <Tooltip>
                                     <TooltipTrigger as-child>
-                                        <button class="dock-icon-btn" @click="modals.showUploadModal.value = true"><Upload class="h-4 w-4" /></button>
+                                        <DockIconButton @click="modals.showUploadModal.value = true"><Upload class="h-4 w-4" /></DockIconButton>
                                     </TooltipTrigger>
                                     <TooltipContent>Upload words</TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger as-child>
-                                        <button class="dock-icon-btn" @click="modals.showCreateModal.value = true"><Plus class="h-4 w-4" /></button>
+                                        <DockIconButton @click="modals.showCreateModal.value = true"><Plus class="h-4 w-4" /></DockIconButton>
                                     </TooltipTrigger>
                                     <TooltipContent>Create wordlist</TooltipContent>
                                 </Tooltip>
                                 <div class="dock-separator" />
                                 <Tooltip>
                                     <TooltipTrigger as-child>
-                                        <button class="dock-icon-btn text-muted-foreground hover:text-destructive" @click="modals.showDeleteDialog.value = true"><Trash2 class="h-4 w-4" /></button>
+                                        <DockIconButton class="text-muted-foreground hover:text-destructive" @click="modals.showDeleteDialog.value = true"><Trash2 class="h-4 w-4" /></DockIconButton>
                                     </TooltipTrigger>
                                     <TooltipContent>Delete wordlist</TooltipContent>
                                 </Tooltip>
@@ -231,7 +231,8 @@ import { ref, computed, defineAsyncComponent } from 'vue';
 import { useStores } from '@/stores';
 import { Plus, Trash2, Upload, X, ListChecks, CheckSquare } from 'lucide-vue-next';
 import { Button, Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@mkbabb/glass-ui';
-import { GlassDock, ConfirmDialog } from '@mkbabb/glass-ui';
+import { GlassDock, DockIconButton } from '@mkbabb/glass-ui/dock';
+import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 import { ThemedCard } from '@/components/custom/card';
 import { formatCount } from '../utils/formatting';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
@@ -329,26 +330,6 @@ const dueForReview = computed(() => data.preloadedDueCount.value ?? 0);
     opacity: 0;
 }
 
-/* Dock icon buttons (mirror GlassDock scoped styles) */
-.dock-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 9999px;
-    border: none;
-    background: transparent;
-    color: var(--color-muted-foreground);
-    cursor: pointer;
-    transition: color 0.15s ease, background-color 0.15s ease;
-    padding: 0;
-}
-.dock-icon-btn:hover {
-    background: color-mix(in srgb, var(--color-foreground) 8%, transparent);
-    color: var(--color-foreground);
-    transform: scale(1.1);
-}
 .dock-separator {
     width: 1px;
     height: 1.5rem;

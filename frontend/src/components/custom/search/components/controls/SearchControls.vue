@@ -68,7 +68,7 @@
                             <div v-if="wordlistMode.selectedWordlist" class="px-4 pt-2 pb-1">
                                 <Button
                                     @click="handleDashboardClick"
-                                    variant="glass-subtle"
+                                    variant="glass-wash"
                                     size="sm"
                                 >
                                     <LayoutDashboard :size="14" />
