@@ -79,7 +79,7 @@
             <Popover v-if="result.matches && result.matches.length > 1">
                 <PopoverTrigger as-child>
                     <button
-                        class="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/60 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-accent/35 hover:text-foreground hover:scale-105"
+                        class="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/60 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-accent/35 hover:text-foreground scale-on-hover"
                         @click.stop
                     >
                         <Info class="h-3 w-3" />

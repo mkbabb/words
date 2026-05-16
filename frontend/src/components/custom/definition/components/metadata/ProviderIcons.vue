@@ -12,7 +12,7 @@
                         activeSource === 'synthesis'
                             ? 'border-[var(--color-gold)]/40 bg-[var(--color-gold)]/12 text-[var(--color-gold)] ring-2 ring-[var(--color-gold)]/20'
                             : interactive
-                              ? 'border-border/40 bg-background/96 text-muted-foreground/80 opacity-70 hover:border-border/60 hover:bg-background hover:opacity-100 hover:-translate-y-0.5 hover:scale-105'
+                              ? 'border-border/40 bg-background/96 text-muted-foreground/80 opacity-70 hover:border-border/60 hover:bg-background hover:opacity-100 hover:-translate-y-0.5 scale-on-hover'
                               : 'cursor-default border-border/50 bg-background text-muted-foreground/50 opacity-60',
                     ]"
                 >
@@ -32,7 +32,7 @@
                     @click="$emit('select-source', provider)"
                     :class="[
                         'flex h-10 w-10 items-center justify-center rounded-full border bg-background/96 shadow-cartoon-sm transform-gpu transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-fast ease-spring-snappy',
-                        interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:scale-105 hover:bg-background hover:shadow-cartoon-md' : 'cursor-default',
+                        interactive ? 'cursor-pointer hover:-translate-y-0.5 scale-on-hover hover:bg-background hover:shadow-cartoon-md' : 'cursor-default',
                         activeSource === provider
                             ? 'border-primary/40 ring-2 ring-primary/20 bg-primary/10'
                             : 'border-border/30',
@@ -54,7 +54,7 @@
         <Popover v-if="providers.length > 1" v-model:open="popoverOpen">
             <PopoverTrigger as-child>
                 <button
-                    class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/40 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-background/90 hover:text-muted-foreground hover:scale-105"
+                    class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/40 transition-[background-color,color,transform] duration-fast ease-spring-smooth hover:bg-background/90 hover:text-muted-foreground scale-on-hover"
                 >
                     <Info :size="12" />
                 </button>
@@ -156,7 +156,7 @@
                 <template #info>
                     <PopoverTrigger as-child>
                         <button
-                            class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-cartoon-sm transition-[background-color,color,opacity,transform] duration-fast ease-spring-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground hover:scale-105 z-controls"
+                            class="absolute -top-2 -left-2 flex h-6 w-6 items-center justify-center rounded-full border border-border/40 bg-background/96 text-muted-foreground/60 shadow-cartoon-sm transition-[background-color,color,opacity,transform] duration-fast ease-spring-smooth opacity-0 group-hover/stack:opacity-100 hover:bg-background hover:text-muted-foreground scale-on-hover z-controls"
                         >
                             <Info :size="14" />
                         </button>

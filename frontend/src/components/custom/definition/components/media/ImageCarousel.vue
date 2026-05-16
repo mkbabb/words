@@ -41,7 +41,7 @@
                 <template v-if="totalCarouselItems > 1">
                     <CarouselPrevious
                         v-show="showControls"
-                        class="absolute top-1/2 left-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-normal hover:scale-110 hover:bg-black/70"
+                        class="absolute top-1/2 left-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-normal scale-on-hover hover:bg-black/70"
                         :class="{
                             'opacity-0 group-hover:opacity-100': !showControls,
                         }"
@@ -51,7 +51,7 @@
                     />
                     <CarouselNext
                         v-show="showControls"
-                        class="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-normal hover:scale-110 hover:bg-black/70"
+                        class="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 border-none glass-overlay transition-normal scale-on-hover hover:bg-black/70"
                         :class="{
                             'opacity-0 group-hover:opacity-100': !showControls,
                         }"

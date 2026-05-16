@@ -38,7 +38,7 @@
         <span v-if="editMode" class="inline-flex items-center gap-1">
             <button
                 @click="addSynonym"
-                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-cartoon-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground hover:scale-110"
+                class="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-background text-muted-foreground shadow-cartoon-sm transition-micro hover:border-border hover:bg-muted hover:text-foreground scale-on-hover"
                 title="Add synonym"
             >
                 <Plus class="h-3.5 w-3.5" />

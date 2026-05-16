@@ -22,7 +22,7 @@
                 {
                     'text-[var(--color-gold)]': aiMode,
                     'cursor-not-allowed opacity-50': !canToggle,
-                    'cursor-pointer hover:scale-110': canToggle,
+                    'cursor-pointer scale-on-hover': canToggle,
                 },
             ]"
             @toggle-mode="handleToggle"

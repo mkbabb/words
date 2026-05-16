@@ -6,8 +6,8 @@
       'active:scale-95',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
       aiMode
-        ? 'hover:bg-[var(--color-gold)]/15 hover:scale-105 text-[var(--color-gold)]'
-        : 'hover:bg-muted/60 hover:scale-105',
+        ? 'hover:bg-[var(--color-gold)]/15 scale-on-hover text-[var(--color-gold)]'
+        : 'hover:bg-muted/60 scale-on-hover',
       className
     ]"
     @click="$emit('toggle')"

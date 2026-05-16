@@ -138,7 +138,7 @@
         @click="restore"
         class="fixed bottom-6 right-6 z-toast p-3 rounded-full
                bg-primary text-primary-foreground shadow-cartoon-sm
-               hover-lift hover:scale-110 transition-smooth active-scale"
+               hover-lift scale-on-hover transition-smooth active-scale"
         title="Show install prompt"
       >
         <Download class="h-5 w-5" />

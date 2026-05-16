@@ -103,7 +103,7 @@ const { toast } = useToast();
 // Computed classes
 const buttonClasses = computed(() => {
     const base =
-        'flex items-center justify-center rounded-full transition-fast hover:scale-110';
+        'flex items-center justify-center rounded-full scale-on-hover';
     const sizes = {
         sm: 'w-8 h-8 bg-black/50 hover:bg-black/70 p-1',
         lg: 'w-12 h-12 bg-primary/80 hover:bg-primary',
