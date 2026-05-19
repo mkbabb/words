@@ -89,7 +89,7 @@
         <Transition name="dropdown">
             <div
                 v-if="showDropdown && editModeEnabled"
-                class="absolute top-full right-0 z-dropdown mt-2 min-w-[140px] origin-top-right rounded-lg glass-medium text-popover-foreground shadow-cartoon-lg p-1"
+                class="absolute top-full right-0 z-dropdown mt-2 min-w-[140px] origin-top-right rounded-lg glass-quiet text-popover-foreground shadow-cartoon-lg p-1"
                 @click.stop
             >
                 <button
@@ -123,7 +123,7 @@
         <Transition name="dropdown">
             <div
                 v-if="showVersionSelector && word"
-                class="absolute top-full right-0 z-dropdown mt-2 w-96 rounded-lg glass-medium p-4 shadow-cartoon-lg"
+                class="absolute top-full right-0 z-dropdown mt-2 w-96 rounded-lg glass-quiet p-4 shadow-cartoon-lg"
                 @click.stop
             >
                 <ProviderVersionSelector

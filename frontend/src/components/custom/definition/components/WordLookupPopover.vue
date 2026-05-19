@@ -5,7 +5,7 @@
             <button
                 v-if="isPillVisible && !isPopoverVisible"
                 data-word-lookup-pill
-                class="lookup-popover fixed z-popover rounded-full glass-medium px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm transition-[background,box-shadow] duration-fast hover:bg-background/95 hover:shadow-cartoon-sm-hover"
+                class="lookup-popover fixed z-popover rounded-full glass-quiet px-3 py-1 text-xs font-medium text-primary shadow-cartoon-sm transition-[background,box-shadow] duration-fast hover:bg-background/95 hover:shadow-cartoon-sm-hover"
                 :style="pillStyle"
                 @mousedown.prevent.stop="onPillClick"
             >
@@ -18,7 +18,7 @@
             <div
                 v-if="isPopoverVisible"
                 data-word-lookup-popover
-                class="lookup-popover paper-texture-overlay fixed z-popover w-64 rounded-xl glass-medium p-3 shadow-cartoon-sm"
+                class="lookup-popover paper-texture-overlay fixed z-popover w-64 rounded-xl glass-quiet p-3 shadow-cartoon-sm"
                 :style="popoverStyle"
             >
                 <!-- Loading state -->
