@@ -12,19 +12,16 @@ const SEARCH_TARGET = process.env.VITE_SEARCH_URL || API_TARGET; // Separate sea
 const VITE_PORT = Number(process.env.VITE_PORT) || 3004;
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   base: process.env.VITE_BASE_PATH || '/',
   resolve: {
-    // Cross-repo dev-resolution contract (glass-ui Q invariant 30, consumer half):
-    // dev/serve resolves workspace-linked `@mkbabb/*` siblings through their
-    // `development` export condition → live `src/`. The production build omits
-    // `development` so siblings resolve via `import` → their published `dist/`.
-    // No hard `dist/` alias for any `@mkbabb/*` sibling — the bare specifier
+    // Cross-repo dev-resolution contract-v2 (glass-ui A8 abrogation):
+    // the `development` export condition is retired fleet-wide. Dev and prod
+    // alike resolve workspace-linked `@mkbabb/*` siblings through `import` →
+    // their published `dist/`, kept always-fresh by each publisher's
+    // `build:watch`. No mode gate, no hard `dist/` alias — the bare specifier
     // resolves through each sibling's `exports` map via the `file:` symlink.
-    conditions:
-      command === 'serve'
-        ? ['development', 'module', 'browser', 'default']
-        : ['module', 'browser', 'default'],
+    conditions: ['module', 'browser', 'default'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       // Resolve latex-paper sub-exports directly (symlink in dev, copy in Docker).
@@ -119,12 +116,11 @@ export default defineConfig(({ command }) => ({
     host: '0.0.0.0',
     strictPort: true,
     fs: {
-      // The `development` export condition resolves workspace-linked `@mkbabb/*`
-      // siblings to their `src/`; Vite serves those src-relative assets over the
-      // `/@fs/` channel, which requires the sibling roots inside `fs.allow`.
-      // `../..` covers the `words/` repo root and its `@mkbabb/*` siblings one
-      // level up (glass-ui, keyframes.js, ...).
-      allow: ['..', '../..'],
+      // Contract-v2 resolves `@mkbabb/*` siblings through their `dist/` (served
+      // from `node_modules` via the `file:` link), not their `src/` over the
+      // `/@fs/` channel — so the workspace-parent (`../..`) widening is retired.
+      // `..` remains for the in-repo `latex-paper` sibling alias.
+      allow: ['..'],
     },
     hmr: {
       clientPort: VITE_PORT,
@@ -202,7 +198,26 @@ export default defineConfig(({ command }) => ({
     },
   },
   optimizeDeps: {
-    // Pre-bundle dependencies for faster cold starts
-    include: ['vue', 'vue-router', 'pinia'],
+    // Pre-bundle dependencies for faster cold starts. Under contract-v2 the
+    // `@mkbabb/*` siblings resolve to their published `dist/` (no `src/` deep
+    // import) — so they pre-bundle like any other node_modules dep. The
+    // glass-ui subpaths listed are the JS entries imported from `src/`; the
+    // CSS-only exports (`styles`, `dark`) are not pre-bundle candidates.
+    include: [
+      'vue',
+      'vue-router',
+      'pinia',
+      '@mkbabb/keyframes.js',
+      '@mkbabb/glass-ui',
+      '@mkbabb/glass-ui/carousel',
+      '@mkbabb/glass-ui/confirm-dialog',
+      '@mkbabb/glass-ui/controls',
+      '@mkbabb/glass-ui/dock',
+      '@mkbabb/glass-ui/forms',
+      '@mkbabb/glass-ui/sidebar',
+      '@mkbabb/glass-ui/stacked-icons',
+      '@mkbabb/glass-ui/tabs',
+      '@mkbabb/glass-ui/typewriter',
+    ],
   },
 }));
