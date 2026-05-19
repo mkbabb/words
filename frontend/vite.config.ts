@@ -12,9 +12,19 @@ const SEARCH_TARGET = process.env.VITE_SEARCH_URL || API_TARGET; // Separate sea
 const VITE_PORT = Number(process.env.VITE_PORT) || 3004;
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: process.env.VITE_BASE_PATH || '/',
   resolve: {
+    // Cross-repo dev-resolution contract (glass-ui Q invariant 30, consumer half):
+    // dev/serve resolves workspace-linked `@mkbabb/*` siblings through their
+    // `development` export condition → live `src/`. The production build omits
+    // `development` so siblings resolve via `import` → their published `dist/`.
+    // No hard `dist/` alias for any `@mkbabb/*` sibling — the bare specifier
+    // resolves through each sibling's `exports` map via the `file:` symlink.
+    conditions:
+      command === 'serve'
+        ? ['development', 'module', 'browser', 'default']
+        : ['module', 'browser', 'default'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       // Resolve latex-paper sub-exports directly (symlink in dev, copy in Docker).
@@ -108,6 +118,14 @@ export default defineConfig({
     port: VITE_PORT,
     host: '0.0.0.0',
     strictPort: true,
+    fs: {
+      // The `development` export condition resolves workspace-linked `@mkbabb/*`
+      // siblings to their `src/`; Vite serves those src-relative assets over the
+      // `/@fs/` channel, which requires the sibling roots inside `fs.allow`.
+      // `../..` covers the `words/` repo root and its `@mkbabb/*` siblings one
+      // level up (glass-ui, keyframes.js, ...).
+      allow: ['..', '../..'],
+    },
     hmr: {
       clientPort: VITE_PORT,
       host: 'localhost',
@@ -187,4 +205,4 @@ export default defineConfig({
     // Pre-bundle dependencies for faster cold starts
     include: ['vue', 'vue-router', 'pinia'],
   },
-});
+}));
