@@ -8,7 +8,7 @@
                 ? 'border-2 border-[var(--color-gold)] bg-[var(--color-gold)]/8 backdrop-blur-sm'
                 : searchBar.hasErrorAnimation
                   ? 'border-2 border-destructive/50 bg-gradient-to-br from-destructive/8 to-destructive/4'
-                  : 'glass-elevated border-2 border-border',
+                  : 'glass-floating border-2 border-border',
             {
                 'shadow-cartoon-sm-hover': containerHovered,
                 'bg-background/95': containerHovered && !searchBar.isAIQuery,

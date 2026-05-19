@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-background">
     <!-- Header -->
-    <div class="border-b border-border glass-elevated">
+    <div class="border-b border-border glass-floating">
       <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
         <div class="flex items-center gap-3">
           <router-link to="/" class="text-muted-foreground hover:text-foreground transition-colors">

@@ -6,7 +6,7 @@
         class="fixed top-6 left-6 right-6 z-toast max-w-md mx-auto"
       >
         <div
-          class="shadow-cartoon-md rounded-2xl glass-elevated
+          class="shadow-cartoon-md rounded-2xl glass-floating
                  border-2 border-border p-6 space-y-4 texture-paper-clean
                  hover-lift transition-smooth"
         >

@@ -7,7 +7,7 @@
             <div
                 v-if="version"
                 :key="version.version"
-                class="rounded-xl glass-elevated p-6 shadow-cartoon-lg"
+                class="rounded-xl glass-floating p-6 shadow-cartoon-lg"
             >
                 <!-- Header -->
                 <div class="flex items-center gap-2">

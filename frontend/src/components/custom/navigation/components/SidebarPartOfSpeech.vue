@@ -24,7 +24,7 @@
         </HoverCardTrigger>
         <HoverCardContent
             :class="cn(
-                'themed-hovercard z-hovercard w-80 glass-elevated bg-background/96 shadow-cartoon-lg',
+                'themed-hovercard z-hovercard w-80 glass-floating bg-background/96 shadow-cartoon-lg',
                 cardVariant !== 'default' ? 'shadow-cartoon-sm' : ''
             )"
             :data-theme="cardVariant || 'default'"

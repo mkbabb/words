@@ -4,7 +4,7 @@
     <aside
       data-sidebar
       :class="cn(
-        'glass-elevated fixed top-0 left-0 z-overlay hidden h-full flex-col overflow-clip rounded-r-2xl shadow-cartoon-lg transform-gpu lg:flex',
+        'glass-floating fixed top-0 left-0 z-overlay hidden h-full flex-col overflow-clip rounded-r-2xl shadow-cartoon-lg transform-gpu lg:flex',
         sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar-expanded'
       )"
     >

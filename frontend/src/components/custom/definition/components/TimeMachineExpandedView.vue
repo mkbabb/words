@@ -3,7 +3,7 @@
         <!-- Back button header -->
         <div class="mb-3 flex items-center gap-3">
             <button
-                class="flex h-8 items-center gap-1.5 rounded-lg glass-default px-3 text-xs text-muted-foreground transition-colors hover:bg-background/95 hover:text-foreground"
+                class="flex h-8 items-center gap-1.5 rounded-lg glass-quiet px-3 text-xs text-muted-foreground transition-colors hover:bg-background/95 hover:text-foreground"
                 @click="$emit('collapse')"
             >
                 <ChevronLeft :size="14" />
@@ -33,7 +33,7 @@
 
         <!-- Scrollable entry content — uses the same renderer as DefinitionDisplay -->
         <div
-            class="flex-1 overflow-y-auto rounded-xl glass-elevated shadow-cartoon-lg scrollbar-thin"
+            class="flex-1 overflow-y-auto rounded-xl glass-floating shadow-cartoon-lg scrollbar-thin"
         >
             <DefinitionContentRenderer
                 v-if="hydratedEntry"

@@ -85,7 +85,7 @@
                         <Info class="h-3 w-3" />
                     </button>
                 </PopoverTrigger>
-                <PopoverContent class="w-52 rounded-xl glass-elevated p-3 shadow-cartoon-lg" side="left" :side-offset="8">
+                <PopoverContent class="w-52 rounded-xl glass-floating p-3 shadow-cartoon-lg" side="left" :side-offset="8">
                     <p class="mb-2 text-xs font-semibold text-muted-foreground">Match Details</p>
                     <div class="space-y-1.5">
                         <div

@@ -1,7 +1,7 @@
 <template>
     <HoverCardContent
         :class="cn(
-            'themed-hovercard z-hovercard max-w-[min(384px,90vw)] w-96 glass-elevated bg-background/96 shadow-cartoon-lg',
+            'themed-hovercard z-hovercard max-w-[min(384px,90vw)] w-96 glass-floating bg-background/96 shadow-cartoon-lg',
             variant !== 'default' ? 'shadow-cartoon-sm' : ''
         )"
         :data-theme="variant || 'default'"
