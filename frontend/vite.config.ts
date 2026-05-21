@@ -173,7 +173,7 @@ export default defineConfig(() => ({
     minify: 'esbuild',
     reportCompressedSize: false, // Faster builds
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
