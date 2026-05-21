@@ -15,15 +15,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/components/*": ["src/components/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/stores/*": ["src/stores/*"],
-      "@/composables/*": ["src/composables/*"],
-      "@/types/*": ["src/types/*"],
-      "@/assets/*": ["src/assets/*"]
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/utils/*": ["./src/utils/*"],
+      "@/stores/*": ["./src/stores/*"],
+      "@/composables/*": ["./src/composables/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/assets/*": ["./src/assets/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
