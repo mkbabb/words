@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { Info } from 'lucide-vue-next';
+import { Info } from '@lucide/vue';
 import { SearchMethod } from '@/types/api';
 import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui';
 import { formatCount } from '@/components/custom/wordlist/utils/formatting';

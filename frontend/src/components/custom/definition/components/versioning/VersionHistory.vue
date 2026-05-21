@@ -166,7 +166,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { X, Eye, RotateCcw } from 'lucide-vue-next';
+import { X, Eye, RotateCcw } from '@lucide/vue';
 import { Button, Badge } from '@mkbabb/glass-ui';
 import { useAuthStore } from '@/stores/auth';
 import { versionsApi } from '@/api';

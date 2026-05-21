@@ -68,7 +68,7 @@ import {
     onUnmounted,
     type PropType,
 } from 'vue';
-import { RefreshCw, Edit2 } from 'lucide-vue-next';
+import { RefreshCw, Edit2 } from '@lucide/vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
 
 const props = defineProps({

@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CheckCircle2, XCircle, Info, AlertTriangle } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, Info, AlertTriangle } from '@lucide/vue';
 import { useNotifications, type Notification } from '@/stores/composables/useNotifications';
 
 const notifications = useNotifications();

@@ -4,7 +4,7 @@ import {
     DictionaryIcon,
     AppleIcon,
 } from '@/components/custom/icons';
-import { Globe, Languages } from 'lucide-vue-next';
+import { Globe, Languages } from '@lucide/vue';
 import type { SourceConfig, LanguageConfig } from '../types';
 
 // Type safe sources configuration

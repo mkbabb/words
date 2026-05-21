@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Clock, Flame, RotateCcw, Tag } from 'lucide-vue-next';
+import { Clock, Flame, RotateCcw, Tag } from '@lucide/vue';
 import { DEFAULT_WORDLIST_FILTERS } from '@/stores/types/constants';
 import WordListSortBuilder from '../../../wordlist/sorting/WordListSortBuilder.vue';
 import DashboardSortBuilder from '../../../wordlist/sorting/DashboardSortBuilder.vue';

@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Share2, Download, Minus, CheckCircle2 } from 'lucide-vue-next';
+import { Share2, Download, Minus, CheckCircle2 } from '@lucide/vue';
 import { STAGGER_SLOW } from '@/utils/animations';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStores } from '@/stores';

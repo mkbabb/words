@@ -157,7 +157,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
-import { FileText, Plus, Search, Upload } from 'lucide-vue-next';
+import { FileText, Plus, Search, Upload } from '@lucide/vue';
 import { Button } from '@mkbabb/glass-ui';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/modals/WordListUploadModal.vue';

@@ -107,7 +107,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { 
-  Copy, Download, Edit2, MoreVertical, Trash2, } from 'lucide-vue-next';
+  Copy, Download, Edit2, MoreVertical, Trash2, } from '@lucide/vue';
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from '@mkbabb/glass-ui';
 import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 import type { WordList } from '@/types';

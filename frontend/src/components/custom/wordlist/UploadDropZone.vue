@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Info, Upload } from 'lucide-vue-next';
+import { Info, Upload } from '@lucide/vue';
 
 defineProps<{
     uploadedFiles: File[];

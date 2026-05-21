@@ -37,7 +37,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Volume2, VolumeX, Loader2 } from 'lucide-vue-next';
+import { Volume2, VolumeX, Loader2 } from '@lucide/vue';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import type { AudioPlaybackState } from '../../composables/useAudioPlayback';
 

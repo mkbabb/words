@@ -103,7 +103,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ChevronRight, MoreVertical, Pencil, Tag, Trash2 } from 'lucide-vue-next';
+import { ChevronRight, MoreVertical, Pencil, Tag, Trash2 } from '@lucide/vue';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, Button } from '@mkbabb/glass-ui';
 import { ThemedCard } from '@/components/custom/card';
 import MasteryBar from './MasteryBar.vue';

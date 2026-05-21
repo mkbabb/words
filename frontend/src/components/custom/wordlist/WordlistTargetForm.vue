@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown } from '@lucide/vue';
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@mkbabb/glass-ui';
 import { Input } from '@mkbabb/glass-ui/forms';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';

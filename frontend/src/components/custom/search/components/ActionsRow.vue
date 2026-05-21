@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot, Lock } from 'lucide-vue-next';
+import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot, Lock } from '@lucide/vue';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import ActionButton from './ActionButton.vue';
 import { useStores } from '@/stores';

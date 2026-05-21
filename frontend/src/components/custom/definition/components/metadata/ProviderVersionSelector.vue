@@ -140,7 +140,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { X, Check, Loader2 } from 'lucide-vue-next';
+import { X, Check, Loader2 } from '@lucide/vue';
 import { Button, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@mkbabb/glass-ui';
 import { versionsApi } from '@/api';
 import { providersApi } from '@/api/providers';

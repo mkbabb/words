@@ -146,7 +146,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue';
-import { X, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { X, ChevronLeft, ChevronRight } from '@lucide/vue';
 import TimeMachineVersionCard from '../TimeMachineVersionCard.vue';
 import TimeMachineTimeline from '../TimeMachineTimeline.vue';
 import TimeMachineExpandedView from '../TimeMachineExpandedView.vue';

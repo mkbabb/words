@@ -124,7 +124,7 @@ import { useStores } from '@/stores';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
-import { FileText, LayoutDashboard } from 'lucide-vue-next';
+import { FileText, LayoutDashboard } from '@lucide/vue';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
 import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';

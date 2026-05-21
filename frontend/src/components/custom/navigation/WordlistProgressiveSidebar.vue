@@ -190,7 +190,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { ChevronDown, ChevronLeft, Clock, Filter, Flame, RotateCcw, Tag } from 'lucide-vue-next';
+import { ChevronDown, ChevronLeft, Clock, Filter, Flame, RotateCcw, Tag } from '@lucide/vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { DEFAULT_WORDLIST_FILTERS } from '@/stores/types/constants';

@@ -1,7 +1,7 @@
 import type { Component } from 'vue';
 import type { Definition } from '@/types/api';
 import { PROVIDER_CONFIG } from '../constants/providers';
-import { RefreshCw } from 'lucide-vue-next';
+import { RefreshCw } from '@lucide/vue';
 
 /**
  * Gets the display name for a provider

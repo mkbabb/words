@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue';
 import { computed } from 'vue';
-import { X, AlertTriangle, Check, Zap } from 'lucide-vue-next';
+import { X, AlertTriangle, Check, Zap } from '@lucide/vue';
 import type { DueWordItem, SM2Quality } from '@/types/wordlist';
 import {
   formatInterval,

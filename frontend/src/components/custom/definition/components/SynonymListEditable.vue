@@ -92,7 +92,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue';
-import { Edit2, X, Plus, RefreshCw } from 'lucide-vue-next';
+import { Edit2, X, Plus, RefreshCw } from '@lucide/vue';
 
 interface Props {
     synonyms: string[];

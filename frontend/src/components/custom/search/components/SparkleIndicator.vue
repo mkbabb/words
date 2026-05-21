@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkles } from 'lucide-vue-next';
+import { Sparkles } from '@lucide/vue';
 
 interface SparkleIndicatorProps {
     show: boolean;

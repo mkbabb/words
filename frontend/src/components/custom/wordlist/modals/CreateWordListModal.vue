@@ -213,7 +213,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { Modal } from '@/components/custom';
 import { Button } from '@mkbabb/glass-ui';
 import { Input } from '@mkbabb/glass-ui/forms';

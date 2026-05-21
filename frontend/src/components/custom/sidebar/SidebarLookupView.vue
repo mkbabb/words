@@ -105,7 +105,7 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useRouter } from 'vue-router';
 import { Accordion } from '@mkbabb/glass-ui';
-import { Plus, Search, Sparkles } from 'lucide-vue-next';
+import { Plus, Search, Sparkles } from '@lucide/vue';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
 import RecentItem from './RecentItem.vue';

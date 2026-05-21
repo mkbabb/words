@@ -225,7 +225,7 @@
 import { computed, ref, toRef, watch } from 'vue';
 import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
 import { StackedIconGroup } from '@mkbabb/glass-ui/stacked-icons';
-import { Plus } from 'lucide-vue-next';
+import { Plus } from '@lucide/vue';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './media/AudioPlaybackButton.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';

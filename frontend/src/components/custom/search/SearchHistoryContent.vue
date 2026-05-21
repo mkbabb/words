@@ -103,7 +103,7 @@ import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { formatDate } from '@/utils';
 import { cn } from '@mkbabb/glass-ui';
-import { History } from 'lucide-vue-next';
+import { History } from '@lucide/vue';
 import SearchHistoryItem from './SearchHistoryItem.vue';
 
 interface Props {

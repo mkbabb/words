@@ -113,7 +113,7 @@ import {
     Eye,
     Clock,
     Type,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 
 import type { AdvancedSortCriterion, SortField, SortOption } from '@/types';
 

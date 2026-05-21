@@ -48,7 +48,7 @@
 
 <script setup lang="ts">
 import { Button } from '@mkbabb/glass-ui';
-import { Lightbulb } from 'lucide-vue-next';
+import { Lightbulb } from '@lucide/vue';
 import heartBubble from '@/assets/yoshi/ui/heart_speech_bubble.png';
 
 interface EmptyStateProps {

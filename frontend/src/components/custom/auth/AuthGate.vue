@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Lock } from 'lucide-vue-next';
+import { Lock } from '@lucide/vue';
 import { useAuthStore } from '@/stores/auth';
 
 interface Props {

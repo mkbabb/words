@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from '@lucide/vue'
 
 interface Props {
   loading?: boolean

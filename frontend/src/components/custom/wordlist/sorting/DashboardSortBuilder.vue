@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { Clock, Type, BarChart3, Trophy } from 'lucide-vue-next';
+import { Clock, Type, BarChart3, Trophy } from '@lucide/vue';
 import { markRaw, type Component } from 'vue';
 
 withDefaults(defineProps<{

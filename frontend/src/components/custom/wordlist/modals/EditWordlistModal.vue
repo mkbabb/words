@@ -152,7 +152,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { Modal } from '@/components/custom';
 import { Button, Label, useToast } from '@mkbabb/glass-ui';
 import { Input, Textarea } from '@mkbabb/glass-ui/forms';

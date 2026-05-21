@@ -203,7 +203,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, RefreshCw, User, Users, Database, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, RefreshCw, User, Users, Database, Trash2 } from '@lucide/vue';
 import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { lookupApi } from '@/api/lookup';

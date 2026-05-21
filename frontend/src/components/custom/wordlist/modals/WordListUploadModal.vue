@@ -153,7 +153,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from 'vue';
-import { ChevronLeft, X } from 'lucide-vue-next';
+import { ChevronLeft, X } from '@lucide/vue';
 import { Modal } from '@/components/custom';
 import { Button } from '@mkbabb/glass-ui';
 import { LoadingProgress } from '@/components/custom/loading';

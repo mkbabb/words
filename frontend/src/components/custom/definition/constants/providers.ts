@@ -4,7 +4,7 @@ import {
     OxfordIcon,
     DictionaryIcon,
 } from '@/components/custom/icons';
-import { RefreshCw } from 'lucide-vue-next';
+import { RefreshCw } from '@lucide/vue';
 import type { Component } from 'vue';
 
 export interface ProviderConfig {

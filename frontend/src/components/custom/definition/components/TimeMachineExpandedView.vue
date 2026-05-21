@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, RotateCcw } from 'lucide-vue-next';
+import { ChevronLeft, RotateCcw } from '@lucide/vue';
 import { Badge, Button } from '@mkbabb/glass-ui';
 import DefinitionContentRenderer from './content/DefinitionContentRenderer.vue';
 import { useAuthStore } from '@/stores/auth';

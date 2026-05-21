@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { LogIn, LogOut, Shield } from 'lucide-vue-next';
+import { LogIn, LogOut, Shield } from '@lucide/vue';
 import { YoshiAvatar } from '@/components/custom/sidebar';
 import { useClerk } from '@clerk/vue';
 import { useAuthStore } from '@/stores/auth';

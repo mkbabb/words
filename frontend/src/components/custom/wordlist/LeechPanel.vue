@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Skull, Ban, Play } from 'lucide-vue-next';
+import { Skull, Ban, Play } from '@lucide/vue';
 import { api } from '@/api/core';
 import type { WordListItem } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@mkbabb/glass-ui';

@@ -115,7 +115,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { X, Plus, FileText, Loader2 } from 'lucide-vue-next';
+import { X, Plus, FileText, Loader2 } from '@lucide/vue';
 import { Button } from '@mkbabb/glass-ui';
 import Modal from '@/components/custom/Modal.vue';
 import CreateWordListModal from '../../wordlist/modals/CreateWordListModal.vue';

@@ -79,7 +79,7 @@ import { cn } from '@mkbabb/glass-ui';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
 import { DarkModeToggle } from '@mkbabb/glass-ui/controls';
 import { Popover, PopoverTrigger, PopoverContent, Avatar, AvatarImage, Button } from '@mkbabb/glass-ui';
-import { PanelRight } from 'lucide-vue-next';
+import { PanelRight } from '@lucide/vue';
 
 interface Props {
     collapsed: boolean;

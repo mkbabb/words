@@ -91,7 +91,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
-import { BookOpen, LayoutDashboard, ListChecks, PanelLeft, Sparkles } from 'lucide-vue-next';
+import { BookOpen, LayoutDashboard, ListChecks, PanelLeft, Sparkles } from '@lucide/vue';
 
 const modeIcons: Record<string, any> = {
     lookup: BookOpen,

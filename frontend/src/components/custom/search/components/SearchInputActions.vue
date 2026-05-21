@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { Maximize2, X } from 'lucide-vue-next';
+import { Maximize2, X } from '@lucide/vue';
 import { Button } from '@mkbabb/glass-ui';
 
 defineProps<{

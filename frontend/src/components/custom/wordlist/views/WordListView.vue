@@ -229,7 +229,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue';
 import { useStores } from '@/stores';
-import { Plus, Trash2, Upload, X, ListChecks, CheckSquare } from 'lucide-vue-next';
+import { Plus, Trash2, Upload, X, ListChecks, CheckSquare } from '@lucide/vue';
 import { Button, Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@mkbabb/glass-ui';
 import { GlassDock, DockIconButton } from '@mkbabb/glass-ui/dock';
 import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';

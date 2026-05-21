@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { Flame } from 'lucide-vue-next';
+import { Flame } from '@lucide/vue';
 import type { WordList } from '@/types';
 import { formatCount } from './utils/formatting';
 

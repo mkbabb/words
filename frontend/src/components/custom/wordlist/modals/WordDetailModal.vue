@@ -147,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { BookOpen, Edit2, Flame, Snowflake, Trash2, X } from 'lucide-vue-next';
+import { BookOpen, Edit2, Flame, Snowflake, Trash2, X } from '@lucide/vue';
 import {
   Dialog,
   DialogContent,

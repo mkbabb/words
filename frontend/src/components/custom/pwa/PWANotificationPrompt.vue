@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Bell, X, Sparkles, BookOpen, Clock, Info } from 'lucide-vue-next';
+import { Bell, X, Sparkles, BookOpen, Clock, Info } from '@lucide/vue';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStores } from '@/stores';
 

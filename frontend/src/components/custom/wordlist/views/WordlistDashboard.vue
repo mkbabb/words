@@ -161,7 +161,7 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { wordlistApi } from '@/api/wordlists';
-import { Plus, BookOpen, Flame } from 'lucide-vue-next';
+import { Plus, BookOpen, Flame } from '@lucide/vue';
 import { useToast } from '@mkbabb/glass-ui';
 import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 
