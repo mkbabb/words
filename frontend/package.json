@@ -16,8 +16,8 @@
   "dependencies": {
     "@clerk/vue": "^1.17.18",
     "@lucide/vue": "^1.16.0",
-    "@mkbabb/glass-ui": "file:../../glass-ui",
-    "@mkbabb/keyframes.js": "file:../../keyframes.js",
+    "@mkbabb/glass-ui": "^2.0.0",
+    "@mkbabb/keyframes.js": "^2.1.1",
     "@mkbabb/latex-paper": "file:./latex-paper",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/vue-virtual": "^3.13.24",
