@@ -24,12 +24,14 @@ export default defineConfig(() => ({
     conditions: ['module', 'browser', 'default'],
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Resolve latex-paper sub-exports directly (symlink in dev, copy in Docker).
-      // Tailwind CSS v4 doesn't resolve package.json exports maps, so each
-      // sub-path needs an explicit alias. More specific paths must come first.
-      '@mkbabb/latex-paper/theme': path.resolve(__dirname, './latex-paper/src/vue/theme.css'),
-      '@mkbabb/latex-paper/vue': path.resolve(__dirname, './latex-paper/src/vue/index.ts'),
-      '@mkbabb/latex-paper': path.resolve(__dirname, './latex-paper/src/index.ts'),
+      // Tailwind CSS v4 doesn't resolve package.json exports maps, so the
+      // CSS-only `/theme` sub-path needs an explicit alias into the published
+      // `@mkbabb/latex-paper` package. The JS sub-exports (`.` + `/vue`)
+      // resolve natively through the exports map — no alias required.
+      '@mkbabb/latex-paper/theme': path.resolve(
+        __dirname,
+        '../node_modules/@mkbabb/latex-paper/src/vue/theme.css',
+      ),
     },
   },
   publicDir: 'public',

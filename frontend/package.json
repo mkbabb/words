@@ -18,7 +18,7 @@
     "@lucide/vue": "^1.16.0",
     "@mkbabb/glass-ui": "^2.0.0",
     "@mkbabb/keyframes.js": "^2.1.1",
-    "@mkbabb/latex-paper": "file:./latex-paper",
+    "@mkbabb/latex-paper": "^0.2.1",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/vue-virtual": "^3.13.24",
     "@vueuse/core": "^14.3.0",
