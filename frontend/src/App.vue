@@ -15,7 +15,8 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
-import { Toaster, TooltipProvider } from '@mkbabb/glass-ui';
+import { Toaster } from '@mkbabb/glass-ui/toast';
+import { TooltipProvider } from '@mkbabb/glass-ui/tooltip';
 import { useGlobalDark } from '@mkbabb/glass-ui/dark';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';

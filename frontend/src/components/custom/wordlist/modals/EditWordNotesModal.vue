@@ -42,15 +42,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-    Button,
-} from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@mkbabb/glass-ui/dialog';
 import { Textarea } from '@mkbabb/glass-ui/forms';
 import type { WordListItem } from '@/types';
 

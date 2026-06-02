@@ -4,7 +4,7 @@ import { useStores } from '@/stores';
 import { useDebounceFn } from '@vueuse/core';
 import type { WordListItem, WordList } from '@/types';
 import { wordlistApi } from '@/api';
-import { useToast } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui/toast';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useWordlistSearch } from '@/components/custom/search/composables/useWordlistSearch';

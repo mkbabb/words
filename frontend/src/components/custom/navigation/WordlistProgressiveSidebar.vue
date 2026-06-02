@@ -191,7 +191,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ChevronDown, ChevronLeft, Clock, Filter, Flame, RotateCcw, Tag } from '@lucide/vue';
-import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@mkbabb/glass-ui/popover';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { DEFAULT_WORDLIST_FILTERS } from '@/stores/types/constants';
 import WordListSortBuilder from '@/components/custom/wordlist/sorting/WordListSortBuilder.vue';

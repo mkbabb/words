@@ -54,7 +54,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
-import { CSSKeyframesAnimation } from '@mkbabb/keyframes.js';
+import { loadAnimationEngine } from '@mkbabb/keyframes.js';
+import type { CSSKeyframesAnimation } from '@mkbabb/keyframes.js';
 import type { LookupMode, ComponentSize } from '@/types';
 
 interface FancyFProps {
@@ -111,9 +112,10 @@ const hasAnimatedIn = ref(false);
 let breathingAnimations: CSSKeyframesAnimation<any>[] = [];
 
 // Bounce-in entrance on first show
-watch(() => props.showSubscript, (visible) => {
+watch(() => props.showSubscript, async (visible) => {
   if (visible && !hasAnimatedIn.value && subscriptWrapper.value) {
     hasAnimatedIn.value = true;
+    const { CSSKeyframesAnimation } = await loadAnimationEngine();
     const anim = new CSSKeyframesAnimation<any>({ duration: 500, fillMode: 'forwards' }, subscriptWrapper.value);
     anim.fromKeyframes({
       '0%': { transform: 'scale(0)', opacity: '0' },
@@ -125,9 +127,12 @@ watch(() => props.showSubscript, (visible) => {
 });
 
 // Squash → overshoot → settle on click
-const handleClick = () => {
+const handleClick = async () => {
   if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
 
+  emit('toggle-mode');
+
+  const { CSSKeyframesAnimation } = await loadAnimationEngine();
   [fancyFMain.value, fancyFSubscript.value].forEach((el, i) => {
     const anim = new CSSKeyframesAnimation<any>({ duration: 800, delay: i * 30, fillMode: 'forwards' }, el);
     anim.fromKeyframes({
@@ -138,14 +143,13 @@ const handleClick = () => {
     });
     anim.play();
   });
-
-  emit('toggle-mode');
 };
 
 // Subtle breathing animation (infinite)
-const startBreathingAnimation = () => {
+const startBreathingAnimation = async () => {
   if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
 
+  const { CSSKeyframesAnimation } = await loadAnimationEngine();
   breathingAnimations = [fancyFMain.value, fancyFSubscript.value].map((el, i) => {
     const anim = new CSSKeyframesAnimation<any>(
       { duration: 4000, iterationCount: Infinity, delay: i * 100 },

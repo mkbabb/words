@@ -162,7 +162,7 @@ import { useAuthStore } from '@/stores/auth';
 import { usersApi } from '@/api/users';
 import { wordlistApi } from '@/api/wordlists';
 import { Plus, BookOpen, Flame } from '@lucide/vue';
-import { useToast } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui/toast';
 import { ConfirmDialog } from '@mkbabb/glass-ui/confirm-dialog';
 
 import WordlistGrid from '../WordlistGrid.vue';

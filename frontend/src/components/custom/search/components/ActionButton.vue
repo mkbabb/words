@@ -17,7 +17,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Button, type ButtonVariants } from '@mkbabb/glass-ui';
+import { Button, type ButtonVariants } from '@mkbabb/glass-ui/button';
 
 type Variant = 'default' | 'primary' | 'danger' | 'secondary';
 

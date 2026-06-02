@@ -114,7 +114,8 @@
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useStores } from '@/stores';
-import { Button, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui/tooltip';
 import { BouncyToggle } from '@mkbabb/glass-ui/tabs';
 import ActionsRow from '../ActionsRow.vue';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../../constants/sources';

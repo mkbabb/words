@@ -223,7 +223,7 @@ import { useContentStore } from '@/stores';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import { PAPER_CONTEXT, useKatex, createRenderTitle } from '@mkbabb/latex-paper/vue';
 import {
     WordHeader,

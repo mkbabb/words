@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { Maximize2, X } from '@lucide/vue';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 
 defineProps<{
     aiMode: boolean;

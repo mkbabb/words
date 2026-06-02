@@ -200,7 +200,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import { ThemedCard } from '@/components/custom/card';
 import { formatCount } from '../utils/formatting';
 import type { ParsedWord } from '../composables/useWordlistFileParser';

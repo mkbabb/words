@@ -119,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
 import { cn } from '@mkbabb/glass-ui';
 import type { GroupedDefinition } from '../../types';
 import type { CardVariant } from '@/types';

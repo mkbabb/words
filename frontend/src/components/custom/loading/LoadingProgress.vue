@@ -133,7 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
 import { getDefaultStages, getCheckpointDescription } from './pipeline-stages';
 import { logger } from '@/utils/logger';
 

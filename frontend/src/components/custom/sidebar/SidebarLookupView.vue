@@ -113,7 +113,7 @@ import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import { useVocabularySuggestions } from '@/composables/useVocabularySuggestions';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { wordlistApi } from '@/api';
-import { useToast } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui/toast';
 import type { SynthesizedDictionaryEntry } from '@/types';
 import { logger } from '@/utils/logger';
 

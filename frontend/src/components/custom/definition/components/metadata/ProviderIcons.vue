@@ -194,7 +194,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Wand2, Info } from '@lucide/vue';
-import { Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Popover, PopoverTrigger, PopoverContent } from '@mkbabb/glass-ui/popover';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui/tooltip';
 import { StackedIconGroup } from '@mkbabb/glass-ui/stacked-icons';
 import {
     getProviderIcon,

@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Volume2, VolumeX, Loader2 } from '@lucide/vue';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui/tooltip';
 import type { AudioPlaybackState } from '../../composables/useAudioPlayback';
 
 const props = withDefaults(defineProps<{

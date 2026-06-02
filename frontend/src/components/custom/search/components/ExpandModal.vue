@@ -43,7 +43,8 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
-import { Button, Dialog, DialogContent } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Dialog, DialogContent } from '@mkbabb/glass-ui/dialog';
 import { Textarea } from '@mkbabb/glass-ui/forms';
 
 interface ExpandModalProps {

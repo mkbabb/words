@@ -223,7 +223,10 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
-import { CardHeader, CardTitle, HoverCard, HoverCardContent, HoverCardTrigger, Popover, PopoverTrigger, PopoverContent, Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { CardHeader, CardTitle } from '@mkbabb/glass-ui/card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
+import { Popover, PopoverTrigger, PopoverContent } from '@mkbabb/glass-ui/popover';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui/tooltip';
 import { StackedIconGroup } from '@mkbabb/glass-ui/stacked-icons';
 import { Plus } from '@lucide/vue';
 import AnimatedTitle from './AnimatedTitle.vue';

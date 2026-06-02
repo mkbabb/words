@@ -98,7 +98,8 @@ const modeIcons: Record<string, any> = {
     wordlist: ListChecks,
     stage: Sparkles,
 };
-import { Button, Tabs, TabsList, TabsTrigger } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@mkbabb/glass-ui';
 
 const modes = [
     { label: 'Lookup', value: 'lookup' },

@@ -144,7 +144,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, provide } from 'vue';
 import { EnsureTargetWindowKey } from '../../constants';
-import { CardContent } from '@mkbabb/glass-ui';
+import { CardContent } from '@mkbabb/glass-ui/card';
 import {
     DefinitionCluster,
     DefinitionItem,

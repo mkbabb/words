@@ -81,7 +81,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from 'vue';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import yoshiYellowStanding from '@/assets/yoshi/standing/yoshi_yellow_standing.png';
 import Modal from '@/components/custom/Modal.vue';
 import ReviewCard from './ReviewCard.vue';

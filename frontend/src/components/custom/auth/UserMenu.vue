@@ -70,7 +70,7 @@ import { useClerk } from '@clerk/vue';
 import { useAuthStore } from '@/stores/auth';
 import { cn } from '@mkbabb/glass-ui';
 import RoleBadge from './RoleBadge.vue';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@mkbabb/glass-ui';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@mkbabb/glass-ui/dropdown-menu';
 
 interface Props {
   collapsed?: boolean;

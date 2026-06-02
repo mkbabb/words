@@ -1,7 +1,7 @@
 import { ref, computed, watch, type Ref } from 'vue';
 import { wordlistApi } from '@/api';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
-import { useToast } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui/toast';
 import { logger } from '@/utils/logger';
 import type { WordList } from '@/types';
 

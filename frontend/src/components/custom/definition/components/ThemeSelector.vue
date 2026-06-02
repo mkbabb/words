@@ -140,7 +140,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Edit2, Check, History, RefreshCw, Layers, ImagePlus } from '@lucide/vue';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@mkbabb/glass-ui/tooltip';
 import { GlassDock, DockIconButton } from '@mkbabb/glass-ui/dock';
 import { CARD_THEMES } from '../constants';
 import { useAuthStore } from '@/stores/auth';

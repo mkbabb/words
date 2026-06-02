@@ -141,7 +141,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { X, Check, Loader2 } from '@lucide/vue';
-import { Button, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@mkbabb/glass-ui/select';
 import { versionsApi } from '@/api';
 import { providersApi } from '@/api/providers';
 import type { VersionSummary, SourceVersionSpec } from '@/types/api';

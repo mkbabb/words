@@ -155,7 +155,7 @@
 import { computed, toRef } from 'vue';
 import { ChevronLeft, X } from '@lucide/vue';
 import { Modal } from '@/components/custom';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import { LoadingProgress } from '@/components/custom/loading';
 import UploadDropZone from '../UploadDropZone.vue';
 import WordPreviewList from '../cards/WordPreviewList.vue';

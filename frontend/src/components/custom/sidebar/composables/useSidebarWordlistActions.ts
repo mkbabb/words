@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { wordlistApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
-import { useToast } from '@mkbabb/glass-ui';
+import { useToast } from '@mkbabb/glass-ui/toast';
 import { useWordlistCache } from '@/composables/useWordlistCache';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';

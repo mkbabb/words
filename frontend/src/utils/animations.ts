@@ -1,6 +1,4 @@
-/** Centralized animation utilities using @mkbabb/keyframes.js */
-
-import { CSSKeyframesAnimation } from '@mkbabb/keyframes.js';
+/** Centralized animation utilities — gradients, temperature mapping, stagger tokens. */
 
 /** Timing presets */
 export const DURATION = {
@@ -9,15 +7,6 @@ export const DURATION = {
   slide: 250,
   bounce: 600,
 } as const;
-
-const animConfigs = {
-  instant: { duration: 150 },
-  fast: { duration: DURATION.release },
-  normal: { duration: 350 },
-  smooth: { duration: DURATION.slide },
-} as const;
-
-type AnimTiming = keyof typeof animConfigs;
 
 /** Stagger configurations for cascading animations */
 export const staggerConfig = {
@@ -33,102 +22,6 @@ export const animationStates = {
   visible: { opacity: '1', transform: 'translateY(0) scale(1)' },
   exit: { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
 } as const;
-
-/** Animate element visibility with slide+fade */
-export function animateVisibility(
-  element: HTMLElement,
-  show: boolean,
-  options: {
-    timing?: AnimTiming;
-    onComplete?: () => void;
-  } = {}
-): CSSKeyframesAnimation<any> | undefined {
-  const { timing = 'fast', onComplete } = options;
-  const config = animConfigs[timing];
-
-  const anim = new CSSKeyframesAnimation<any>({ duration: config.duration, fillMode: 'forwards' }, element);
-
-  if (show) {
-    element.style.display = 'block';
-    anim.fromVars([
-      { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
-      { opacity: '1', transform: 'translateY(0) scale(1)' },
-    ]);
-  } else {
-    anim.fromVars([
-      { opacity: '1', transform: 'translateY(0) scale(1)' },
-      { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
-    ]);
-  }
-
-  anim.play().then(() => {
-    if (!show) element.style.display = 'none';
-    onComplete?.();
-  });
-
-  return anim;
-}
-
-/** Animate container height to fit visible children */
-export function animateContainerHeight(
-  container: HTMLElement,
-  timing: AnimTiming = 'normal'
-): CSSKeyframesAnimation<any> {
-  const config = animConfigs[timing];
-  const children = Array.from(container.children) as HTMLElement[];
-
-  let totalHeight = 0;
-  children.forEach(child => {
-    if (child.style.display !== 'none' && child.style.opacity !== '0') {
-      totalHeight += child.offsetHeight + parseInt(getComputedStyle(child).marginBottom || '0');
-    }
-  });
-
-  const anim = new CSSKeyframesAnimation<any>({ duration: config.duration, fillMode: 'forwards' }, container);
-  anim.fromVars([
-    { height: `${container.offsetHeight}px` },
-    { height: `${totalHeight}px` },
-  ]);
-  anim.play();
-  return anim;
-}
-
-/** Simple fade-in animation */
-export function fadeTransition(
-  element: HTMLElement,
-  timing: AnimTiming = 'fast'
-): CSSKeyframesAnimation<any> {
-  const config = animConfigs[timing];
-  const anim = new CSSKeyframesAnimation<any>({ duration: config.duration, fillMode: 'forwards' }, element);
-  anim.fromVars([{ opacity: '0' }, { opacity: '1' }]);
-  anim.play();
-  return anim;
-}
-
-/** Auto-hide element after delay with fade-out */
-export function createAutoHide(
-  element: HTMLElement,
-  delay: number = 10000,
-  onHide?: () => void
-) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const start = () => {
-    cancel();
-    timer = setTimeout(() => {
-      animateVisibility(element, false, { onComplete: onHide });
-    }, delay);
-  };
-
-  const cancel = () => {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-
-  return { start, cancel };
-}
 
 // Dynamic rainbow gradient generator
 export function generateRainbowGradient(steps: number = 7): string {

@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@mkbabb/glass-ui/hover-card';
 import { cn } from '@mkbabb/glass-ui';
 import PartOfSpeechPreview from './PartOfSpeechPreview.vue';
 

@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CardContent } from '@mkbabb/glass-ui';
+import { CardContent } from '@mkbabb/glass-ui/card';
 import type { Etymology } from '@/types/api';
 import EditableField from './editing/EditableField.vue';
 import ContentBlockRenderer from './content/ContentBlockRenderer.vue';

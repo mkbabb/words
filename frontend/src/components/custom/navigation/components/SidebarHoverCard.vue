@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { HoverCardContent } from '@mkbabb/glass-ui';
+import { HoverCardContent } from '@mkbabb/glass-ui/hover-card';
 import { cn } from '@mkbabb/glass-ui';
 import type { SidebarCluster } from '../types';
 

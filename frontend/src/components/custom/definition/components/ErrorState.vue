@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import { RotateCcw, HelpCircle } from '@lucide/vue';
 import swirlIcon from '@/assets/yoshi/ui/swirl_icon.png';
 import sunIcon from '@/assets/yoshi/ui/sun_icon.png';

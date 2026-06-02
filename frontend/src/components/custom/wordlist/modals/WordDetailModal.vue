@@ -148,13 +148,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { BookOpen, Edit2, Flame, Snowflake, Trash2, X } from '@lucide/vue';
-import {
-  Dialog,
-  DialogContent,
-  DialogClose,
-  DialogTitle,
-  Button,
-} from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Dialog, DialogContent, DialogClose, DialogTitle } from '@mkbabb/glass-ui/dialog';
 import { wordlistApi } from '@/api';
 import type { WordListItem } from '@/types';
 import { formatRelativeTime } from '@/utils';

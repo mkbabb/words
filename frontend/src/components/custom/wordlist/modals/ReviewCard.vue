@@ -118,7 +118,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Button, Badge } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
+import { Button } from '@mkbabb/glass-ui/button';
 import { ThemedCard } from '@/components/custom/card';
 import type { DueWordItem, SM2Quality } from '@/types/wordlist';
 import type { SynthesizedDictionaryEntry } from '@/types';

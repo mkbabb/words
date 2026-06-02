@@ -167,7 +167,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { X, Eye, RotateCcw } from '@lucide/vue';
-import { Button, Badge } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
+import { Button } from '@mkbabb/glass-ui/button';
 import { useAuthStore } from '@/stores/auth';
 import { versionsApi } from '@/api';
 import VersionDiffViewer from './VersionDiffViewer.vue';

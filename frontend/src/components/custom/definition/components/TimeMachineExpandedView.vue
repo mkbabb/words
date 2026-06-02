@@ -71,7 +71,8 @@
 
 <script setup lang="ts">
 import { ChevronLeft, RotateCcw } from '@lucide/vue';
-import { Badge, Button } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
+import { Button } from '@mkbabb/glass-ui/button';
 import DefinitionContentRenderer from './content/DefinitionContentRenderer.vue';
 import { useAuthStore } from '@/stores/auth';
 import type { VersionSummary } from '@/types/api';

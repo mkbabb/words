@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { wordlistApi } from '@/api'
-import { useToast } from '@mkbabb/glass-ui'
-import { logger } from '@/utils/logger'
+import { useToast } from '@mkbabb/glass-ui/toast';import { logger } from '@/utils/logger'
 
 export function useSlugGeneration() {
   const { toast } = useToast()

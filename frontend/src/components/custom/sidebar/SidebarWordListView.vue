@@ -158,7 +158,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { FileText, Plus, Search, Upload } from '@lucide/vue';
-import { Button } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/modals/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/modals/CreateWordListModal.vue';

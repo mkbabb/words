@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { CardContent } from '@mkbabb/glass-ui';
+import { CardContent } from '@mkbabb/glass-ui/card';
 import type { SynonymChooser } from '@/types/api';
 
 defineProps<{

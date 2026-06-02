@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
 import { ShimmerText } from '@/components/custom/animation';
 import SidebarHoverCard from './SidebarHoverCard.vue';
 import SidebarPartOfSpeech from './SidebarPartOfSpeech.vue';

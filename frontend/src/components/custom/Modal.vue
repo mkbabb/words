@@ -18,9 +18,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Dialog, DialogContent } from '@mkbabb/glass-ui'
-
-interface Props {
+import { Dialog, DialogContent } from '@mkbabb/glass-ui/dialog';interface Props {
   modelValue: boolean
   closeOnBackdrop?: boolean
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl'

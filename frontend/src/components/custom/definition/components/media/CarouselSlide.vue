@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
 import type { ImageMedia } from '@/types/api';
 
 interface Props {

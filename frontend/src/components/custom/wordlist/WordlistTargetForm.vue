@@ -111,7 +111,8 @@
 
 <script setup lang="ts">
 import { ChevronDown } from '@lucide/vue';
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@mkbabb/glass-ui/dropdown-menu';
 import { Input } from '@mkbabb/glass-ui/forms';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import type { WordList } from '@/types';

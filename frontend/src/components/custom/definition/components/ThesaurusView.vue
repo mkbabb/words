@@ -185,7 +185,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useElementSize, useParentElement } from '@vueuse/core';
-import { Card, CardContent, Button, HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui';
+import { Button } from '@mkbabb/glass-ui/button';
+import { Card, CardContent } from '@mkbabb/glass-ui/card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@mkbabb/glass-ui/hover-card';
 import { Sparkles } from '@lucide/vue';
 import { cn } from '@mkbabb/glass-ui';
 import { getHeatmapClass } from '../utils/formatting';

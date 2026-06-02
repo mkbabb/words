@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Badge } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
 import type { EditMetadataSummary } from '@/types/api';
 import type { SynthesisAuditSummary } from '@/types/api/versions';
 

@@ -39,7 +39,8 @@
 </template>
 
 <script setup lang="ts">
-import { CardContent, Badge } from '@mkbabb/glass-ui';
+import { Badge } from '@mkbabb/glass-ui/badge';
+import { CardContent } from '@mkbabb/glass-ui/card';
 import type { Phrase } from '@/types/api';
 
 defineProps<{
